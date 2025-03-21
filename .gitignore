@@ -64,3 +64,6 @@ src/Makefile.package.settings-e
 
 #install
 InstallLammps*
+
+#OneAPI
+cmake/presets/oneapi-*
