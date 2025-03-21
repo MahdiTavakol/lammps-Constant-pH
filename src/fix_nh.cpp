@@ -40,9 +40,9 @@
 using namespace LAMMPS_NS;
 using namespace FixConst;
 
-#define DELTAFLIP 0.1
-#define TILTMAX 1.5
-#define EPSILON 1.0e-6
+static constexpr double DELTAFLIP = 0.1;
+static constexpr double TILTMAX = 1.5;
+static constexpr double EPSILON = 1.0e-6;
 
 enum{NOBIAS,BIAS};
 enum{NONE,XYZ,XY,YZ,XZ};
@@ -53,12 +53,9 @@ enum{ISO,ANISO,TRICLINIC};
  ---------------------------------------------------------------------- */
 
 FixNH::FixNH(LAMMPS *lmp, int narg, char **arg) :
-  Fix(lmp, narg, arg),
-  rfix(nullptr), id_dilate(nullptr), irregular(nullptr),
-  id_temp(nullptr), id_press(nullptr),
-  eta(nullptr), eta_dot(nullptr), eta_dotdot(nullptr),
-  eta_mass(nullptr), etap(nullptr), etap_dot(nullptr), etap_dotdot(nullptr),
-  etap_mass(nullptr)
+    Fix(lmp, narg, arg), id_dilate(nullptr), irregular(nullptr), step_respa(nullptr), id_temp(nullptr),
+    id_press(nullptr), eta(nullptr), eta_dot(nullptr), eta_dotdot(nullptr), eta_mass(nullptr),
+    etap(nullptr), etap_dot(nullptr), etap_dotdot(nullptr), etap_mass(nullptr)
 {
   if (narg < 4) utils::missing_cmd_args(FLERR, std::string("fix ") + style, error);
 
@@ -368,7 +365,7 @@ FixNH::FixNH(LAMMPS *lmp, int narg, char **arg) :
       iarg += 2;
     } else if (strcmp(arg[iarg],"lambda_andersen") == 0) {
       iarg+=2;
-    } else if (strcmp(arg[iarg],"lambda_bussi") == 0) {
+    } else if (strcmp(arg[iarg],"lambda_bossi") == 0) {
       iarg+=2;
     } else if (strcmp(arg[iarg],"lambda_nose-hoover") == 0) {
       iarg+=2;
@@ -459,10 +456,16 @@ FixNH::FixNH(LAMMPS *lmp, int narg, char **arg) :
     error->all(FLERR,"Invalid fix {} pressure settings", style);
 
   if (dipole_flag) {
-    if (!atom->sphere_flag)
-      error->all(FLERR,"Using update dipole flag requires atom style sphere");
-    if (!atom->mu_flag)
-      error->all(FLERR,"Using update dipole flag requires atom attribute mu");
+    if (strstr(style, "/sphere")) {
+      if (!atom->omega_flag)
+        error->all(FLERR,"Using update dipole flag requires atom attribute omega");
+      if (!atom->radius_flag)
+        error->all(FLERR,"Using update dipole flag requires atom attribute radius");
+      if (!atom->mu_flag)
+        error->all(FLERR,"Using update dipole flag requires atom attribute mu");
+    } else {
+      error->all(FLERR, "Must use a '/sphere' Nose-Hoover fix style for updating dipoles");
+    }
   }
 
   if ((tstat_flag && t_period <= 0.0) ||
@@ -578,8 +581,7 @@ FixNH::FixNH(LAMMPS *lmp, int narg, char **arg) :
     if (deviatoric_flag) size_vector += 1;
   }
 
-  nrigid = 0;
-  rfix = nullptr;
+
 
   if (pre_exchange_flag) irregular = new Irregular(lmp);
   else irregular = nullptr;
@@ -654,28 +656,38 @@ void FixNH::init()
 
   // ensure no conflict with fix deform
 
+
   if (pstat_flag)
-    for (int i = 0; i < modify->nfix; i++)
-      if (strcmp(modify->fix[i]->style,"deform") == 0) {
-        int *dimflag = (dynamic_cast<FixDeform *>(modify->fix[i]))->dimflag;
+    for (auto &ifix : modify->get_fix_by_style("^deform")) {
+      auto deform = dynamic_cast<FixDeform *>(ifix);
+      if (deform) {
+        int *dimflag = deform->dimflag;
         if ((p_flag[0] && dimflag[0]) || (p_flag[1] && dimflag[1]) ||
             (p_flag[2] && dimflag[2]) || (p_flag[3] && dimflag[3]) ||
             (p_flag[4] && dimflag[4]) || (p_flag[5] && dimflag[5]))
           error->all(FLERR,"Cannot use fix {} and fix deform on "
                      "same component of stress tensor", style);
       }
+    }
 
   // set temperature and pressure ptrs
 
   temperature = modify->get_compute_by_id(id_temp);
-  if (!temperature) error->all(FLERR,"Temperature ID {} for fix {} does not exist", id_temp, style);
-
-  if (temperature->tempbias) which = BIAS;
-  else which = NOBIAS;
+  if (!temperature) {
+    error->all(FLERR,"Temperature compute ID {} for fix {} does not exist", id_temp, style);
+  } else {
+    if (temperature->tempflag == 0)
+      error->all(FLERR, "Compute ID {} for fix {} does not compute a temperature", id_temp, style);
+    if (temperature->tempbias) which = BIAS;
+    else which = NOBIAS;
+  }
 
   if (pstat_flag) {
     pressure = modify->get_compute_by_id(id_press);
-    if (!pressure) error->all(FLERR,"Pressure ID {} for fix {} does not exist", id_press, style);
+    if (!pressure)
+      error->all(FLERR,"Pressure compute ID {} for fix {} does not exist", id_press, style);
+    if (pressure->pressflag == 0)
+      error->all(FLERR,"Compute ID {} for fix {} does not compute pressure", id_press, style);
   }
 
   // set timesteps and frequencies
@@ -726,26 +738,20 @@ void FixNH::init()
   else kspace_flag = 0;
 
   if (utils::strmatch(update->integrate_style,"^respa")) {
-    nlevels_respa = (dynamic_cast<Respa *>(update->integrate))->nlevels;
-    step_respa = (dynamic_cast<Respa *>(update->integrate))->step;
+    auto respa_ptr = dynamic_cast<Respa *>(update->integrate);
+    if (!respa_ptr) error->all(FLERR, "Failure to access Respa style {}", update->integrate_style);
+    nlevels_respa = respa_ptr->nlevels;
+    step_respa = respa_ptr->step;
     dto = 0.5*step_respa[0];
   }
 
   // detect if any rigid fixes exist so rigid bodies move when box is remapped
   // rfix[] = indices to each fix rigid
 
-  delete [] rfix;
-  nrigid = 0;
-  rfix = nullptr;
 
-  for (int i = 0; i < modify->nfix; i++)
-    if (modify->fix[i]->rigid_flag) nrigid++;
-  if (nrigid) {
-    rfix = new int[nrigid];
-    nrigid = 0;
-    for (int i = 0; i < modify->nfix; i++)
-      if (modify->fix[i]->rigid_flag) rfix[nrigid++] = i;
-  }
+  rfix.clear();
+  for (auto &ifix : modify->get_fix_list())
+    if (ifix->rigid_flag) rfix.push_back(ifix);
 }
 
 /* ----------------------------------------------------------------------
@@ -1060,7 +1066,7 @@ void FixNH::couple()
   }
 
   if (!std::isfinite(p_current[0]) || !std::isfinite(p_current[1]) || !std::isfinite(p_current[2]))
-    error->all(FLERR,"Non-numeric pressure - simulation unstable");
+    error->all(FLERR,"Non-numeric pressure - simulation unstable" + utils::errorurl(7));
 
   // switch order from xy-xz-yz to Voigt ordering
 
@@ -1070,7 +1076,7 @@ void FixNH::couple()
     p_current[5] = tensor[3];
 
     if (!std::isfinite(p_current[3]) || !std::isfinite(p_current[4]) || !std::isfinite(p_current[5]))
-      error->all(FLERR,"Non-numeric pressure - simulation unstable");
+      error->all(FLERR,"Non-numeric pressure - simulation unstable" + utils::errorurl(7));
   }
 }
 
@@ -1104,9 +1110,7 @@ void FixNH::remap()
         domain->x2lamda(x[i],x[i]);
   }
 
-  if (nrigid)
-    for (i = 0; i < nrigid; i++)
-      modify->fix[rfix[i]]->deform(0);
+  for (auto &ifix : rfix) ifix->deform(0);
 
   // reset global and local box to new size/shape
 
@@ -1251,9 +1255,7 @@ void FixNH::remap()
         domain->lamda2x(x[i],x[i]);
   }
 
-  if (nrigid)
-    for (i = 0; i < nrigid; i++)
-      modify->fix[rfix[i]]->deform(1);
+  for (auto &ifix : rfix) ifix->deform(1);
 }
 
 /* ----------------------------------------------------------------------
@@ -1720,8 +1722,14 @@ void FixNH::reset_dt()
 
   // If using respa, then remap is performed in innermost level
 
-  if (utils::strmatch(update->integrate_style,"^respa"))
+  
+  if (utils::strmatch(update->integrate_style,"^respa")) {
+    auto respa_ptr = dynamic_cast<Respa *>(update->integrate);
+    if (!respa_ptr) error->all(FLERR, "Failure to access Respa style {}", update->integrate_style);
+    nlevels_respa = respa_ptr->nlevels;
+    step_respa = respa_ptr->step;
     dto = 0.5*step_respa[0];
+  }
 
   if (pstat_flag)
     pdrag_factor = 1.0 - (update->dt * p_freq_max * drag / nc_pchain);

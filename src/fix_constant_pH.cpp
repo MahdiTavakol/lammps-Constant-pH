@@ -197,8 +197,8 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
     } else if (strcmp(arg[iarg], "lambda_s_file") == 0) {
       fp_flags |= LAMBDA_S_FP;
       if (comm->me == 0) {
-        lambda_1_fp = fopen(arg[iarg + 1], "w");
-        lambda_2_fp = fopen(arg[iarg + 2], "w");
+        lambda_1_fp.open(arg[iarg+1],std::ofstream::out);
+        lambda_2_fp.open(arg[iarg+1],std::ofstream::out);
       }
       iarg += 3;
     } else if (strcmp(arg[iarg], "commands") == 0) {
@@ -237,8 +237,6 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
 FixConstantPH::~FixConstantPH()
 {
   // According to RAII I do not need to close std::ifstreams
-  
-  if (commandsFile && comm->me == 0) fclose(commandsFile);
 
   // deallocate char* variables
   if (fix_adaptive_protonation_id)
@@ -255,7 +253,7 @@ FixConstantPH::~FixConstantPH()
   // deallocate memories whose size is dependent on natoms
   deallocate_storage();
 
-  for (int i = 0; i < ncommands; i++) { delete[] commands[i]; }
+  for (int i = 0; i < ncommands; i++) delete[] commands[i];
   delete[] commands;
 }
 
@@ -597,7 +595,7 @@ void FixConstantPH::compute_Hs()
   backup_restore_qfev<1>();
   // computing the HA and HB for each lambda
   for (int j = 0; j < n_lambdas; j++) {
-    std::fill(lambdas_j, lambdas_j + n_lambdas, 0.0);
+    std::fill(lambdas_j.get(), lambdas_j.get() + n_lambdas, 0.0);
     double lambda_j = 0.0;
     modify_qs(lambda_j, j);
     update_lmp();
@@ -825,13 +823,13 @@ void FixConstantPH::read_pH_structure_files()
 
       std::string token;
       std::stringstream iss3(line);
-      std::getline(iss3,token,",");
-      type = std::stoi(token);
-      std::getline(iss3,token,",");
+      std::getline(iss3,token,',');
+      int type = std::stoi(token);
+      std::getline(iss3,token,',');
       typePerProtMol[type] = std::stoi(token);
       protonable[type] = 1;
       for (int j = 0; j < pHnStructures1; ++j) {
-        if (!(std::getline(iss3,token,",")))
+        if (!(std::getline(iss3,token,',')))
           error->one(FLERR, "Malformed line in pHStructureFile1");
         pH1qs[type][j] = std::stof(token);
       }
@@ -842,13 +840,13 @@ void FixConstantPH::read_pH_structure_files()
 
 
       std::stringstream iss4(line);
-      std::getline(iss4,token,",");
+      std::getline(iss4,token,',');
       type = std::stoi(token);
-      std::getline(iss4,token,",");
+      std::getline(iss4,token,',');
       typePerProtMol[type] = std::stoi(token);
       protonable[type] = 1;
       for (int j = 0; j < pHnStructures2; ++j) {
-        if (!(std::getline(iss4,token,",")))
+        if (!(std::getline(iss4,token,',')))
           error->one(FLERR, "Malformed line in pHStructureFile2");
         pH2qs[type][j] = std::stof(token);
       }
@@ -878,40 +876,34 @@ void FixConstantPH::read_commands_file()
     * commandn
     */
 
-  char line[512];    // Increased buffer size for long commands
+  std::string line; 
   if (comm->me == 0) {
-    if (!fgets(line, sizeof(line), commandsFile)) error->all(FLERR, "Error reading commands file");
+    if (!std::getline(commandsFile,line))
+      error->one(FLERR, "Error reading commands file");
+    std::stringstream iss(line);
 
-    line[strcspn(line, "\n")] = '\0';    // Remove newline
-    char *token = strtok(line, ",");
-    ncommands = std::stoi(token);
+    iss >> ncommands;
   }
+
   MPI_Bcast(&ncommands, 1, MPI_INT, 0, world);
 
   commands = new char *[ncommands];
 
   if (comm->me == 0) {
-    fgets(line, sizeof(line), commandsFile);    // comment-1
-    fgets(line, sizeof(line), commandsFile);    // comment-2
+    std::getline(commandsFile,line); // comment-1
+    std::getline(commandsFile,line); // comment-2
 
-    for (int i = 0; i < ncommands; i++) {
-      if (!fgets(line, sizeof(line), commandsFile)) error->all(FLERR, "Error reading command line");
+    for (int i = 0; i < ncommands; i++)
+    {
+      if (!std::getline(commandsFile,line))
+        error->one(FLERR,"Error reading commands lines");
 
-      line[strcspn(line, "\n")] = '\0';    // Remove newline
-
-      // Trim leading and trailing whitespace
-      char *start = line + strspn(line, " \t");    // Skip leading spaces
-      char *end = start + strlen(start) - 1;
-      while (end > start && (*end == ' ' || *end == '\t')) *end-- = '\0';
-
-      size_t len = strlen(start) + 1;
+      size_t len = line.size();
       commands[i] = new char[len];
-      strcpy(commands[i], start);    // Copy trimmed command
+      strcpy(commands[i], line.c_str());
     }
-    fclose(commandsFile);
   }
 
-  commandsFile = nullptr;    // Ensure it's null after closing
 
   for (int i = 0; i < ncommands; i++) {
     int len = (comm->me == 0) ? strlen(commands[i]) + 1 : 0;
@@ -1162,6 +1154,7 @@ template <int direction> void FixConstantPH::backup_restore_qfev()
     for (i = 0; i < natom; i++)
       for (int j = 0; j < 6; j++) forward_reverse_copy<direction>(pvatom_orig, pvatom, i, j);
   }
+  
 
   if (force->kspace) {
     forward_reverse_copy<direction>(energy_orig, force->kspace->energy);
@@ -1464,11 +1457,11 @@ void FixConstantPH::init_GFF()
     std::stringstream iss2(line);
     std::string token;
 
-    if(!std::getline(iss2,token,","))
+    if(!std::getline(iss2,token,','))
       error->one(FLERR, "The GFF correction file in the fix constant_pH is in a wrong format!");
     _lambda = std::stof(token);
 
-    if(!std::getline(iss2,token,","))
+    if(!std::getline(iss2,token,','))
       error->one(FLERR, "The GFF correction file in the fix constant_pH is in a wrong format!");
     _GFF = std::stof(token);
 
