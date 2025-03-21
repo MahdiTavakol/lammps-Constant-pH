@@ -598,31 +598,29 @@ FixNH::~FixNH()
 {
   if (copymode) return;
 
-  delete [] id_dilate;
-  delete [] rfix;
-
+  delete[] id_dilate;
   delete irregular;
 
   // delete temperature and pressure if fix created them
 
   if (tcomputeflag) modify->delete_compute(id_temp);
-  delete [] id_temp;
+  delete[] id_temp;
 
   if (tstat_flag) {
-    delete [] eta;
-    delete [] eta_dot;
-    delete [] eta_dotdot;
-    delete [] eta_mass;
+    delete[] eta;
+    delete[] eta_dot;
+    delete[] eta_dotdot;
+    delete[] eta_mass;
   }
 
   if (pstat_flag) {
     if (pcomputeflag) modify->delete_compute(id_press);
-    delete [] id_press;
+    delete[] id_press;
     if (mpchain) {
-      delete [] etap;
-      delete [] etap_dot;
-      delete [] etap_dotdot;
-      delete [] etap_mass;
+      delete[] etap;
+      delete[] etap_dot;
+      delete[] etap_dotdot;
+      delete[] etap_mass;
     }
   }
 }
