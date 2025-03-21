@@ -136,7 +136,7 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
       if (flags & ADAPTIVE)
         error->all(FLERR, "molids and Fix_adapative_protonation cannot be used at the same time");
       iarg += 2;
-      memory->create(molids, n_lambdas, "constant_pH:lambdas");
+      molids = std::make_unique<int []>(n_lambdas);
       for (int i = 0; i < n_lambdas; i++) {
         molids[i] = utils::numeric(FLERR, arg[iarg], false, lmp);
         iarg++;
@@ -180,19 +180,19 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
       iarg++;
     } else if (strcmp(arg[iarg], "lambda_file") == 0) {
       fp_flags |= LAMBDA_FP;
-      if (comm->me == 0) lambda_fp = fopen(arg[iarg + 1], "w");
+      if (comm->me == 0) lambda_fp.open(arg[iarg+1],std::ofstream::out); 
       iarg += 2;
     } else if (strcmp(arg[iarg], "v_lambda_file") == 0) {
       fp_flags |= V_LAMBDA_FP;
-      if (comm->me == 0) v_lambda_fp = fopen(arg[iarg + 1], "w");
+      if (comm->me == 0) v_lambda_fp.open(arg[iarg+1],std::ofstream::out); 
       iarg += 2;
     } else if (strcmp(arg[iarg], "a_lambda_file") == 0) {
       fp_flags |= A_LAMBDA_FP;
-      if (comm->me == 0) a_lambda_fp = fopen(arg[iarg + 1], "w");
+      if (comm->me == 0) a_lambda_fp.open(arg[iarg+1],std::ofstream::out); 
       iarg += 2;
     } else if (strcmp(arg[iarg], "H_lambda_file") == 0) {
       fp_flags |= H_LAMBDA_FP;
-      if (comm->me == 0) H_lambda_fp = fopen(arg[iarg + 1], "w");
+      if (comm->me == 0) H_lambda_fp.open(arg[iarg+1],std::ofstream::out); 
       iarg += 2;
     } else if (strcmp(arg[iarg], "lambda_s_file") == 0) {
       fp_flags |= LAMBDA_S_FP;
@@ -204,8 +204,8 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
     } else if (strcmp(arg[iarg], "commands") == 0) {
       flags |= COMMANDS;
       if (comm->me == 0) {
-        commandsFile = fopen(arg[iarg + 1], "r");
-        if (commandsFile == nullptr) error->one(FLERR, "Unable to open the commands file");
+        commandsFile.open(arg[iarg+1],std::ifstream::in); 
+        if (!commandsFile.is_open()) error->one(FLERR, "Unable to open the commands file");
       }
       read_commands_file();
       iarg += 2;
@@ -442,17 +442,17 @@ void FixConstantPH::set_lambdas()
   memory->create(m_lambdas, n_lambdas, 3, "constant_pH:m_lambdas");
   memory->create(H_lambdas, n_lambdas, "constant_pH:H_lambdas");
 
-  HAs = std::make_unique<double []>(n_lambas);
-  HBs = std::make_unique<double []>(n_lambas);
-  fs = std::make_unique<double []>(n_lambas);
-  dfs = std::make_unique<double []>(n_lambas);
-  Us = std::make_unique<double []>(n_lambas);
-  dUs = std::make_unique<double []>(n_lambas);
-  lambdas_j = std::make_unique<double []>(n_lambas);
-  GFF_lambdas = std::make_unique<double []>(n_lambas);
+  HAs = std::make_unique<double []>(n_lambdas);
+  HBs = std::make_unique<double []>(n_lambdas);
+  fs = std::make_unique<double []>(n_lambdas);
+  dfs = std::make_unique<double []>(n_lambdas);
+  Us = std::make_unique<double []>(n_lambdas);
+  dUs = std::make_unique<double []>(n_lambdas);
+  lambdas_j = std::make_unique<double []>(n_lambdas);
+  GFF_lambdas = std::make_unique<double []>(n_lambdas);
 
   if (flags & ADAPTIVE) {
-    molids = std::make_unique<double []>(n_lambas);
+    molids = std::make_unique<int []>(n_lambdas);
     // get_protonable_molids should be modified to be compatible with std::unique_ptr
     fix_adaptive_protonation->get_protonable_molids(molids.get());
   }
