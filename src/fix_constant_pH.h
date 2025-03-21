@@ -21,6 +21,8 @@ FixStyle(constant_pH,FixConstantPH);
 #ifndef LMP_FIX_CONSTANTPH_H
 #define LMP_FIX_CONSTANTPH_H
 
+#include <fstream>
+
 #include "fix.h"
 #include "fix_adaptive_protonation.h"
 #include "pair.h"
@@ -48,26 +50,29 @@ namespace LAMMPS_NS {
      protected:
         int flags;
 	// Sturcture files
-        FILE *pHStructureFile1, *pHStructureFile2;
+        std::ifstream pHStructureFile1, pHStructureFile2; 
 
 	// Atom types and charges that change due to protonation
         int pHnStructures1, pHnStructures2;
         int pHnTypes1, pHnTypes2;
         double **pH1qs, **pH2qs;
-        int * typePerProtMol;
-        int * protonable;
+        
+        std::unique_ptr<int []> typePerProtMol;
+        std::unique_ptr<int []> protonable;
 
         // Commands that run whenever the lambdas array is modified
         int ncommands;
         char ** commands;
-        FILE *commandsFile;
+        std::ifstream commandsFile;
 
 	// Input variables for constant values
 	double pK, pH, T;
 
 	double a, b, s, m, w, r, d, k, h;
-	double* HAs, * HBs;
-	double* Us, * dUs;
+        std::unique_ptr<double []> HAs;
+        std::unique_ptr<double []> HBs;
+        std::unique_ptr<double []> Us;
+        std::unique_ptr<double []> dUs;
 	
 	// parameter for shifting the minima of the potential near lambda = 0 and lambda = 1
 	double mu;
@@ -82,26 +87,27 @@ namespace LAMMPS_NS {
         // Lambda arrays
         double ** lambdas, ** v_lambdas, ** a_lambdas, ** m_lambdas, * H_lambdas;
         double T_lambdas[3];
-        int * molids;
+        std::unique_ptr <int []> molids;
         int n_lambdas;
         
         
         // Temp array to change lambdas in order to get HAs and HBs
-        double * lambdas_j;
+        std::unique_ptr<double []> lambdas_j;
 
 	// The smoothing function 
-	double * fs, * dfs;
+        std::unique_ptr<double []> fs;
+        std::unique_ptr<double []> dfs;
 
 	// Parameters for the forcefield modifiction term
         bool GFF_flag;
-	FILE *fp;
+        std::ifstream fp;
 	double **GFF;
 	int GFF_size;
-	double* GFF_lambdas;
+        std::unique_ptr<double []> GFF_lambdas;
 
         // Parameters for printing the Udwp
         bool print_Udwp_flag;
-        FILE *Udwp_fp;
+        std::ofstream Udwp_fp;
         void print_Udwp();
 
         // Parameters for the buffer
@@ -125,7 +131,7 @@ namespace LAMMPS_NS {
 
         // Output files when we have adaptive protonation
         int fp_flags;
-        FILE* lambda_fp, *lambda_1_fp, *lambda_2_fp, *v_lambda_fp, *a_lambda_fp, *H_lambda_fp;
+        std::ofstream lambda_fp, lambda_1_fp, lambda_2_fp, v_lambda_fp, a_lambda_fp, H_lambda_fp;
 
 
         // The name of the intermediate file written by the fix_adaptive_protonation 

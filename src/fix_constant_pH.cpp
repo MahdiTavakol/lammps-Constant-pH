@@ -40,6 +40,8 @@
 #include "timer.h"
 #include "update.h"
 
+#include <sstream>
+#include <iomanip>
 #include <cstring>
 #include <map>
 #include <string>
@@ -71,15 +73,13 @@ static constexpr double tol = 1e-5;
 /* ---------------------------------------------------------------------- */
 
 FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
-    Fix(lmp, narg, arg), pHStructureFile1(nullptr), pHStructureFile2(nullptr), pH1qs(nullptr),
-    pH2qs(nullptr), typePerProtMol(nullptr), protonable(nullptr), HAs(nullptr), HBs(nullptr),
-    Us(nullptr), dUs(nullptr), lambdas_j(nullptr), lambdas(nullptr), v_lambdas(nullptr),
-    a_lambdas(nullptr), m_lambdas(nullptr), H_lambdas(nullptr), molids(nullptr), fs(nullptr),
-    dfs(nullptr), fp(nullptr), GFF(nullptr), GFF_lambdas(nullptr), Udwp_fp(nullptr),
+    Fix(lmp, narg, arg), pH1qs(nullptr),
+    pH2qs(nullptr),  lambdas(nullptr), v_lambdas(nullptr),
+    a_lambdas(nullptr), m_lambdas(nullptr), H_lambdas(nullptr),
+    GFF(nullptr), 
     fix_adaptive_protonation_id(nullptr), fixgpu(nullptr), q_orig(nullptr), f_orig(nullptr),
     peatom_orig(nullptr), pvatom_orig(nullptr), keatom_orig(nullptr), kvatom_orig(nullptr),
-    lambda_fp(nullptr), lambda_1_fp(nullptr), lambda_2_fp(nullptr), v_lambda_fp(nullptr),
-    a_lambda_fp(nullptr), H_lambda_fp(nullptr), commands(nullptr), commandsFile(nullptr)
+    commands(nullptr), commandsFile(nullptr)
 {
   if (narg < 9) utils::missing_cmd_args(FLERR, "fix constant_pH", error);
 
@@ -88,11 +88,12 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
 
   // Reading the file that contains the charges before and after protonation/deprotonation
   if (comm->me == 0) {
-    pHStructureFile1 = fopen(arg[4], "r");
-    if (pHStructureFile1 == nullptr) error->one(FLERR, "Unable to open the file");
+    pHStructureFile1.open(arg[4],std::ifstream::in);
+    if (!pHStructureFile1.is_open()) error->one(FLERR, "Unable to open the file");
 
-    pHStructureFile2 = fopen(arg[5], "r");
-    if (pHStructureFile2 == nullptr) error->one(FLERR, "Unable to open the file");
+
+    pHStructureFile2.open(arg[4],std::ifstream::in);
+    if (!pHStructureFile2.is_open()) error->one(FLERR, "Unable to open the file");
   }
 
   pK = utils::numeric(FLERR, arg[6], false, lmp);
@@ -122,15 +123,13 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
   while (iarg < narg) {
     if (strcmp(arg[iarg], "GFF") == 0) {
       GFF_flag = true;
-      fp = fopen(arg[iarg + 1], "r");
-      if (fp == nullptr)
+      fp.open(arg[iarg+1],std::ifstream::in);
+      if (!fp.is_open())
         error->one(FLERR, "Cannot find fix constant_pH the GFF correction file {}", arg[iarg + 1]);
       iarg += 2;
     } else if (strcmp(arg[iarg], "Print_Udwp") == 0) {
       print_Udwp_flag = true;
-      Udwp_fp = fopen(arg[iarg + 1], "w");
-      if (Udwp_fp == nullptr)
-        error->one(FLERR, "Cannot find fix constant_pH the Udwp debugging file {}", arg[iarg + 1]);
+      Udwp_fp.open(arg[iarg+1],std::ifstream::out);
       iarg += 2;
     } else if (strcmp(arg[iarg], "molids") == 0) {
       n_lambdas = utils::numeric(FLERR, arg[iarg + 1], false, lmp);
@@ -237,21 +236,9 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
 
 FixConstantPH::~FixConstantPH()
 {
-  // Closing files if they are open.
-  if (pHStructureFile1 && comm->me == 0)
-    fclose(pHStructureFile1);    // I have already closed it.. This is here just to assure it is closed
-  if (pHStructureFile2 && comm->me == 0)
-    fclose(pHStructureFile2);    // I have already closed it.. This is here just to assure it is closed
+  // According to RAII I do not need to close std::ifstreams
+  
   if (commandsFile && comm->me == 0) fclose(commandsFile);
-  if (fp && (comm->me == 0)) fclose(fp);
-  if (Udwp_fp && (comm->me == 0))
-    fclose(Udwp_fp);    // We should never reach that point as this file is writting just at the setup stage and then it will be closed
-  if (lambda_fp && (comm->me == 0)) fclose(lambda_fp);
-  if (lambda_1_fp && (comm->me == 0)) fclose(lambda_1_fp);
-  if (lambda_2_fp && (comm->me == 0)) fclose(lambda_2_fp);
-  if (v_lambda_fp && (comm->me == 0)) fclose(v_lambda_fp);
-  if (a_lambda_fp && (comm->me == 0)) fclose(a_lambda_fp);
-  if (H_lambda_fp && (comm->me == 0)) fclose(H_lambda_fp);
 
   // deallocate char* variables
   if (fix_adaptive_protonation_id)
@@ -260,8 +247,6 @@ FixConstantPH::~FixConstantPH()
   // deallocating the variables whose size depend on the ntypes andfix_constant_pH.cp as the ntypes does not change during the simulation there is no need for reallocation of them
   if (pH1qs) memory->destroy(pH1qs);
   if (pH2qs) memory->destroy(pH2qs);
-  if (typePerProtMol) memory->destroy(typePerProtMol);
-  if (protonable) memory->destroy(protonable);
   if (GFF) memory->destroy(GFF);
 
   // deallocate the memories with size dependent on the n_lambda
@@ -432,17 +417,16 @@ void FixConstantPH::delete_lambdas()
   if (m_lambdas) memory->destroy(m_lambdas);
   if (H_lambdas) memory->destroy(H_lambdas);
 
-  if (HAs) memory->destroy(HAs);
-  if (HBs) memory->destroy(HBs);
-  if (GFF_lambdas) memory->destroy(GFF_lambdas);
-  if (fs) memory->destroy(fs);
-  if (dfs) memory->destroy(dfs);
-  if (Us) memory->destroy(Us);
-  if (dUs) memory->destroy(dUs);
+  HAs.reset();
+  HBs.reset();
+  fs.reset();
+  dfs.reset();
+  Us.reset();
+  dUs.reset();
+  lambdas_j.reset();
+  molids.reset();
+  GFF_lambdas.reset();
 
-  if (lambdas_j) memory->destroy(lambdas_j);
-
-  if (molids) memory->destroy(molids);
 }
 
 /* ----------------------------------------------------------------------
@@ -458,19 +442,19 @@ void FixConstantPH::set_lambdas()
   memory->create(m_lambdas, n_lambdas, 3, "constant_pH:m_lambdas");
   memory->create(H_lambdas, n_lambdas, "constant_pH:H_lambdas");
 
-  memory->create(HAs, n_lambdas, "constant_pH:HAs");
-  memory->create(HBs, n_lambdas, "constant_pH:HBs");
-  memory->create(GFF_lambdas, n_lambdas, "constant_pH:GFF_lambdas");
-  memory->create(fs, n_lambdas, "constant_pH:fs");
-  memory->create(dfs, n_lambdas, "constant_pH:df");
-  memory->create(Us, n_lambdas, "constant_pH:Us");
-  memory->create(dUs, n_lambdas, "constant_pH:dUs");
-
-  memory->create(lambdas_j, n_lambdas, "constant_pH:lambdas_j");
+  HAs = std::make_unique<double []>(n_lambas);
+  HBs = std::make_unique<double []>(n_lambas);
+  fs = std::make_unique<double []>(n_lambas);
+  dfs = std::make_unique<double []>(n_lambas);
+  Us = std::make_unique<double []>(n_lambas);
+  dUs = std::make_unique<double []>(n_lambas);
+  lambdas_j = std::make_unique<double []>(n_lambas);
+  GFF_lambdas = std::make_unique<double []>(n_lambas);
 
   if (flags & ADAPTIVE) {
-    memory->create(molids, n_lambdas, "constant_pH:molids");
-    fix_adaptive_protonation->get_protonable_molids(molids);
+    molids = std::make_unique<double []>(n_lambas);
+    // get_protonable_molids should be modified to be compatible with std::unique_ptr
+    fix_adaptive_protonation->get_protonable_molids(molids.get());
   }
 
   for (int i = 0; i < n_lambdas; i++) {
@@ -786,33 +770,26 @@ void FixConstantPH::read_pH_structure_files()
     * ...  
     */
 
-  /*Allocating the required memory*/
+
   int ntypes = atom->ntypes;
-  memory->create(protonable, ntypes + 1,"constant_pH:protonable");    //ntypes+1 so the atom types start from 1.
-  memory->create(typePerProtMol, ntypes + 1, "constant_pH:typePerProtMol");
+  protonable = std::make_unique<int[]>(ntypes + 1);
+  typePerProtMol = std::make_unique<int[]>(ntypes + 1);
 
-  char line[128];
+  std::string line;
+
   if (comm->me == 0) {
-    if (!pHStructureFile1 || !pHStructureFile2)
-      error->all(FLERR, "Error in reading the pH structure file in fix constant_pH");
+    // skip comments
+    std::getline(pHStructureFile1, line);
+    std::getline(pHStructureFile2, line);
 
-    // comment
-    fgets(line, sizeof(line), pHStructureFile1);
-    fgets(line, sizeof(line), pHStructureFile2);
+    // read pHnStructures
+    std::getline(pHStructureFile1, line);
+    std::stringstream iss1(line);
+    iss1 >> pHnStructures1;
 
-    // pHnStructures
-    fgets(line, sizeof(line), pHStructureFile1);
-    line[strcspn(line, "\n")] = '\0';
-    char *token = strtok(line, ",");
-    pHnStructures1 = std::stoi(token);
-
-    // pHnStructures
-    fgets(line, sizeof(line), pHStructureFile2);
-    line[strcspn(line, "\n")] = '\0';
-    token = strtok(line, ",");
-    pHnStructures2 = std::stoi(token);
-
-    // check if both the pHnTypes1 == pHnTypes2
+    std::getline(pHStructureFile2, line);
+    std::stringstream iss2(line);
+    iss2 >> pHnStructures2;
   }
 
   MPI_Bcast(&pHnStructures1, 1, MPI_INT, 0, world);
@@ -822,62 +799,66 @@ void FixConstantPH::read_pH_structure_files()
   memory->create(pH2qs, ntypes + 1, pHnStructures2, "constant_pH:pH2qs");
 
   if (comm->me == 0) {
-    // pHnTypes
-    fgets(line, sizeof(line), pHStructureFile1);
-    line[strcspn(line, "\n")] = '\0';
-    char *token = strtok(line, ",");
-    pHnTypes1 = std::stoi(token);
+    std::getline(pHStructureFile1, line);
+    std::stringstream iss1(line);
+    iss1 >> pHnTypes1;
 
-    fgets(line, sizeof(line), pHStructureFile2);
-    line[strcspn(line, "\n")] = '\0';
-    token = strtok(line, ",");
-    pHnTypes2 = std::stoi(token);
+    std::getline(pHStructureFile2, line);
+    std::stringstream iss2(line);
+    iss2 >> pHnTypes2;
 
-    for (int i = 1; i < ntypes + 1; i++) {
+
+    if (pHnTypes1 != pHnTypes2)
+      error->one(FLERR, "Mismatch in protonable type counts between pH structure files");
+
+    for (int i = 1; i <= ntypes; ++i) {
       protonable[i] = 0;
       typePerProtMol[i] = 0;
-      for (int j = 0; j < pHnStructures1; j++) pH1qs[i][j] = 0.0;
-      for (int j = 0; j < pHnStructures2; j++) pH2qs[i][j] = 0.0;
+      for (int j = 0; j < pHnStructures1; ++j) pH1qs[i][j] = 0.0;
+      for (int j = 0; j < pHnStructures2; ++j) pH2qs[i][j] = 0.0;
     }
 
-    for (int i = 0; i < pHnTypes1; i++) {
-      if (fgets(line, sizeof(line), pHStructureFile1) == nullptr)
-        error->all(FLERR, "Error in reading the pH structure file in fix constant_pH");
-      line[strcspn(line, "\n")] = '\0';
-      token = strtok(line, ",");
-      int type = std::stoi(token);
-      protonable[type] = 1;
-      token = strtok(NULL, ",");
-      typePerProtMol[type] = std::stoi(token);
-      for (int j = 0; j < pHnStructures1; j++) {
-        token = strtok(NULL, ",");
-        pH1qs[type][j] = std::stod(token);
-      }
+    for (int i = 0; i < pHnTypes1; ++i) {
+      // File 1
+      if (!std::getline(pHStructureFile1, line))
+        error->all(FLERR, "Error reading pHStructureFile1");
 
-      if (fgets(line, sizeof(line), pHStructureFile2) == nullptr)
-        error->all(FLERR, "Error in reading the pH structure file in fix constant_pH");
-      line[strcspn(line, "\n")] = '\0';
-      token = strtok(line, ",");
+      std::string token;
+      std::stringstream iss3(line);
+      std::getline(iss3,token,",");
       type = std::stoi(token);
-      protonable[type] = 1;
-      token = strtok(NULL, ",");
+      std::getline(iss3,token,",");
       typePerProtMol[type] = std::stoi(token);
-      for (int j = 0; j < pHnStructures2; j++) {
-        token = strtok(NULL, ",");
-        pH2qs[type][j] = std::stod(token);
+      protonable[type] = 1;
+      for (int j = 0; j < pHnStructures1; ++j) {
+        if (!(std::getline(iss3,token,",")))
+          error->one(FLERR, "Malformed line in pHStructureFile1");
+        pH1qs[type][j] = std::stof(token);
+      }
+
+      // File 2
+      if (!std::getline(pHStructureFile2, line))
+        error->all(FLERR, "Error reading pHStructureFile2");
+
+
+      std::stringstream iss4(line);
+      std::getline(iss4,token,",");
+      type = std::stoi(token);
+      std::getline(iss4,token,",");
+      typePerProtMol[type] = std::stoi(token);
+      protonable[type] = 1;
+      for (int j = 0; j < pHnStructures2; ++j) {
+        if (!(std::getline(iss4,token,",")))
+          error->one(FLERR, "Malformed line in pHStructureFile2");
+        pH2qs[type][j] = std::stof(token);
       }
     }
-    fclose(pHStructureFile1);
-    fclose(pHStructureFile2);
   }
 
-  pHStructureFile1 = nullptr;
-  pHStructureFile2 = nullptr;
-
-  MPI_Bcast(protonable, ntypes + 1, MPI_INT, 0, world);
-  MPI_Bcast(typePerProtMol, ntypes + 1, MPI_INT, 0, world);
-  MPI_Bcast(pH1qs[0], (ntypes + 1) * (pHnStructures1), MPI_DOUBLE, 0, world);
-  MPI_Bcast(pH2qs[0], (ntypes + 1) * (pHnStructures2), MPI_DOUBLE, 0, world);
+  MPI_Bcast(protonable.get(), ntypes + 1, MPI_INT, 0, world);
+  MPI_Bcast(typePerProtMol.get(), ntypes + 1, MPI_INT, 0, world);
+  MPI_Bcast(pH1qs[0], (ntypes + 1) * pHnStructures1, MPI_DOUBLE, 0, world);
+  MPI_Bcast(pH2qs[0], (ntypes + 1) * pHnStructures2, MPI_DOUBLE, 0, world);
 }
 
 /* ----------------------------------------------------------------------
@@ -1049,21 +1030,24 @@ void FixConstantPH::calculate_dU(const double &_lambda, double &_U, double &_dU)
 void FixConstantPH::print_Udwp()
 {
   double lambda_Udwp, U_Udwp, dU_Udwp;
-  int n_points = 100;
+
+  const int n_points = 100;
+  const double dlambda_Udwp = 2.0 / (double) n_points;
 
   lambda_Udwp = -0.5;
-  double dlambda_Udwp = 2.0 / (double) n_points;
 
   if (comm->me == 0) {
-    fprintf(Udwp_fp, "Lambda,U,dU\n");
+    if (!Udwp_fp.is_open())
+      error->one(FLERR, "Udwp_fp file stream is not open");
+
+    Udwp_fp << "Lambda,U,dU" << std::endl;
+    Udwp_fp << std::fixed << std::setprecision(8);
     for (int i = 0; i <= n_points; i++) {
       calculate_dU(lambda_Udwp, U_Udwp, dU_Udwp);
-      fprintf(Udwp_fp, "%f,%f,%f\n", lambda_Udwp, U_Udwp, dU_Udwp);
+      Udwp_fp << lambda_Udwp << "," << U_Udwp << "," <<  dU_Udwp << std::endl;
       lambda_Udwp += dlambda_Udwp;
     }
-    fclose(Udwp_fp);
   }
-  Udwp_fp = nullptr;
 }
 
 /* ----------------------------------------------------------------------
@@ -1463,31 +1447,37 @@ void FixConstantPH::calculate_GFFs()
 
 void FixConstantPH::init_GFF()
 {
-  char line[100];
-  fgets(line, sizeof(line), fp);
-  line[strcspn(line, "\n")] = 0;
-  GFF_size = atoi(line);
+  std::string line;
+  std::stringstream iss;
+
+  std::getline(fp,line);
+  iss.clear();
+  iss.str(line);
+  iss >> GFF_size;
+
   memory->create(GFF, GFF_size, 2, "constant_pH:GFF");
-  int i = 0;
-  while (fgets(line, sizeof(line), fp) != NULL && i < GFF_size) {
+  int i = -1;
+
+  while (std::getline(fp,line) && ++i < GFF_size) {
+
     double _lambda, _GFF;
-    line[strcspn(line, "\n")] = 0;
-    char *token = strtok(line, ",");
-    if (token != NULL)
-      _lambda = atof(token);
-    else
+    std::stringstream iss2(line);
+    std::string token;
+
+    if(!std::getline(iss2,token,","))
       error->one(FLERR, "The GFF correction file in the fix constant_pH is in a wrong format!");
-    token = strtok(line, ",");
-    if (token != NULL)
-      _GFF = atof(token);
-    else
+    _lambda = std::stof(token);
+
+    if(!std::getline(iss2,token,","))
       error->one(FLERR, "The GFF correction file in the fix constant_pH is in a wrong format!");
+    _GFF = std::stof(token);
+
     GFF[i][0] = _lambda;
     GFF[i][1] = _GFF;
-    i++;
   }
-  if (fp && (comm->me == 0)) fclose(fp);
-  fp = nullptr;
+
+  if ( i != GFF_size)
+    error->one(FLERR, "The GFF correction file in the fix constant_pH is in a wrong format!");
 }
 
 /* ----------------------------------------------------------------------
@@ -1546,20 +1536,22 @@ void FixConstantPH::write_lambdas_header()
 {
   if (comm->me != 0) return;    // Only rank 0 writes
 
-  struct {
+  const struct {
     int flag;
-    FILE *fp;
-  } files[] = {{LAMBDA_FP, lambda_fp},     {V_LAMBDA_FP, v_lambda_fp}, {A_LAMBDA_FP, a_lambda_fp},
-               {H_LAMBDA_FP, H_lambda_fp}, {LAMBDA_S_FP, lambda_1_fp}, {LAMBDA_S_FP, lambda_2_fp}};
+    std::ofstream *fp;
+  } files[] = {{LAMBDA_FP, &lambda_fp},     {V_LAMBDA_FP, &v_lambda_fp}, {A_LAMBDA_FP, &a_lambda_fp},
+               {H_LAMBDA_FP, &H_lambda_fp}, {LAMBDA_S_FP, &lambda_1_fp}, {LAMBDA_S_FP, &lambda_2_fp}};
 
   for (auto &file : files) {
     if (fp_flags & file.flag && file.fp) {
-      fprintf(file.fp, "n_lambdas=%d\n", n_lambdas);
-      for (int i = 0; i < n_lambdas; i++) fprintf(file.fp, "lambda-%d,", molids[i]);
+      *(file.fp) << "n_lambdas=" << n_lambdas << std::endl;
+      for (int i = 0; i < n_lambdas-1; i++) 
+        *(file.fp) << "lambda-" <<  molids[i] << ",";
+      *(file.fp) << "lambda-" << molids[n_lambdas-1];
       if (file.flag == LAMBDA_S_FP)
-        fprintf(file.fp, "\n");
+        *(file.fp) << std::endl;
       else
-        fprintf(file.fp, "lambda-buffer\n");
+        *(file.fp) << ",lambda-buffer" << std::endl;
     }
   }
 }
@@ -1575,29 +1567,30 @@ void FixConstantPH::write_lambdas()
   if (comm->me != 0) return;    // Only rank 0 writes
 
   if (fp_flags & H_LAMBDA_FP && H_lambda_fp) {
-    for (int i = 0; i < n_lambdas; i++) fprintf(H_lambda_fp, "%f,", H_lambdas[i]);
-    fprintf(H_lambda_fp, "%f\n", H_lambda_buff);
+    for (int i = 0; i < n_lambdas; i++) H_lambda_fp << H_lambdas[i] << ",";
+    H_lambda_fp << H_lambda_buff << std::endl;
   }
 
-  struct {
+  const struct {
     int flag;
-    FILE *fp;
+    std::ofstream *fp;
     double **content;
     int j;
     double buff_value;
-  } files[] = {{V_LAMBDA_FP, v_lambda_fp, v_lambdas, 0, v_lambda_buff},
-               {A_LAMBDA_FP, a_lambda_fp, a_lambdas, 0, a_lambda_buff},
-               {LAMBDA_FP, lambda_fp, lambdas, 0, lambda_buff},
-               {LAMBDA_S_FP, lambda_1_fp, lambdas, 1, 0.0},
-               {LAMBDA_S_FP, lambda_2_fp, lambdas, 2, 0.0}};
+  } files[] = {{V_LAMBDA_FP, &v_lambda_fp, v_lambdas, 0, v_lambda_buff},
+               {A_LAMBDA_FP, &a_lambda_fp, a_lambdas, 0, a_lambda_buff},
+               {LAMBDA_FP, &lambda_fp, lambdas, 0, lambda_buff},
+               {LAMBDA_S_FP, &lambda_1_fp, lambdas, 1, 0.0},
+               {LAMBDA_S_FP, &lambda_2_fp, lambdas, 2, 0.0}};
 
   for (auto &file : files) {
     if (fp_flags & file.flag && file.fp) {
-      for (int i = 0; i < n_lambdas; i++) fprintf(file.fp, "%f,", file.content[i][file.j]);
+      for (int i = 0; i < n_lambdas-1; i++) *(file.fp) << file.content[i][file.j] << ",";
+      *(file.fp) << file.content[n_lambdas-1][file.j]; 
       if (file.flag == LAMBDA_S_FP)
-        fprintf(file.fp, "\n");
+        *(file.fp) << std::endl;
       else
-        fprintf(file.fp, "%f\n", file.buff_value);
+        *(file.fp) << "," << file.buff_value << std::endl;
     }
   }
 }
