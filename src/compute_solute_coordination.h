@@ -27,29 +27,24 @@ namespace LAMMPS_NS {
 
 class ComputeSoluteCoordination : public Compute {
  public:
+   ComputeSoluteCoordination(class LAMMPS *, int, char **);
+   ~ComputeSoluteCoordination() override;
+   void init() override;
+   void compute_peratom() override;
+   void init_list(int, class NeighList*) override;
+
   int nchunk, ncoord, compress, idsflag, lockcount;
   int computeflag;    // 1 if this compute invokes other computes
   double chunk_volume_scalar;
-  double *chunk_volume_vec;
-  double **coord;
-  int *ichunk, *chunkID;
 
-  ComputeSoluteCoordination(class LAMMPS *, int, char **);
-  ~ComputeSoluteCoordination() override;
-  void init() override;
-  void compute_peratom() override;
-  void init_list(int, class NeighList*) override;
 
 
  private:
   int typeOW;
   int nmax;
 
-
    // Neighborlist is required for accessing neighbors
    class NeighList* list;
-
-
 
 };
 
