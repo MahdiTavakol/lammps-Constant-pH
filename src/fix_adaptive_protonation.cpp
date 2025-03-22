@@ -46,6 +46,7 @@
 #include <cmath>
 #include <cstring>
 #include <stdio.h>
+#include <sstream>
 
 #include <iostream>
 
@@ -59,13 +60,8 @@ enum {F_NONE,RESET_MID = 1 << 1, INIT_MID = 1 << 2};
 /* --------------------------------------------------------------------------------------- */
 
 FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS* lmp, int narg, char** arg) : Fix(lmp, narg, arg), 
-   pHStructureFile1(nullptr), pHStructureFile2(nullptr),
-   mark(nullptr), mark_local(nullptr),mark_prev(nullptr),
-   molecule_size(nullptr), molecule_size_local(nullptr),
    pH1qs(nullptr), pH2qs(nullptr),
-   typePerProtMol(nullptr),
-   protonable(nullptr), protonable_molids(nullptr), n_protonable(0),
-   init_molid_file(nullptr)
+   n_protonable(0)
 {
    if (narg < 7) utils::missing_cmd_args(FLERR, "fix adaptive_protonation", error);
 
@@ -77,10 +73,9 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS* lmp, int narg, char** arg
    if (nevery < 0) error->all(FLERR,"Illegal fix adaptive_protonation every value {}", nevery);
 
    if (comm->me == 0) {
-      pHStructureFile1 = fopen(arg[4],"r"); // The structure in the solid state
-      if (pHStructureFile1 == nullptr) error->one(FLERR,"Unable to open the file");
-      pHStructureFile2 = fopen(arg[5],"r"); // The structure in the solvent phase ==> It should be modified based on the pKa and pH values by the fix constant_pH command
-      if (pHStructureFile2 == nullptr) error->one(FLERR,"Unable to open the file");
+      pHStructureFile1.open(arg[4],std::ifstream::in); // The structure in the solid state
+      pHStructureFile2.open(arg[5],std::ifstream::in); // The structure in the solvent phase ==> It should be modified based on the pKa and pH values by the fix constant_pH command
+      if (!pHStructureFile1.is_open() || !pHStructureFile2.is_open()) error->one(FLERR,"Unable to open the file");
    }
 
    typeOW = utils::numeric(FLERR,arg[6],false,lmp);
@@ -95,16 +90,16 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS* lmp, int narg, char** arg
       } else if (strcmp(arg[iarg], "initial_molids") == 0) {
 	 flags |= INIT_MID;
 	 if (comm->me == 0) {
-	    init_molid_file = fopen(arg[iarg+1],"r");
-            if (init_molid_file == nullptr)
-	       error->one(FLERR,"Unable to open the file {}",arg[iarg+1]);
+	    init_molid_file.open(arg[iarg+1],std::ifstream::in);
+            if (!init_molid_file.is_open())
+	            error->one(FLERR,"Unable to open the file {}",arg[iarg+1]);
 	 }
 	 iarg += 2;
       } else if (strcmp(arg[iarg],"intermediate_file") == 0) {
          flags |= INIT_MID;
          if (comm->me == 0) {
-            init_molid_file = fopen(arg[iarg+1],"r");
-            if (init_molid_file == nullptr)
+            init_molid_file.open(arg[iarg+1],std::ifstream::in);
+            if (!init_molid_file.is_open())
               error->one(FLERR,"Unable to open the intermediate file {}",arg[iarg+1]);
          }
          iarg += 2;      
@@ -181,8 +176,6 @@ FixAdaptiveProtonation::~FixAdaptiveProtonation()
 {
    if (pH1qs) memory->destroy(pH1qs);
    if (pH2qs) memory->destroy(pH2qs);
-   if (typePerProtMol) memory->destroy(typePerProtMol);
-   if (protonable) memory->destroy(protonable);
    if (vector_atom) delete [] vector_atom;
 
    deallocate_storage(); 
@@ -190,8 +183,6 @@ FixAdaptiveProtonation::~FixAdaptiveProtonation()
    // It is a good practice to put the deallocated pointers to nullptr
    pH1qs = nullptr;
    pH2qs = nullptr;
-   typePerProtMol = nullptr;
-   protonable = nullptr;
    vector_atom = nullptr;
 }
 
@@ -222,7 +213,7 @@ void FixAdaptiveProtonation::init()
    // request for a neighbor list
    neighbor->add_request(this, list_flags);
    
-   std::fill(nchanges,nchanges+3,0);
+   std::fill(nchanges.begin(),nchanges.end(),0);
 }
 
 /* ---------------------------------------------------------------------------------------
@@ -298,7 +289,7 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
 
 void FixAdaptiveProtonation::read_pH_structure_files()
 {
-    /* File format
+  /* File format
     * Comment
     * pHnStructures
     * pHnTypes
@@ -307,104 +298,95 @@ void FixAdaptiveProtonation::read_pH_structure_files()
     * ...  
     */
 
-   /*Allocating the required memory*/
-   int ntypes = atom->ntypes;
-   memory->create(protonable,ntypes+1,"constant_pH:protonable"); //ntypes+1 so the atom types start from 1.
-   memory->create(typePerProtMol,ntypes+1,"constant_pH:typePerProtMol");
+
+  int ntypes = atom->ntypes;
+  protonable = std::make_unique<int[]>(ntypes + 1);
+  typePerProtMol = std::make_unique<int[]>(ntypes + 1);
+
+  std::string line;
+
+  if (comm->me == 0) {
+    // skip comments
+    std::getline(pHStructureFile1, line);
+    std::getline(pHStructureFile2, line);
+
+    // read pHnStructures
+    std::getline(pHStructureFile1, line);
+    std::stringstream iss1(line);
+    iss1 >> pHnStructures1;
+
+    std::getline(pHStructureFile2, line);
+    std::stringstream iss2(line);
+    iss2 >> pHnStructures2;
+  }
+
+  MPI_Bcast(&pHnStructures1, 1, MPI_INT, 0, world);
+  MPI_Bcast(&pHnStructures2, 1, MPI_INT, 0, world);
+
+  memory->create(pH1qs, ntypes + 1, pHnStructures1, "constant_pH:pH1qs");
+  memory->create(pH2qs, ntypes + 1, pHnStructures2, "constant_pH:pH2qs");
+
+  if (comm->me == 0) {
+    std::getline(pHStructureFile1, line);
+    std::stringstream iss1(line);
+    iss1 >> pHnTypes1;
+
+    std::getline(pHStructureFile2, line);
+    std::stringstream iss2(line);
+    iss2 >> pHnTypes2;
 
 
+    if (pHnTypes1 != pHnTypes2)
+      error->one(FLERR, "Mismatch in protonable type counts between pH structure files");
 
-   char line[128];
-   if (comm->me == 0)
-   {
-       if (!pHStructureFile1 || !pHStructureFile2 )
-           error->all(FLERR,"Error in reading the pH structure file in fix constant_pH");
+    for (int i = 1; i <= ntypes; ++i) {
+      protonable[i] = 0;
+      typePerProtMol[i] = 0;
+      for (int j = 0; j < pHnStructures1; ++j) pH1qs[i][j] = 0.0;
+      for (int j = 0; j < pHnStructures2; ++j) pH2qs[i][j] = 0.0;
+    }
 
-       // comment 
-       fgets(line,sizeof(line),pHStructureFile1);
-       fgets(line,sizeof(line),pHStructureFile2);
+    for (int i = 0; i < pHnTypes1; ++i) {
+      // File 1
+      if (!std::getline(pHStructureFile1, line))
+        error->all(FLERR, "Error reading pHStructureFile1");
 
-       // pHnStructures
-       fgets(line,sizeof(line),pHStructureFile1);
-       line[strcspn(line,"\n")] = '\0';
-       char *token = strtok(line,",");   
-       pHnStructures1 = std::stoi(token);
+      std::string token;
+      std::stringstream iss3(line);
+      std::getline(iss3,token,',');
+      int type = std::stoi(token);
+      std::getline(iss3,token,',');
+      typePerProtMol[type] = std::stoi(token);
+      protonable[type] = 1;
+      for (int j = 0; j < pHnStructures1; ++j) {
+        if (!(std::getline(iss3,token,',')))
+          error->one(FLERR, "Malformed line in pHStructureFile1");
+        pH1qs[type][j] = std::stof(token);
+      }
 
-       // pHnStructures
-       fgets(line,sizeof(line),pHStructureFile2);
-       line[strcspn(line,"\n")] = '\0';
-       token = strtok(line,",");   
-       pHnStructures2 = std::stoi(token);
-   }
+      // File 2
+      if (!std::getline(pHStructureFile2, line))
+        error->all(FLERR, "Error reading pHStructureFile2");
 
-   MPI_Bcast(&pHnStructures1,1,MPI_INT,0,world);
-   MPI_Bcast(&pHnStructures2,1,MPI_INT,0,world);
 
-   memory->create(pH1qs,ntypes+1,pHnStructures1, "constant_pH:pH1qs");
-   memory->create(pH2qs,ntypes+1,pHnStructures2, "constant_pH:pH2qs");
+      std::stringstream iss4(line);
+      std::getline(iss4,token,',');
+      type = std::stoi(token);
+      std::getline(iss4,token,',');
+      typePerProtMol[type] = std::stoi(token);
+      protonable[type] = 1;
+      for (int j = 0; j < pHnStructures2; ++j) {
+        if (!(std::getline(iss4,token,',')))
+          error->one(FLERR, "Malformed line in pHStructureFile2");
+        pH2qs[type][j] = std::stof(token);
+      }
+    }
+  }
 
-   if (comm->me == 0) {
-      // pHnTypes
-      fgets(line,sizeof(line),pHStructureFile1);
-      line[strcspn(line,"\n")] = '\0';
-      char *token = strtok(line,",");    
-      pHnTypes1 = std::stoi(token);
-
-      fgets(line,sizeof(line),pHStructureFile2);
-      line[strcspn(line,"\n")] = '\0';
-      token = strtok(line,",");    
-      pHnTypes2 = std::stoi(token);
-	
-      for (int i = 1; i < ntypes+1; i++)
-      {
-	        protonable[i] = 0;
-	        typePerProtMol[i] = 0;
-	        for (int j = 0; j < pHnStructures1; j++)
-	           pH1qs[i][j] = 0.0;
-	        for (int j = 0; j < pHnStructures2; j++)
-	           pH2qs[i][j] = 0.0;
-      }  
-	   
-      for (int i = 0; i < pHnTypes1; i++)
-      {
-	        if (fgets(line,sizeof(line),pHStructureFile1) == nullptr)
-	           error->all(FLERR,"Error in reading the pH structure file in fix constant_pH");
-	        line[strcspn(line,"\n")] = '\0';
-	        token = strtok(line,",");
-	        int type = std::stoi(token);
-	        protonable[type] = 1;
-	        token = strtok(NULL,",");
-	        typePerProtMol[type] = std::stoi(token);
-	        for (int j = 0; j < pHnStructures1; j++) {
-	           token = strtok(NULL,",");
-	           pH1qs[type][j] = std::stod(token);  
-	        }
-
-	        if (fgets(line,sizeof(line),pHStructureFile2) == nullptr)
-	           error->all(FLERR,"Error in reading the pH structure file in fix constant_pH");
-	        line[strcspn(line,"\n")] = '\0';
-	        token = strtok(line,",");
-	        type = std::stoi(token);
-	        protonable[type] = 1;
-	        token = strtok(NULL,",");
-	        typePerProtMol[type] = std::stoi(token);
-	        for (int j = 0; j < pHnStructures2; j++) {
-	           token = strtok(NULL,",");
-	           pH2qs[type][j] = std::stod(token);  
-	         }
-       }
-       fclose(pHStructureFile1);
-       fclose(pHStructureFile2);
-   }
-   
-   // To avoid the code trying to reclose it.
-   pHStructureFile1 = nullptr;
-   pHStructureFile2 = nullptr;
-   
-   MPI_Bcast(protonable,ntypes+1,MPI_INT,0,world);
-   MPI_Bcast(typePerProtMol,ntypes+1,MPI_INT,0,world);
-   MPI_Bcast(pH1qs[0],(ntypes+1)*(pHnStructures1),MPI_DOUBLE,0,world);
-   MPI_Bcast(pH2qs[0],(ntypes+1)*(pHnStructures2),MPI_DOUBLE,0,world); 
+  MPI_Bcast(protonable.get(), ntypes + 1, MPI_INT, 0, world);
+  MPI_Bcast(typePerProtMol.get(), ntypes + 1, MPI_INT, 0, world);
+  MPI_Bcast(pH1qs[0], (ntypes + 1) * pHnStructures1, MPI_DOUBLE, 0, world);
+  MPI_Bcast(pH2qs[0], (ntypes + 1) * pHnStructures2, MPI_DOUBLE, 0, world);
 }
 
 /* ----------------------------------------------------------------------------------------
@@ -415,17 +397,14 @@ void FixAdaptiveProtonation::write_molids(const char* const file_name ) const
 {
    if (comm->me == 0) {
       if (file_name == nullptr) error->one(FLERR,"The wrong file name in fix adaptive protonation");
-      FILE* output_file = fopen(file_name,"w");
-      if (output_file == nullptr) error->one(FLERR,"Cannot open the file");
-      if (output_file == nullptr) error->one(FLERR,"Cannot open the molid files for writing");
-      fprintf(output_file,"%d\n",n_protonable);
-      fprintf(output_file,"The molids file\n");
-      fprintf(output_file,"with the intermediate information of the fix adaptive protonation command\n");   
+      std::ofstream output_file(file_name,std::ofstream::out);
+      if (!output_file.is_open()) error->one(FLERR,"Cannot open the molid files for writing");
+      output_file << n_protonable << std::endl;
+      output_file << "The molids file" << std::endl;
+      output_file << "with the intermediate information of the fix adaptive protonation command" << std::endl;   
       for (int i = 0; i < n_protonable; i++) {
-         fprintf(output_file,"%d\n",protonable_molids[i]);
+         output_file << protonable_molids[i] << std::endl;
       }
-      fclose(output_file);
-      output_file = nullptr;
    }
 }
 
@@ -435,18 +414,12 @@ void FixAdaptiveProtonation::write_molids(const char* const file_name ) const
 
 void FixAdaptiveProtonation::deallocate_storage()
 {
-   if (protonable_molids) memory->destroy(protonable_molids);
-   if (mark) memory->destroy(mark);
-   if (mark_prev) memory->destroy(mark_prev);
-   if (mark_local) memory->destroy(mark_local);
-   if (molecule_size) memory->destroy(molecule_size);
-   if (molecule_size_local) memory->destroy(molecule_size_local);
-   protonable_molids = nullptr;
-   mark = nullptr;
-   mark_prev = nullptr;
-   mark_local = nullptr;
-   molecule_size = nullptr;
-   molecule_size_local = nullptr;
+   protonable_molids.reset();
+   mark.reset();
+   mark_prev.reset();
+   mark_local.reset();
+   molecule_size.reset();
+   molecule_size_local.reset();
 }
 
 /* ----------------------------------------------------------------------------------------
@@ -456,18 +429,18 @@ void FixAdaptiveProtonation::deallocate_storage()
 
 void FixAdaptiveProtonation::allocate_storage()
 {
-   memory->create(protonable_molids,nmolecules,"AdaptiveProtonation:protonable_molids");
-   memory->create(mark,nmolecules+1,"AdaptiveProtontation:mark");
-   memory->create(mark_prev,nmolecules+1,"AdaptiveProtonation:mark_prev");
-   memory->create(mark_local,nmolecules+1,"AdaptiveProtonation:mark_local");
-   memory->create(molecule_size,nmolecules+1,"AdaptiveProtonation:molecule_size");
-   memory->create(molecule_size_local,nmolecules+1,"AdaptiveProtonation:molecule_size_local");
-   std::fill(protonable_molids,protonable_molids+nmolecules,-1);
-   std::fill(mark,mark+nmolecules+1,0);
-   std::fill(mark_local,mark_local+nmolecules+1,0);
-   std::fill(molecule_size,molecule_size+nmolecules+1,0);
-   std::fill(molecule_size_local,molecule_size_local+nmolecules+1,0);
-   std::fill(mark_prev,mark_prev+nmolecules+1,-1); /* I put it on purpose so in the first step every molecule changes unless 
+   protonable_molids = std::make_unique<int []>(nmolecules);
+   mark = std::make_unique<int []>(nmolecules+1);
+   mark_prev = std::make_unique<int []>(nmolecules+1);
+   mark_local = std::make_unique<int []>(nmolecules+1);
+   molecule_size = std::make_unique<int []>(nmolecules+1);
+   molecule_size_local = std::make_unique<int []>(nmolecules+1);
+   std::fill(protonable_molids.get(),protonable_molids.get()+nmolecules,-1);
+   std::fill(mark.get(),mark.get()+nmolecules+1,0);
+   std::fill(mark_local.get(),mark_local.get()+nmolecules+1,0);
+   std::fill(molecule_size.get(),molecule_size.get()+nmolecules+1,0);
+   std::fill(molecule_size_local.get(),molecule_size_local.get()+nmolecules+1,0);
+   std::fill(mark_prev.get(),mark_prev.get()+nmolecules+1,-1); /* I put it on purpose so in the first step every molecule changes unless 
                                                     * INIT_MIDS is set in which case the read_init_mids() function rewrites this.
                                                     */
 }
@@ -522,8 +495,8 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
 
 
    // Reducing the values from various cpus
-   MPI_Allreduce(mark_local,mark,nmolecules+1,MPI_INT,MPI_SUM,world);
-   MPI_Allreduce(molecule_size_local,molecule_size,nmolecules+1,MPI_INT,MPI_SUM,world);
+   MPI_Allreduce(mark_local.get(),mark.get(),nmolecules+1,MPI_INT,MPI_SUM,world);
+   MPI_Allreduce(molecule_size_local.get(),molecule_size.get(),nmolecules+1,MPI_INT,MPI_SUM,world);
 
    for (int i = 1; i < nmolecules+1; i++)
    {

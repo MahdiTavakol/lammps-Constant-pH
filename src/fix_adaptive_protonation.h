@@ -24,6 +24,8 @@ FixStyle(adaptive_protonation,FixAdaptiveProtonation);
 #include "fix.h"
 #include "atom_vec.h"
 
+#include <fstream>
+
 namespace LAMMPS_NS {
 
    class FixAdaptiveProtonation : public Fix {
@@ -59,16 +61,17 @@ namespace LAMMPS_NS {
    protected:
 
       /// -----> This part is similar to the part in the fix_constant_pH.cpp, so should be a separate class
-      // The input files 
-      FILE* pHStructureFile1, * pHStructureFile2;
+      // The input files
+      std::ifstream  pHStructureFile1, pHStructureFile2;
 
    
       // The information on the protonable species
       int pHnStructures1, pHnStructures2;
       int pHnTypes1, pHnTypes2;
       double **pH1qs, **pH2qs;
-      int * typePerProtMol;
-      int *protonable;
+
+      std::unique_ptr<int []> typePerProtMol;
+      std::unique_ptr<int []> protonable;
 
       void read_pH_structure_files();
 
@@ -79,7 +82,7 @@ namespace LAMMPS_NS {
       /* When a huge number of lambdas is added to the system the simulation becomes unstable.
          So, there might be a need to input the molids of the lambdas
       */
-      FILE* init_molid_file;
+     std::ifstream  init_molid_file;
       
 
 
@@ -99,19 +102,19 @@ namespace LAMMPS_NS {
        *  1 ---> SOLVENT
        */
 
-      int * mark;
-      int * mark_local;
-      int * mark_prev; // For the previous step
-      int * mark_per_mol; // If one atom have mark == 1 all the atoms of that molecule should have mark == 1
+      std::unique_ptr<int []> mark;
+      std::unique_ptr<int []> mark_local;
+      std::unique_ptr<int []> mark_prev; // For the previous step
+      std::unique_ptr<int []> mark_per_mol; // If one atom have mark == 1 all the atoms of that molecule should have mark == 1
 
-      int * molecule_size; // used to average the mark for each molecule
-      int * molecule_size_local;
+      std::unique_ptr<int []> molecule_size; // used to average the mark for each molecule
+      std::unique_ptr<int []> molecule_size_local;
       
       // Tracking the changes in the q_total
       double q_change;
 
       // array to access the molids of the protonable molecules
-      int * protonable_molids;
+      std::unique_ptr<int []> protonable_molids;
       int n_protonable;
 
       // Changes in the environment which is needed in the fix_constant_pH to check if it needs to get the protonable_molids or not.

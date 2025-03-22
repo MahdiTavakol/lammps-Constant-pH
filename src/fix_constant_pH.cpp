@@ -129,7 +129,7 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
       iarg += 2;
     } else if (strcmp(arg[iarg], "Print_Udwp") == 0) {
       print_Udwp_flag = true;
-      Udwp_fp.open(arg[iarg+1],std::ifstream::out);
+      Udwp_fp.open(arg[iarg+1],std::ofstream::out);
       iarg += 2;
     } else if (strcmp(arg[iarg], "molids") == 0) {
       n_lambdas = utils::numeric(FLERR, arg[iarg + 1], false, lmp);
