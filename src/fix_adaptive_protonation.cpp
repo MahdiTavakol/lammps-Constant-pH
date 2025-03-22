@@ -576,38 +576,33 @@ void FixAdaptiveProtonation::read_molids_file()
     *  molidn
     */
   
-   char *token;
+   std::string line;
    if (comm->me == 0) {
-
-      char line[128];
-      fgets(line,sizeof(line),init_molid_file);
-      line[strcspn(line,"\n")] = '\0';
-      token = strtok(line,",");
-      n_protonable = std::stoi(token);
+      // comment-1
+      std::getline(init_molid_file,line);
+      // comment-2
+      std::getline(init_molid_file,line);
+      // n_protonable
+      std::getline(init_molid_file,line);
+      n_protonable = std::stoi(line);
       // Checking that if there is enough space in the allocated arrays
       if (n_protonable > nmolecules) error->one(FLERR,"Unknown error");
-      // Skipping the first comment
-      fgets(line,sizeof(line),init_molid_file);
-      // Skipping the second comment
-      fgets(line,sizeof(line),init_molid_file);
+      
       for (int i = 0; i < n_protonable; i++) {
-	 fgets(line,sizeof(line),init_molid_file);
-         line[strcspn(line,"\n")] = '\0';
-	 token = strtok(line,",");
-	 protonable_molids[i] = std::stoi(token);
+         if (!std::getline(init_molid_file,line))
+            error->one(FLERR,"Error in reading the init_molid_file");
+         protonable_molids[i] = std::stoi(line);
       }
-      fclose(init_molid_file);
    }
-   // It should set to nullptr in all the ranks so none of them tries to close the file again.
-   init_molid_file = nullptr;
+
 
    // First broadcasting the size;
    MPI_Bcast(&n_protonable,1,MPI_INT,0,world);
    // Then broadcasting the individual molids
-   MPI_Bcast(protonable_molids,n_protonable,MPI_INT,0,world);
+   MPI_Bcast(protonable_molids.get(),n_protonable,MPI_INT,0,world);
    
    
-   std::fill(mark_prev,mark_prev+nmolecules+1,0); // zero is for SOLID
+   std::fill(mark_prev.get(),mark_prev.get()+nmolecules+1,0); // zero is for SOLID
    for (int i = 0; i < n_protonable; i++)
       mark_prev[protonable_molids[i]] = SOLVENT; // protonable molecules are exposed to the SOLVENT.	
 }
@@ -636,7 +631,7 @@ void FixAdaptiveProtonation::modify_protonation_state()
    double* q = atom->q;
    int * type = atom->type;
    int * molecule = atom->molecule;
-   int nchanges_local[3] = {0,0,0};
+   std::array<int,3> nchanges_local = {0,0,0};
    double q_change_local = 0;
    double q_init;
 
@@ -650,9 +645,9 @@ void FixAdaptiveProtonation::modify_protonation_state()
             switch (mark_prev[molecule[i]]) {
                case SOLID:   // The molecule was in the solid before
                case NEITHER: // First step (initial value of mark_prev is -1)
-		  q_init = q[i];
+		            q_init = q[i];
                   //q[i] = pH2qs[type[i]][0];
-		  q_change_local += q[i] - q_init;
+		            q_change_local += q[i] - q_init;
                   nchanges_local[0]++;
                   nchanges_local[1]++;
                   break;
@@ -670,9 +665,9 @@ void FixAdaptiveProtonation::modify_protonation_state()
             switch (mark_prev[molecule[i]]) {
                case SOLVENT:  // It came from the water ----> deprotonate it
                case NEITHER:  // First step (initial value of mark_prev is -1)
-	          q_init = q[i];
+	               q_init = q[i];
                   //q[i] = pH1qs[type[i]][0];
-		  q_change_local += q[i] - q_init;
+		            q_change_local += q[i] - q_init;
                   nchanges_local[0]++;
                   nchanges_local[2]++;
                   break;
@@ -693,7 +688,7 @@ void FixAdaptiveProtonation::modify_protonation_state()
    }
    
    MPI_Allreduce(&q_change_local,&q_change,1,MPI_DOUBLE,MPI_SUM,world);
-   MPI_Allreduce(nchanges_local,nchanges,3,MPI_INT,MPI_SUM,world);
+   MPI_Allreduce(nchanges_local.data(),nchanges.data(),3,MPI_INT,MPI_SUM,world);
    
    
    // Check if we need to change n_protonable and protonable_molids
