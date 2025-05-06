@@ -444,19 +444,22 @@ void FixAdaptiveProtonation::read_molids_file()
 
   std::string line;
   if (comm->me == 0) {
+    // n_protonable
+    std::getline(init_molid_file, line);
+    n_protonable = std::stoi(line);
     // comment-1
     std::getline(init_molid_file, line);
     // comment-2
     std::getline(init_molid_file, line);
-    // n_protonable
-    std::getline(init_molid_file, line);
-    n_protonable = std::stoi(line);
+    
     // Checking that if there is enough space in the allocated arrays
     if (n_protonable > nmolecules) error->one(FLERR, "Unknown error");
 
+    std::cout << "HERE_" << n_protonable << std::endl;
     for (int i = 0; i < n_protonable; i++) {
       if (!std::getline(init_molid_file, line))
         error->one(FLERR, "Error in reading the init_molid_file");
+      std::cout << line << std::endl;
       protonable_molids[i] = std::stoi(line);
     }
   }
