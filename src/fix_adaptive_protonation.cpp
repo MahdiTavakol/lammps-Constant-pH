@@ -503,6 +503,7 @@ void FixAdaptiveProtonation::modify_protonation_state()
 
   // I am not sure if this is necessary or not.
   double **pH1qs = pH_structure_storage->pH1qs;
+  double **pH2qs = pH_structure_storage->pH2qs;
 
   for (int i = 0; i < nlocal; i++) {
     switch (mark[molecule[i]]) {
