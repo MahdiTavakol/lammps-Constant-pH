@@ -222,6 +222,7 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
   peratom_flag = 1;
   size_peratom_cols = 0;
   peratom_freq = nevery;
+  extarray = 0;
 }
 
 /* ---------------------------------------------------------------------- */

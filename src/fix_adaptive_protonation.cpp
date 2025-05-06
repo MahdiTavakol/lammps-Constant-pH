@@ -111,6 +111,8 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
   size_vector = 3;
   size_peratom_cols = 0;
   peratom_freq = nevery;
+  extscalar = 0;
+  extvector = 0;
 
   /* This part used to be in the setup() function, 
     * however since this fix adaptive protonation is
@@ -430,6 +432,7 @@ void FixAdaptiveProtonation::set_molecule_id()
 
 void FixAdaptiveProtonation::read_molids_file()
 {
+   using std::getline, std::string, std::stoi, std::fill;
   /*
     *  File format
     *  comment_1
@@ -442,25 +445,24 @@ void FixAdaptiveProtonation::read_molids_file()
     *  molidn
     */
 
-  std::string line;
+  string line;
   if (comm->me == 0) {
     // n_protonable
-    std::getline(init_molid_file, line);
-    n_protonable = std::stoi(line);
+    getline(init_molid_file, line);
+    n_protonable = stoi(line);
     // comment-1
-    std::getline(init_molid_file, line);
+    getline(init_molid_file, line);
     // comment-2
-    std::getline(init_molid_file, line);
-    
+    getline(init_molid_file, line);
+
     // Checking that if there is enough space in the allocated arrays
     if (n_protonable > nmolecules) error->one(FLERR, "Unknown error");
 
-    std::cout << "HERE_" << n_protonable << std::endl;
+
     for (int i = 0; i < n_protonable; i++) {
-      if (!std::getline(init_molid_file, line))
+      if (!getline(init_molid_file, line))
         error->one(FLERR, "Error in reading the init_molid_file");
-      std::cout << line << std::endl;
-      protonable_molids[i] = std::stoi(line);
+      protonable_molids[i] = stoi(line);
     }
   }
 
@@ -469,7 +471,7 @@ void FixAdaptiveProtonation::read_molids_file()
   // Then broadcasting the individual molids
   MPI_Bcast(protonable_molids.get(), n_protonable, MPI_INT, 0, world);
 
-  std::fill(mark_prev.get(), mark_prev.get() + nmolecules + 1, 0);    // zero is for SOLID
+  fill(mark_prev.get(), mark_prev.get() + nmolecules + 1, 0);    // zero is for SOLID
   for (int i = 0; i < n_protonable; i++)
     mark_prev[protonable_molids[i]] =
         SOLVENT;    // protonable molecules are exposed to the SOLVENT.
