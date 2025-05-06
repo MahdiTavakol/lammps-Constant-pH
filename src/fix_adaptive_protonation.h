@@ -109,7 +109,7 @@ namespace LAMMPS_NS {
       int n_protonable;
 
       // Changes in the environment which is needed in the fix_constant_pH to check if it needs to get the protonable_molids or not.
-      int nchanges[3]; // changes, solid_to_water, water_to_solid
+      std::array<int,3> nchanges; // changes, solid_to_water, water_to_solid
 
 
       // maximum number of atoms and number of molecules

@@ -290,7 +290,7 @@ void FixConstantPH::init()
 
 
   // Reading the pH structure files
-  pH_structure_storage = std::make_unique<constant_pH_structures>(fileName1, fileName2);
+  pH_structure_storage = std::make_unique<constant_pH_structures>(lmp,fileName1, fileName2);
   pH_structure_storage->read_pH_structure_files();
 
 }
@@ -488,10 +488,10 @@ void FixConstantPH::initialize_lambda()
   int ntypes = atom->ntypes;
   int nlocal = atom->nlocal;
   double *q = atom->q;
-  
+
   double** pH1qs = pH_structure_storage->pH1qs;
   double** pH2qs = pH_structure_storage->pH2qs;
-  int* protonable = pH_structure_storage->protonable;
+  int* protonable = pH_structure_storage->protonable.get(); // Not safe, you should use std::shared_ptr instead..
 
   double pH1qtotal = 0.0;
   double pH2qtotal = 0.0;
@@ -535,6 +535,9 @@ void FixConstantPH::update_a_lambda()
   double kT = force->boltz * T;
   double nStructures1Barrier = 0.5 * kT;
   double nStructures2Barrier = 0.5 * kT;
+
+  int pHnStructures1 = pH_structure_storage->pHnStructures1;
+  int pHnStructures2 = pH_structure_storage->pHnStructures2;
 
   //df = 1.0;
   //f = 1.0;
@@ -1083,9 +1086,11 @@ void FixConstantPH::modify_qs(double scale, int j)
   double *q = atom->q;
 
 
-  int* protonable = pH_structure_storage->protonable;
+  int* protonable = pH_structure_storage->protonable.get(); // Not safe, I should use std::shared_ptr instead...
   double** pH1qs = pH_structure_storage->pH1qs;
   double** pH2qs = pH_structure_storage->pH2qs;
+  int pHnStructures1 = pH_structure_storage->pHnStructures1;
+  int pHnStructures2 = pH_structure_storage->pHnStructures2;
 
   double *q_changes_local = new double[4]{0.0, 0.0, 0.0, 0.0};
   double *q_changes = new double[4]{0.0, 0.0, 0.0, 0.0};
@@ -1158,6 +1163,12 @@ void FixConstantPH::modify_qs(double **scales)
   int *type = atom->type;
   int ntypes = atom->ntypes;
   double *q = atom->q;
+
+  int* protonable = pH_structure_storage->protonable.get(); // Not safe, I should use std::shared_ptr instead...
+  double** pH1qs = pH_structure_storage->pH1qs;
+  double** pH2qs = pH_structure_storage->pH2qs;
+  int pHnStructures1 = pH_structure_storage->pHnStructures1;
+  int pHnStructures2 = pH_structure_storage->pHnStructures2;
 
   double *q_changes_local = new double[5]{0.0, 0.0, 0.0, 0.0, 0.0};
   double *q_changes = new double[5]{0.0, 0.0, 0.0, 0.0, 0.0};

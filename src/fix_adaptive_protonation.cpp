@@ -192,7 +192,7 @@ int FixAdaptiveProtonation::setmask()
 void FixAdaptiveProtonation::init()
 {
    // Reading the pH structure files
-   pH_structure_storage = std::make_unique<constant_pH_structures>(fileName1, fileName2);
+   pH_structure_storage = std::make_unique<constant_pH_structures>(lmp,fileName1, fileName2);
    pH_structure_storage->read_pH_structure_files();
 
    // Checking if the atom style contains the molecules information
@@ -205,7 +205,7 @@ void FixAdaptiveProtonation::init()
 
    // request for a neighbor list
    neighbor->add_request(this, list_flags);
-   
+
    std::fill(nchanges.begin(),nchanges.end(),0);
 }
 
@@ -342,6 +342,8 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
    int *ilist, *jlist, *numneigh, **firstneigh;
    int inum, jnum;
    int wnum; // number of surrounding water molecules
+
+   int * protonable = pH_structure_storage->protonable.get(); // Not safe, you should use std::shared_ptr instead..
 
    inum = list->inum; // I do not need ghost atoms for inum. however, I need them in jnum
    ilist = list->ilist;

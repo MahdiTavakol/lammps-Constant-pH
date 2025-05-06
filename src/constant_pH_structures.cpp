@@ -1,12 +1,18 @@
 #include "constant_pH_structures.h"
 
+#include "atom.h"
 #include "comm.h"
+#include "error.h"
 #include "memory.h"
 
 #include <sstream>
 
-constant_pH_structures::constant_pH_structures(const string& fileName1,
-                                               const string& fileName2)
+using namespace LAMMPS_NS;
+
+constant_pH_structures::constant_pH_structures(LAMMPS *lmp, 
+                                               const string& fileName1,
+                                               const string& fileName2):
+                                               Pointers(lmp), pH1qs(nullptr), pH2qs(nullptr)
 {
     if (comm->me == 0) {
         pHStructureFile1.open(fileName1,std::ifstream::in);
@@ -16,10 +22,10 @@ constant_pH_structures::constant_pH_structures(const string& fileName1,
      }
 }
 
-constant_pH_structures()::~constant_pH_structures()
+constant_pH_structures::~constant_pH_structures()
 {
     if (pH1qs) memory->destroy(pH1qs);
-    if (pH2qs) memory->destory(pH2qs);
+    if (pH2qs) memory->destroy(pH2qs);
 
     pH1qs = nullptr;
     pH2qs = nullptr;
@@ -56,7 +62,7 @@ void constant_pH_structures::read_pH_structure_files()
             nStructures = stoi(line);
         }
 
-        MPI_BCast(&nStructures,1,MPI_INT,0,world);
+        MPI_Bcast(&nStructures,1,MPI_INT,0,world);
         memory->create(pHqs,ntypes+1,nStructures,memory_string);
 
         if (comm->me == 0)
@@ -108,6 +114,6 @@ void constant_pH_structures::read_pH_structure_files()
    };
 
 
-   parse_file(pHStructureFile1,pH1qs,pHnTypes1,"constant_pH:pH1qs");
-   parse_file(pHStructureFile2,pH2qs,pHnTypes2,"constant_pH:pH2qs");
+   parse_file(pHStructureFile1,pHnStructures1,pH1qs,pHnTypes1,"constant_pH:pH1qs");
+   parse_file(pHStructureFile2,pHnStructures2,pH2qs,pHnTypes2,"constant_pH:pH2qs");
 }
