@@ -83,8 +83,8 @@ class FixAdaptiveProtonation : public Fix {
   std::unique_ptr<int[]> mark;
   std::unique_ptr<int[]> mark_local;
   std::unique_ptr<int[]> mark_prev;    // For the previous step
-  std::unique_ptr<int[]>
-      mark_per_mol;    // If one atom have mark == 1 all the atoms of that molecule should have mark == 1
+  std::unique_ptr<int[]> mark_per_mol;   
+  // If one atom have mark == 1 all the atoms of that molecule should have mark == 1
 
   std::unique_ptr<int[]> molecule_size;    // used to average the mark for each molecule
   std::unique_ptr<int[]> molecule_size_local;
