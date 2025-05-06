@@ -60,8 +60,7 @@ enum {F_NONE,RESET_MID = 1 << 1, INIT_MID = 1 << 2};
 /* --------------------------------------------------------------------------------------- */
 
 FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS* lmp, int narg, char** arg) : Fix(lmp, narg, arg), 
-   pH1qs(nullptr), pH2qs(nullptr),
-   n_protonable(0)
+   n_protonable{0}
 {
    if (narg < 7) utils::missing_cmd_args(FLERR, "fix adaptive_protonation", error);
 
@@ -72,11 +71,9 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS* lmp, int narg, char** arg
 
    if (nevery < 0) error->all(FLERR,"Illegal fix adaptive_protonation every value {}", nevery);
 
-   if (comm->me == 0) {
-      pHStructureFile1.open(arg[4],std::ifstream::in); // The structure in the solid state
-      pHStructureFile2.open(arg[5],std::ifstream::in); // The structure in the solvent phase ==> It should be modified based on the pKa and pH values by the fix constant_pH command
-      if (!pHStructureFile1.is_open() || !pHStructureFile2.is_open()) error->one(FLERR,"Unable to open the file");
-   }
+   fileName1 = arg[4];
+   fileName2 = arg[5];
+
 
    typeOW = utils::numeric(FLERR,arg[6],false,lmp);
    threshold = utils::numeric(FLERR,arg[7],false,lmp);
@@ -174,15 +171,10 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS* lmp, int narg, char** arg
 
 FixAdaptiveProtonation::~FixAdaptiveProtonation()
 {
-   if (pH1qs) memory->destroy(pH1qs);
-   if (pH2qs) memory->destroy(pH2qs);
    if (vector_atom) delete [] vector_atom;
 
    deallocate_storage(); 
 
-   // It is a good practice to put the deallocated pointers to nullptr
-   pH1qs = nullptr;
-   pH2qs = nullptr;
    vector_atom = nullptr;
 }
 
@@ -199,8 +191,9 @@ int FixAdaptiveProtonation::setmask()
 
 void FixAdaptiveProtonation::init()
 {
-   // I am not sure if this should be here to in the setup() function
-   read_pH_structure_files();
+   // Reading the pH structure files
+   pH_structure_storage = std::make_unique<constant_pH_structures>(fileName1, fileName2);
+   pH_structure_storage->read_pH_structure_files();
 
    // Checking if the atom style contains the molecules information
    if (atom->molecular != 1) error->all(FLERR,"Illegal atom style in the fix adpative protonation");
@@ -281,112 +274,6 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
    // Resetting the mark_prev parameter to help us keep the track of which molecule moves from solid to solvent and vice versa
    set_mark_prev();
 
-}
-
-/* ----------------------------------------------------------------------------------------
-    Reading the structure files
-   ---------------------------------------------------------------------------------------- */
-
-void FixAdaptiveProtonation::read_pH_structure_files()
-{
-  /* File format
-    * Comment
-    * pHnStructures
-    * pHnTypes
-    * type1,  number of type1 atoms in the protonable molecule, qState1, qState2, qState3
-    * ... 
-    * ...  
-    */
-
-
-  int ntypes = atom->ntypes;
-  protonable = std::make_unique<int[]>(ntypes + 1);
-  typePerProtMol = std::make_unique<int[]>(ntypes + 1);
-
-  std::string line;
-
-  if (comm->me == 0) {
-    // skip comments
-    std::getline(pHStructureFile1, line);
-    std::getline(pHStructureFile2, line);
-
-    // read pHnStructures
-    std::getline(pHStructureFile1, line);
-    std::stringstream iss1(line);
-    iss1 >> pHnStructures1;
-
-    std::getline(pHStructureFile2, line);
-    std::stringstream iss2(line);
-    iss2 >> pHnStructures2;
-  }
-
-  MPI_Bcast(&pHnStructures1, 1, MPI_INT, 0, world);
-  MPI_Bcast(&pHnStructures2, 1, MPI_INT, 0, world);
-
-  memory->create(pH1qs, ntypes + 1, pHnStructures1, "constant_pH:pH1qs");
-  memory->create(pH2qs, ntypes + 1, pHnStructures2, "constant_pH:pH2qs");
-
-  if (comm->me == 0) {
-    std::getline(pHStructureFile1, line);
-    std::stringstream iss1(line);
-    iss1 >> pHnTypes1;
-
-    std::getline(pHStructureFile2, line);
-    std::stringstream iss2(line);
-    iss2 >> pHnTypes2;
-
-
-    if (pHnTypes1 != pHnTypes2)
-      error->one(FLERR, "Mismatch in protonable type counts between pH structure files");
-
-    for (int i = 1; i <= ntypes; ++i) {
-      protonable[i] = 0;
-      typePerProtMol[i] = 0;
-      for (int j = 0; j < pHnStructures1; ++j) pH1qs[i][j] = 0.0;
-      for (int j = 0; j < pHnStructures2; ++j) pH2qs[i][j] = 0.0;
-    }
-
-    for (int i = 0; i < pHnTypes1; ++i) {
-      // File 1
-      if (!std::getline(pHStructureFile1, line))
-        error->all(FLERR, "Error reading pHStructureFile1");
-
-      std::string token;
-      std::stringstream iss3(line);
-      std::getline(iss3,token,',');
-      int type = std::stoi(token);
-      std::getline(iss3,token,',');
-      typePerProtMol[type] = std::stoi(token);
-      protonable[type] = 1;
-      for (int j = 0; j < pHnStructures1; ++j) {
-        if (!(std::getline(iss3,token,',')))
-          error->one(FLERR, "Malformed line in pHStructureFile1");
-        pH1qs[type][j] = std::stof(token);
-      }
-
-      // File 2
-      if (!std::getline(pHStructureFile2, line))
-        error->all(FLERR, "Error reading pHStructureFile2");
-
-
-      std::stringstream iss4(line);
-      std::getline(iss4,token,',');
-      type = std::stoi(token);
-      std::getline(iss4,token,',');
-      typePerProtMol[type] = std::stoi(token);
-      protonable[type] = 1;
-      for (int j = 0; j < pHnStructures2; ++j) {
-        if (!(std::getline(iss4,token,',')))
-          error->one(FLERR, "Malformed line in pHStructureFile2");
-        pH2qs[type][j] = std::stof(token);
-      }
-    }
-  }
-
-  MPI_Bcast(protonable.get(), ntypes + 1, MPI_INT, 0, world);
-  MPI_Bcast(typePerProtMol.get(), ntypes + 1, MPI_INT, 0, world);
-  MPI_Bcast(pH1qs[0], (ntypes + 1) * pHnStructures1, MPI_DOUBLE, 0, world);
-  MPI_Bcast(pH2qs[0], (ntypes + 1) * pHnStructures2, MPI_DOUBLE, 0, world);
 }
 
 /* ----------------------------------------------------------------------------------------
@@ -634,6 +521,9 @@ void FixAdaptiveProtonation::modify_protonation_state()
    std::array<int,3> nchanges_local = {0,0,0};
    double q_change_local = 0;
    double q_init;
+   
+   // I am not sure if this is necessary or not.
+   double** pH1qs = pH_structure_storage->pH1qs;
 
 
    for (int i = 0; i < nlocal; i++) {

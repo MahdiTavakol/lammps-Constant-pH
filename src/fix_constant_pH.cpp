@@ -73,8 +73,7 @@ static constexpr double tol = 1e-5;
 /* ---------------------------------------------------------------------- */
 
 FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
-    Fix(lmp, narg, arg), pH1qs(nullptr),
-    pH2qs(nullptr),  lambdas(nullptr), v_lambdas(nullptr),
+    Fix(lmp, narg, arg), lambdas(nullptr), v_lambdas(nullptr),
     a_lambdas(nullptr), m_lambdas(nullptr), H_lambdas(nullptr),
     GFF(nullptr), 
     fix_adaptive_protonation_id(nullptr), fixgpu(nullptr), q_orig(nullptr), f_orig(nullptr),
@@ -87,14 +86,9 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
   if (nevery < 0) error->all(FLERR, "Illegal fix constant_pH every value {}", nevery);
 
   // Reading the file that contains the charges before and after protonation/deprotonation
-  if (comm->me == 0) {
-    pHStructureFile1.open(arg[4],std::ifstream::in);
-    if (!pHStructureFile1.is_open()) error->one(FLERR, "Unable to open the file");
 
-
-    pHStructureFile2.open(arg[4],std::ifstream::in);
-    if (!pHStructureFile2.is_open()) error->one(FLERR, "Unable to open the file");
-  }
+  fileName1 = arg[4];
+  fileName2 = arg[5];
 
   pK = utils::numeric(FLERR, arg[6], false, lmp);
   pH = utils::numeric(FLERR, arg[7], false, lmp);
@@ -242,9 +236,6 @@ FixConstantPH::~FixConstantPH()
   if (fix_adaptive_protonation_id)
     delete [] fix_adaptive_protonation_id;    // Since it is allocated with lmp->utils->strdup, it must be deallocated with delete []
 
-  // deallocating the variables whose size depend on the ntypes andfix_constant_pH.cp as the ntypes does not change during the simulation there is no need for reallocation of them
-  if (pH1qs) memory->destroy(pH1qs);
-  if (pH2qs) memory->destroy(pH2qs);
   if (GFF) memory->destroy(GFF);
 
   // deallocate the memories with size dependent on the n_lambda
@@ -296,6 +287,12 @@ void FixConstantPH::init()
   r_buff = 16.458;
   m_buff = 0.1507;
   d_buff = 0.0;
+
+
+  // Reading the pH structure files
+  pH_structure_storage = std::make_unique<constant_pH_structures>(fileName1, fileName2);
+  pH_structure_storage->read_pH_structure_files();
+
 }
 
 /* ---------------------------------------------------------------------- */
@@ -333,8 +330,6 @@ void FixConstantPH::setup(int /*vflag*/)
   nmax = atom->nmax;
   allocate_storage();
 
-  // Reading the structure of protonable states before and after protonation.
-  read_pH_structure_files();
 
   // I have put this part here on purpose so if the fix_adaptive_protonation reads the initial molids, it is set here
   fix_adaptive_protonation->get_n_protonable(this->n_lambdas);
@@ -493,6 +488,10 @@ void FixConstantPH::initialize_lambda()
   int ntypes = atom->ntypes;
   int nlocal = atom->nlocal;
   double *q = atom->q;
+  
+  double** pH1qs = pH_structure_storage->pH1qs;
+  double** pH2qs = pH_structure_storage->pH2qs;
+  int* protonable = pH_structure_storage->protonable;
 
   double pH1qtotal = 0.0;
   double pH2qtotal = 0.0;
@@ -753,110 +752,6 @@ void FixConstantPH::reset_buff_params(const double _x_lambda_buff, const double 
     MPI_Bcast(&a_lambda_buff, 1, MPI_DOUBLE, 0, world);
     MPI_Bcast(&m_lambda_buff, 1, MPI_DOUBLE, 0, world);
   }
-}
-
-/* ---------------------------------------------------------------------- */
-
-void FixConstantPH::read_pH_structure_files()
-{
-  /* File format
-    * Comment
-    * pHnStructures
-    * pHnTypes
-    * type1,  number of type1 atoms in the protonable molecule, qState1, qState2, qState3
-    * ... 
-    * ...  
-    */
-
-
-  int ntypes = atom->ntypes;
-  protonable = std::make_unique<int[]>(ntypes + 1);
-  typePerProtMol = std::make_unique<int[]>(ntypes + 1);
-
-  std::string line;
-
-  if (comm->me == 0) {
-    // skip comments
-    std::getline(pHStructureFile1, line);
-    std::getline(pHStructureFile2, line);
-
-    // read pHnStructures
-    std::getline(pHStructureFile1, line);
-    std::stringstream iss1(line);
-    iss1 >> pHnStructures1;
-
-    std::getline(pHStructureFile2, line);
-    std::stringstream iss2(line);
-    iss2 >> pHnStructures2;
-  }
-
-  MPI_Bcast(&pHnStructures1, 1, MPI_INT, 0, world);
-  MPI_Bcast(&pHnStructures2, 1, MPI_INT, 0, world);
-
-  memory->create(pH1qs, ntypes + 1, pHnStructures1, "constant_pH:pH1qs");
-  memory->create(pH2qs, ntypes + 1, pHnStructures2, "constant_pH:pH2qs");
-
-  if (comm->me == 0) {
-    std::getline(pHStructureFile1, line);
-    std::stringstream iss1(line);
-    iss1 >> pHnTypes1;
-
-    std::getline(pHStructureFile2, line);
-    std::stringstream iss2(line);
-    iss2 >> pHnTypes2;
-
-
-    if (pHnTypes1 != pHnTypes2)
-      error->one(FLERR, "Mismatch in protonable type counts between pH structure files");
-
-    for (int i = 1; i <= ntypes; ++i) {
-      protonable[i] = 0;
-      typePerProtMol[i] = 0;
-      for (int j = 0; j < pHnStructures1; ++j) pH1qs[i][j] = 0.0;
-      for (int j = 0; j < pHnStructures2; ++j) pH2qs[i][j] = 0.0;
-    }
-
-    for (int i = 0; i < pHnTypes1; ++i) {
-      // File 1
-      if (!std::getline(pHStructureFile1, line))
-        error->all(FLERR, "Error reading pHStructureFile1");
-
-      std::string token;
-      std::stringstream iss3(line);
-      std::getline(iss3,token,',');
-      int type = std::stoi(token);
-      std::getline(iss3,token,',');
-      typePerProtMol[type] = std::stoi(token);
-      protonable[type] = 1;
-      for (int j = 0; j < pHnStructures1; ++j) {
-        if (!(std::getline(iss3,token,',')))
-          error->one(FLERR, "Malformed line in pHStructureFile1");
-        pH1qs[type][j] = std::stof(token);
-      }
-
-      // File 2
-      if (!std::getline(pHStructureFile2, line))
-        error->all(FLERR, "Error reading pHStructureFile2");
-
-
-      std::stringstream iss4(line);
-      std::getline(iss4,token,',');
-      type = std::stoi(token);
-      std::getline(iss4,token,',');
-      typePerProtMol[type] = std::stoi(token);
-      protonable[type] = 1;
-      for (int j = 0; j < pHnStructures2; ++j) {
-        if (!(std::getline(iss4,token,',')))
-          error->one(FLERR, "Malformed line in pHStructureFile2");
-        pH2qs[type][j] = std::stof(token);
-      }
-    }
-  }
-
-  MPI_Bcast(protonable.get(), ntypes + 1, MPI_INT, 0, world);
-  MPI_Bcast(typePerProtMol.get(), ntypes + 1, MPI_INT, 0, world);
-  MPI_Bcast(pH1qs[0], (ntypes + 1) * pHnStructures1, MPI_DOUBLE, 0, world);
-  MPI_Bcast(pH2qs[0], (ntypes + 1) * pHnStructures2, MPI_DOUBLE, 0, world);
 }
 
 /* ----------------------------------------------------------------------
@@ -1186,6 +1081,11 @@ void FixConstantPH::modify_qs(double scale, int j)
   int *type = atom->type;
   int ntypes = atom->ntypes;
   double *q = atom->q;
+
+
+  int* protonable = pH_structure_storage->protonable;
+  double** pH1qs = pH_structure_storage->pH1qs;
+  double** pH2qs = pH_structure_storage->pH2qs;
 
   double *q_changes_local = new double[4]{0.0, 0.0, 0.0, 0.0};
   double *q_changes = new double[4]{0.0, 0.0, 0.0, 0.0};

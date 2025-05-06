@@ -8,12 +8,10 @@ using std::string, std::ifstream;
 
 class constant_pH_structures
 {
+    friend class FixAdaptiveProtonation;
+    friend class FixConstantPH;
 public:
-    constant_pH_structures(const string& fileName1,const string& fileName2, 
-                          double**& pH1qs_, double**& pH2qs_,
-                          int& pHnStructures1_, int& pHnStructures2_,
-                          int& pHnTypes1_, int& pHnTypes2_, 
-                          int*& typePerProtMol_, int*& protonable_);
+    constant_pH_structures(const string& fileName1,const string& fileName2);
 
     ~constant_pH_structures();
     constant_pH_structures(const constant_pH_structures& rhs) = delete;
@@ -23,10 +21,16 @@ public:
 
     void read_pH_structure_files();
 
+
+
 private:
-    double **&pH1qs, **&pH2qs;
-    int *&typePerProtMol, *&protonable;
-    int &pHnStructures1, &pHnStructures2;
-    int &pHnTypes1, &pHnTypes2;
     ifstream pHStructureFile1, pHStructureFile2;
+
+
+    /* These variables will be accessed by fix_adaptive_protonation and fix_constant_pH*/
+    double **pH1qs, **pH2qs;
+    std::unique_ptr<int []> typePerProtMol;
+    std::unique_ptr<int []> protonable;
+    int pHnStructures1, pHnStructures2;
+    int pHnTypes1, pHnTypes2;
 };

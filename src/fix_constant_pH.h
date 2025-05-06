@@ -49,16 +49,13 @@ namespace LAMMPS_NS {
 
      protected:
         int flags;
-	// Sturcture files
-        std::ifstream pHStructureFile1, pHStructureFile2; 
 
-	// Atom types and charges that change due to protonation
-        int pHnStructures1, pHnStructures2;
-        int pHnTypes1, pHnTypes2;
-        double **pH1qs, **pH2qs;
         
-        std::unique_ptr<int []> typePerProtMol;
-        std::unique_ptr<int []> protonable;
+	// Sturcture files
+        std::string fileName1, fileName2;
+
+        // The structure information
+        std::unique_ptr<constant_pH_structures> pH_structure_storage;
 
         // Commands that run whenever the lambdas array is modified
         int ncommands;

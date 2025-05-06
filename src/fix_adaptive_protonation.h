@@ -23,6 +23,7 @@ FixStyle(adaptive_protonation,FixAdaptiveProtonation);
 
 #include "fix.h"
 #include "atom_vec.h"
+#include "constant_pH_structures.h"
 
 #include <fstream>
 
@@ -60,22 +61,12 @@ namespace LAMMPS_NS {
 
    protected:
 
-      /// -----> This part is similar to the part in the fix_constant_pH.cpp, so should be a separate class
+ 
       // The input files
-      std::ifstream  pHStructureFile1, pHStructureFile2;
+      std::string fileName1, fileName2;
 
-   
-      // The information on the protonable species
-      int pHnStructures1, pHnStructures2;
-      int pHnTypes1, pHnTypes2;
-      double **pH1qs, **pH2qs;
-
-      std::unique_ptr<int []> typePerProtMol;
-      std::unique_ptr<int []> protonable;
-
-      void read_pH_structure_files();
-
-      // <------ This part is similar to the part in the fix_constant_pH.cpp, so should be a separate class
+      // The structure information
+      std::unique_ptr<constant_pH_structures> pH_structure_storage;
       
       int flags;
 
