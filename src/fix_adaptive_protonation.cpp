@@ -295,18 +295,19 @@ void FixAdaptiveProtonation::deallocate_storage()
 
 void FixAdaptiveProtonation::allocate_storage()
 {
-  protonable_molids = std::make_unique<int[]>(nmolecules);
-  mark = std::make_unique<int[]>(nmolecules + 1);
-  mark_prev = std::make_unique<int[]>(nmolecules + 1);
-  mark_local = std::make_unique<int[]>(nmolecules + 1);
-  molecule_size = std::make_unique<int[]>(nmolecules + 1);
-  molecule_size_local = std::make_unique<int[]>(nmolecules + 1);
-  std::fill(protonable_molids.get(), protonable_molids.get() + nmolecules, -1);
-  std::fill(mark.get(), mark.get() + nmolecules + 1, 0);
-  std::fill(mark_local.get(), mark_local.get() + nmolecules + 1, 0);
-  std::fill(molecule_size.get(), molecule_size.get() + nmolecules + 1, 0);
-  std::fill(molecule_size_local.get(), molecule_size_local.get() + nmolecules + 1, 0);
-  std::fill(mark_prev.get(), mark_prev.get() + nmolecules + 1,
+  using std::make::unique, std::fill;
+  protonable_molids = make_unique<int[]>(nmolecules);
+  mark = make_unique<int[]>(nmolecules + 1);
+  mark_prev = make_unique<int[]>(nmolecules + 1);
+  mark_local = make_unique<int[]>(nmolecules + 1);
+  molecule_size = make_unique<int[]>(nmolecules + 1);
+  molecule_size_local = make_unique<int[]>(nmolecules + 1);
+  fill(protonable_molids.get(), protonable_molids.get() + nmolecules, -1);
+  fill(mark.get(), mark.get() + nmolecules + 1, 0);
+  fill(mark_local.get(), mark_local.get() + nmolecules + 1, 0);
+  fill(molecule_size.get(), molecule_size.get() + nmolecules + 1, 0);
+  fill(molecule_size_local.get(), molecule_size_local.get() + nmolecules + 1, 0);
+  fill(mark_prev.get(), mark_prev.get() + nmolecules + 1,
             -1); /* I put it on purpose so in the first step every molecule changes unless 
                                                     * INIT_MIDS is set in which case the read_init_mids() function rewrites this.
                                                     */
@@ -323,8 +324,8 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
   int inum, jnum;
   int wnum;    // number of surrounding water molecules
 
-  int *protonable = pH_structure_storage->protonable
-                        .get();    // Not safe, you should use std::shared_ptr instead..
+  int *protonable = pH_structure_storage->protonable.get();
+  // Not safe, you should use std::shared_ptr instead..
 
   inum = list->inum;    // I do not need ghost atoms for inum. however, I need them in jnum
   ilist = list->ilist;
@@ -345,6 +346,7 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
       vector_atom[i] = 0;
       continue;
     }
+
     jlist = firstneigh[i];
     jnum = numneigh[i];
     for (int jj = 0; jj < jnum; jj++) {
@@ -473,8 +475,8 @@ void FixAdaptiveProtonation::read_molids_file()
 
   fill(mark_prev.get(), mark_prev.get() + nmolecules + 1, 0);    // zero is for SOLID
   for (int i = 0; i < n_protonable; i++)
-    mark_prev[protonable_molids[i]] =
-        SOLVENT;    // protonable molecules are exposed to the SOLVENT.
+    mark_prev[protonable_molids[i]] = SOLVENT;
+    // protonable molecules are exposed to the SOLVENT.
 }
 
 /* ----------------------------------------------------------------------------------------
