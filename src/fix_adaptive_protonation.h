@@ -50,7 +50,7 @@ class FixAdaptiveProtonation : public Fix {
   void get_n_changes(int &_nchanges) const { _nchanges = this->nchanges[0]; }
 
   // Writes molids information to a file which can be used later with fix constant_pH whenever the commands keyword of the fix_constant_pH is invoked
-  void write_molids(const char *const file_name) const;
+  void write_molids(const std::string& file_name) const;
 
  protected:
   // The input files

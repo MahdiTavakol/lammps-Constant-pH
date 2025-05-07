@@ -260,10 +260,10 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
    Writing molids into a file
    ---------------------------------------------------------------------------------------- */
 
-void FixAdaptiveProtonation::write_molids(const char *const file_name) const
+void FixAdaptiveProtonation::write_molids(const std::string& file_name) const
 {
   if (comm->me == 0) {
-    if (file_name == nullptr) error->one(FLERR, "The wrong file name in fix adaptive protonation");
+    if (file_name.empty()) error->one(FLERR, "The wrong file name in fix adaptive protonation");
     std::ofstream output_file(file_name, std::ofstream::out);
     if (!output_file.is_open()) error->one(FLERR, "Cannot open the molid files for writing");
     output_file << n_protonable << std::endl;
@@ -295,7 +295,7 @@ void FixAdaptiveProtonation::deallocate_storage()
 
 void FixAdaptiveProtonation::allocate_storage()
 {
-  using std::make::unique, std::fill;
+  using std::make_unique, std::fill;
   protonable_molids = make_unique<int[]>(nmolecules);
   mark = make_unique<int[]>(nmolecules + 1);
   mark_prev = make_unique<int[]>(nmolecules + 1);

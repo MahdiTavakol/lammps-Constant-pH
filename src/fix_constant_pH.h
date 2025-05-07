@@ -56,7 +56,7 @@ class FixConstantPH : public Fix {
 
   // Commands that run whenever the lambdas array is modified
   int ncommands;
-  char **commands;
+  std::unique_ptr<string []> commands;
   std::ifstream commandsFile;
 
   // Input variables for constant values
@@ -125,7 +125,7 @@ class FixConstantPH : public Fix {
   std::ofstream lambda_fp, lambda_1_fp, lambda_2_fp, v_lambda_fp, a_lambda_fp, H_lambda_fp;
 
   // The name of the intermediate file written by the fix_adaptive_protonation
-  char *intermediate_file_name;
+  std::string intermediate_file_name;
 
   // output methods for a variable sized lambdas, v_lambdas, ...
   void write_lambdas_header();

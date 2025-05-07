@@ -13,10 +13,6 @@
 ------------------------------------------------------------------------- */
 /* ---v0.10.31----- */
 
-#define DEBUG
-#ifdef DEBUG
-#include <iostream>
-#endif
 #include <random>
 
 #include "fix.h"
@@ -76,15 +72,15 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
     Fix(lmp, narg, arg), lambdas(nullptr), v_lambdas(nullptr), a_lambdas(nullptr),
     m_lambdas(nullptr), H_lambdas(nullptr), GFF(nullptr), fix_adaptive_protonation_id(nullptr),
     fixgpu(nullptr), q_orig(nullptr), f_orig(nullptr), peatom_orig(nullptr), pvatom_orig(nullptr),
-    keatom_orig(nullptr), kvatom_orig(nullptr), commands(nullptr), commandsFile(nullptr)
+    keatom_orig(nullptr), kvatom_orig(nullptr), commandsFile(nullptr), 
+    qOWs(-0.834),qHWs(0.278),mu(0.0),ncommands(0),flags(0),fp_flags(0)
 {
   if (narg < 9) utils::missing_cmd_args(FLERR, "fix constant_pH", error);
 
   nevery = utils::inumeric(FLERR, arg[3], false, lmp);
   if (nevery < 0) error->all(FLERR, "Illegal fix constant_pH every value {}", nevery);
 
-  // Reading the file that contains the charges before and after protonation/deprotonation
-
+  //files that contain the charges before and after protonation/deprotonation
   fileName1 = arg[4];
   fileName2 = arg[5];
 
@@ -92,20 +88,6 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
   pH = utils::numeric(FLERR, arg[7], false, lmp);
   T = utils::numeric(FLERR, arg[8], false, lmp);
 
-  qOWs = -0.834;
-  qHWs = 0.278;
-
-  // Default value for mu
-  mu = 0.0;
-
-  // set the ncommands to zero
-  ncommands = 0;
-
-  // Unset all flags to avoid uninitialized values
-  flags = 0;
-
-  // Unset the fp flags to avoid uninitialized values
-  fp_flags = 0;
 
   GFF_flag = false;
   print_Udwp_flag = false;
@@ -232,9 +214,8 @@ FixConstantPH::~FixConstantPH()
   // According to RAII I do not need to close std::ifstreams
 
   // deallocate char* variables
-  if (fix_adaptive_protonation_id)
-    delete
-        [] fix_adaptive_protonation_id;    // Since it is allocated with lmp->utils->strdup, it must be deallocated with delete []
+  if (fix_adaptive_protonation_id) delete [] fix_adaptive_protonation_id;   
+  // Since it is allocated with lmp->utils->strdup, it must be deallocated with delete []
 
   if (GFF) memory->destroy(GFF);
 
@@ -244,8 +225,6 @@ FixConstantPH::~FixConstantPH()
   // deallocate memories whose size is dependent on natoms
   deallocate_storage();
 
-  for (int i = 0; i < ncommands; i++) delete[] commands[i];
-  delete[] commands;
 }
 
 /* ----------------------------------------------------------------------
@@ -762,6 +741,7 @@ void FixConstantPH::reset_buff_params(const double _x_lambda_buff, const double 
    ---------------------------------------------------------------------- */
 void FixConstantPH::read_commands_file()
 {
+  using std::getline, std::string;
   /*
     * The file format
     * ncommands
@@ -773,38 +753,41 @@ void FixConstantPH::read_commands_file()
     * commandn
     */
 
-  std::string line;
+  string line;
   if (comm->me == 0) {
-    if (!std::getline(commandsFile, line)) error->one(FLERR, "Error reading commands file");
+    if (!getline(commandsFile, line)) error->one(FLERR, "Error reading commands file");
     std::stringstream iss(line);
 
     iss >> ncommands;
   }
 
   MPI_Bcast(&ncommands, 1, MPI_INT, 0, world);
+  commands = std::make_unique<string []>(ncommands);
 
-  commands = new char *[ncommands];
 
   if (comm->me == 0) {
-    std::getline(commandsFile, line);    // comment-1
-    std::getline(commandsFile, line);    // comment-2
+    getline(commandsFile, line);    // comment-1
+    getline(commandsFile, line);    // comment-2
 
     for (int i = 0; i < ncommands; i++) {
-      if (!std::getline(commandsFile, line)) error->one(FLERR, "Error reading commands lines");
+      if (!getline(commandsFile, line)) error->one(FLERR, "Error reading commands lines");
 
-      size_t len = line.size();
-      commands[i] = new char[len];
-      strcpy(commands[i], line.c_str());
+      commands[i] = line;
     }
   }
 
-  for (int i = 0; i < ncommands; i++) {
-    int len = (comm->me == 0) ? strlen(commands[i]) + 1 : 0;
-    MPI_Bcast(&len, 1, MPI_INT, 0, world);    // Use MPI_INT for length broadcast
 
-    if (comm->me != 0) commands[i] = new char[len];
+  for (int i = 0; i < ncommands; i++)
+  {
+    int len = (comm->me == 0)?commands[i].size()+1:0;
+    MPI_Bcast(&len,1,MPI_INT,0,world);
 
-    MPI_Bcast(commands[i], len, MPI_CHAR, 0, world);
+    std::vector<char> buffer(len);
+    if (comm->me == 0)
+      std::memcpy(buffer.data(), commands[i].c_str(),len);
+    MPI_Bcast(buffer.data(),len,MPI_CHAR,0,world);
+    if (comm->me != 0)
+      commands[i] = std::string(buffer.data());
   }
 }
 
@@ -1224,11 +1207,11 @@ void FixConstantPH::modify_qs(double **scales)
     double sigma_scale = 0.0;
     for (int i = 0; i < n_lambdas; i++) sigma_scale += scales[i][0];
     //std::cout << "scale[" << i <<"] = " << scales[i][0] << std::endl;
-    std::cout << "sigma_scale = " << sigma_scale << std::endl;
-    std::cout << " q_changes = " << q_changes[1] << std::endl;
-    std::cout << " q_changes = " << q_changes[2] << std::endl;
-    std::cout << " q_changes = " << q_changes[3] << std::endl;
-    std::cout << " q_changes = " << q_changes[4] << std::endl;
+    //std::cout << "sigma_scale = " << sigma_scale << std::endl;
+    //std::cout << " q_changes = " << q_changes[1] << std::endl;
+    //std::cout << " q_changes = " << q_changes[2] << std::endl;
+    //std::cout << " q_changes = " << q_changes[3] << std::endl;
+    //std::cout << " q_changes = " << q_changes[4] << std::endl;
   }
 
   /* If the buffer is set the modify_q_buffer modifies the charge of the buffer 
