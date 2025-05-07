@@ -213,6 +213,31 @@ void FixAdaptiveProtonation::init_list(int /*id*/, NeighList *ptr)
 
 /* --------------------------------------------------------------------------------------- */
 
+int FixAdaptiveProtonation::pack_forward_comm(int n, int *list, double *buf, int /*pbc_flag*/, int * /*pbc*/)
+{
+  int i,j,m;
+
+  m = 0;
+  for (i = 0; i < n; i++) {
+    j = list[i];
+    buf[m++] = vector_atom[j];
+  }
+  return m;
+}
+
+/* -------------------------------------------------------------------------------------- */
+
+void FixAdaptiveProtonation::unpack_forward_comm(int n, int first, double *buf)
+{
+  int i,m,last;
+
+  m = 0;
+  last = first + n;
+  for (i = first; i < last; i++) vector_atom[i] = buf[m++];
+}
+
+/* --------------------------------------------------------------------------------------- */
+
 void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
 {
   if (update->ntimestep % nevery) return;
@@ -307,10 +332,10 @@ void FixAdaptiveProtonation::allocate_storage()
   fill(mark_local.get(), mark_local.get() + nmolecules + 1, 0);
   fill(molecule_size.get(), molecule_size.get() + nmolecules + 1, 0);
   fill(molecule_size_local.get(), molecule_size_local.get() + nmolecules + 1, 0);
-  fill(mark_prev.get(), mark_prev.get() + nmolecules + 1,
-            -1); /* I put it on purpose so in the first step every molecule changes unless 
-                                                    * INIT_MIDS is set in which case the read_init_mids() function rewrites this.
-                                                    */
+  fill(mark_prev.get(), mark_prev.get() + nmolecules + 1,-1);
+   /* I put it on purpose so in the first step every molecule changes unless 
+    * INIT_MIDS is set in which case the read_init_mids() function rewrites this.
+    */
 }
 
 /* ----------------------------------------------------------------------------------------

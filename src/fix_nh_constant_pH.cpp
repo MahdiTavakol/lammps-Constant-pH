@@ -495,7 +495,7 @@ void FixNHConstantPH::constrain_lambdas()
       
       if (cycle == 0 && comm->me == 0) 
          if (N_buff < mols_charge_change*n_lambdas)
-            error->one(FLERR,"The charge content of N_buff is not large enough for n_lambdas: Please increase the N_buff");
+            error->one(FLERR,"The charge content of N_buff={} is not large enough for n_lambdas={}: Please increase the N_buff\n",N_buff,n_lambdas);
       
       for (int i = 0; i < n_lambdas; i++) {
          sigma_lambda += x_lambdas[i][0];
