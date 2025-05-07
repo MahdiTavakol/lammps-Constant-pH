@@ -115,7 +115,7 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
   extvector = 0;
 
   // Enabling the comm_forward method
-  comm_forward = 1;
+  //comm_forward = 1;
 
   /* This part used to be in the setup() function, 
     * however since this fix adaptive protonation is
