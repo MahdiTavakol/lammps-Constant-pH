@@ -114,7 +114,7 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
   extscalar = 0;
   extvector = 0;
 
-  // Enabling the comm_forward
+  // Enabling the comm_forward method
   comm_forward = 1;
 
   /* This part used to be in the setup() function, 
@@ -176,6 +176,7 @@ int FixAdaptiveProtonation::setmask()
 {
   int mask = 0;
   mask |= INITIAL_INTEGRATE;
+  mask |= END_OF_STEP;
   return mask;
 }
 
@@ -277,14 +278,22 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
   // Counting the number of water molecules surrounding the protonable molecules
   mark_protonation_deprotonation();
 
-  // Communicating the ghost atom information
-  comm->forward_comm(this);
 
   // This is required since the fix_constant_pH.cpp does not deal with those molecules in the solid
   modify_protonation_state();
 
   // Resetting the mark_prev parameter to help us keep the track of which molecule moves from solid to solvent and vice versa
   set_mark_prev();
+}
+
+/* ---------------------------------------------------------------------------------------- 
+   Updating the wnum values just in case that atom exchange has happened in this step
+   ---------------------------------------------------------------------------------------- */
+
+void FixAdaptiveProtonation::end_of_step()
+{
+   if (neighbor->ago == 0)
+      mark_protonation_deprotonation();
 }
 
 /* ----------------------------------------------------------------------------------------
