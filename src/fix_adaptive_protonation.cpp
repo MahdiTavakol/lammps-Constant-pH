@@ -274,6 +274,9 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
   // Counting the number of water molecules surrounding the protonable molecules
   mark_protonation_deprotonation();
 
+  // Communicating the ghost atom information
+  comm->forward_comm(this);
+
   // This is required since the fix_constant_pH.cpp does not deal with those molecules in the solid
   modify_protonation_state();
 
