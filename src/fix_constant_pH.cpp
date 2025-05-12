@@ -73,7 +73,7 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
     m_lambdas(nullptr), H_lambdas(nullptr), GFF(nullptr), fix_adaptive_protonation_id(nullptr),
     fixgpu(nullptr), q_orig(nullptr), f_orig(nullptr), peatom_orig(nullptr), pvatom_orig(nullptr),
     keatom_orig(nullptr), kvatom_orig(nullptr), commandsFile(nullptr), 
-    qOWs(-0.834),qHWs(0.278),mu(0.0),ncommands(0),flags(0),fp_flags(0)
+    qOWs(-0.834),qHWs(0.278),mu(0.0),ncommands(0),flags(0),fp_flags(0), write_lambda_nevery(1)
 {
   if (narg < 9) utils::missing_cmd_args(FLERR, "fix constant_pH", error);
 
@@ -152,11 +152,14 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
     } else if (strcmp(arg[iarg], "zero_total_charge") == 0) {
       flags |= ZEROCHARGE;
       iarg++;
+    } else if (strcmp(arg[iarg],"write_lambda_nevery") == 0) {
+      write_lambda_nevery = utils::numeric(FLERR,arg[iarg+1],false,lmp);
+      iarg+=2;
     } else if (strcmp(arg[iarg], "lambda_file") == 0) {
       fp_flags |= LAMBDA_FP;
       if (comm->me == 0) lambda_fp.open(arg[iarg + 1], std::ofstream::out);
       iarg += 2;
-    } else if (strcmp(arg[iarg], "v_lambda_file") == 0) {
+    }  else if (strcmp(arg[iarg], "v_lambda_file") == 0) {
       fp_flags |= V_LAMBDA_FP;
       if (comm->me == 0) v_lambda_fp.open(arg[iarg + 1], std::ofstream::out);
       iarg += 2;
@@ -195,6 +198,8 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
   if (!(flags & ADAPTIVE) && (flags & COMMANDS))
     error->warning(FLERR,
                    "The keyword \"commands\" has been used without the keyword \"adaptive\"");
+  if (write_lambda_nevery == 1)
+    error->warning(FLERR,"The default value of write_lambda_nevery leads to large output files in long simulations!");
 
   fixgpu = nullptr;
 
@@ -370,7 +375,7 @@ void FixConstantPH::post_force(int /*vflag*/)
   calculate_dfs();
   calculate_dUs();
   update_a_lambda();
-  write_lambdas();
+  if (!(update->ntimestep % write_lambda_nevery)) write_lambdas();
 }
 
 /* ----------------------------------------------------------------------
