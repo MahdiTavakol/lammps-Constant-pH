@@ -198,7 +198,7 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
   if (!(flags & ADAPTIVE) && (flags & COMMANDS))
     error->warning(FLERR,
                    "The keyword \"commands\" has been used without the keyword \"adaptive\"");
-  if (write_lambda_nevery == 1)
+  if (write_lambda_nevery == 1 && comm->me == 0)
     error->warning(FLERR,"The default value of write_lambda_nevery leads to large output files in long simulations!");
 
   fixgpu = nullptr;
