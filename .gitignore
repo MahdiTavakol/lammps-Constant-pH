@@ -67,3 +67,9 @@ InstallLammps*
 
 #OneAPI
 cmake/presets/oneapi-*
+
+#gcc
+cmake/presets/gcc-*
+
+#
+test2
