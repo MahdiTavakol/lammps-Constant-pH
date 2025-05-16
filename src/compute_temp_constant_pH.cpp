@@ -55,11 +55,11 @@ fix_constant_pH_id(nullptr), x_lambdas(nullptr), v_lambdas(nullptr), a_lambdas(n
 
 ComputeTempConstantPH::~ComputeTempConstantPH()
 {
-  if (fix_constant_pH_id) delete[] fix_constant_pH_id;
-  if (x_lambdas) delete[] x_lambdas;
-  if (v_lambdas) delete[] v_lambdas;
-  if (a_lambdas) delete[] a_lambdas;
-  if (m_lambdas) delete[] m_lambdas;
+  if (fix_constant_pH_id) memory->destroy(fix_constant_pH_id);
+  if (x_lambdas) memory->destroy(x_lambdas);
+  if (v_lambdas) memory->destory(v_lambdas);
+  if (a_lambdas) memory->destory(a_lambdas);
+  if (m_lambdas) memory->destory(m_lambdas);
   
   fix_constant_pH_id = nullptr;
   x_lambdas = nullptr;
