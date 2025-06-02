@@ -251,15 +251,15 @@ int FixConstantPH::setmask()
 void FixConstantPH::init()
 {
   // default values from Donnini, Ullmann, J Chem Theory Comput 2016 - Table S2
-  w = 200;
-  s = 0.3;
-  h = 7.0;
-  k = 4.417;       //2.553;
-  a = 0.04208;     //0.03401;
-  b = 0.002957;    //0.005238;
-  r = 16.458;
-  m = 0.1507;
-  d = 3.50;    //2.0; //The height of the barrier is 2*d
+  w = 50; //200;
+  s = 0.3;//0.3;
+  h = 10; //7.0;
+  k = 6.267; //4.417;       //2.553;
+  a = 0.05130; //0.04208;     //0.03401;
+  b = 0.001411; //0.002957;    //0.005238;
+  r = 21.428;//16.458;
+  m = 0.1078;//0.1507;
+  d = 5.0; //3.50;    //2.0; //The height of the barrier is 2*d
 
   // default values for the buffer potential with h = 0 from Donnin J Chem Theory Comput 2016 - Table S2
   w_buff = 200;
