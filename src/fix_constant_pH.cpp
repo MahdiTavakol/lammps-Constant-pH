@@ -808,9 +808,8 @@ void FixConstantPH::check_num_OWs_HWs()
   
   std::unique_ptr<int []> num_local = std::make_unique<int []>(2);
   std::unique_ptr<int []> num_total = std::make_unique<int []>(2);
-
-  for (auto& num: num_local ) num = 0;
-  for (auto& num: num_total ) num = 0;
+  std::fill(num_local.get(),num_local.get()+2,0.0);
+  std::fill(num_total.get(),num_total.get()+2,0.0);
 
 
   for (int i = 0; i < nlocal; i++) {
@@ -1082,13 +1081,12 @@ void FixConstantPH::modify_qs(double scale, int j)
   int pHnStructures1 = pH_structure_storage->pHnStructures1;
   int pHnStructures2 = pH_structure_storage->pHnStructures2;
 
-  /*
+
   std::unique_ptr<double []> q_changes_local = std::make_unique<double []>(4);
   std::unique_ptr<double []> q_changes = std::make_unique<double []>(4);
+  std::fill(q_changes_local.get(),q_changes_local.get()+4,0.0);
+  std::fill(q_changes.get(),q_changes.get()+4,0.0);
 
-  for (auto& val : q_changes_local ) val = 0.0;
-  for (auto& val : q_changes ) val = 0.0;
-  */
 
   double scale0 = scale;
 
@@ -1120,7 +1118,7 @@ void FixConstantPH::modify_qs(double scale, int j)
        and the constraint in the fix_nh_constant_pH would constrain the total charge.
        So, nothing lefts to do here! */
   if (!(flags & BUFFER) || (flags & ZEROCHARGE)) {
-    MPI_Allreduce(q_changes_local, q_changes, 2, MPI_DOUBLE, MPI_SUM, world);
+    MPI_Allreduce(q_changes_local.get(), q_changes.get(), 2, MPI_DOUBLE, MPI_SUM, world);
     double HW_q_change = -q_changes[1] / static_cast<double>(num_HWs);
 
     for (int i = 0; i < nlocal; i++) {
@@ -1167,8 +1165,8 @@ void FixConstantPH::modify_qs(double **scales)
 
   std::unique_ptr<double []> q_changes_local = std::make_unique<double []>(5);
   std::unique_ptr<double []> q_changes = std::make_unique<double []>(5);
-  for (auto& val: q_changes_local) val = 0.0;
-  for (auto& val: q_changes) val = 0.0;
+  std::fill(q_changes_local.get(), q_changes_local.get()+5,0.0);
+  std::fill(q_changes.get(),q_changes.get()+5,0.0);
 
 
   std::fill(vector_atom, vector_atom + nmax, -1);
