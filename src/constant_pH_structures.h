@@ -20,8 +20,8 @@ class constant_pH_structures : protected Pointers {
   ~constant_pH_structures();
   constant_pH_structures(const constant_pH_structures &rhs) = delete;
   constant_pH_structures &operator=(const constant_pH_structures &rhs) = delete;
-  constant_pH_structures(const constant_pH_structures &&rhs) = delete;
-  constant_pH_structures &operator=(const constant_pH_structures &&rhs) = delete;
+  constant_pH_structures(constant_pH_structures &&rhs) = delete;
+  constant_pH_structures &operator=(constant_pH_structures &&rhs) = delete;
 
   void read_pH_structure_files();
 

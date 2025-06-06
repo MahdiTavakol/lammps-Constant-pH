@@ -86,17 +86,17 @@ void constant_pH_structures::read_pH_structure_files()
         int type;
         getline(iss, field, ',');
         type = stoi(field);
-        protonable[type] = 1;
+        protonable[type+1] = 1;
         int type_per_prot_mol;
         getline(iss, field, ',');
         type_per_prot_mol = stoi(field);
-        typePerProtMol[type] = type_per_prot_mol;
+        typePerProtMol[type+1] = type_per_prot_mol;
 
         double q;
         for (int j = 0; j < nStructures; j++) {
           getline(iss, field, ',');
           q = stod(field);
-          pHqs[type][j] = q;
+          pHqs[type+1][j] = q;
         }
       }
     }
