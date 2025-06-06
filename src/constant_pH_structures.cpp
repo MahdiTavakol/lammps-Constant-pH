@@ -75,28 +75,26 @@ void constant_pH_structures::read_pH_structure_files()
       }
 
       for (int i = 0; i < pHnTypes; i++) {
-        stringstream iss;
-
         if (!getline(file, line))
           error->one(FLERR, "Error in reading the pH structure file in fix constant_pH");
 
-        iss.str(line);
+        stringstream iss(line);
 
         string field;
         int type;
         getline(iss, field, ',');
         type = stoi(field);
-        protonable[type+1] = 1;
+        protonable[type] = 1;
         int type_per_prot_mol;
         getline(iss, field, ',');
         type_per_prot_mol = stoi(field);
-        typePerProtMol[type+1] = type_per_prot_mol;
+        typePerProtMol[type] = type_per_prot_mol;
 
         double q;
         for (int j = 0; j < nStructures; j++) {
           getline(iss, field, ',');
           q = stod(field);
-          pHqs[type+1][j] = q;
+          pHqs[type][j] = q;
         }
       }
     }
