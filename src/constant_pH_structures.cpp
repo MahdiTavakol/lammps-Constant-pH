@@ -11,8 +11,8 @@ using namespace LAMMPS_NS;
 
 constant_pH_structures::constant_pH_structures(LAMMPS *lmp, const string &fileName1,
                                                const string &fileName2) :
-    Pointers(lmp),
-    pH1qs(nullptr), pH2qs(nullptr)
+    Pointers{lmp},
+    pH1qs{nullptr}, pH2qs{nullptr}
 {
   if (comm->me == 0) {
     pHStructureFile1.open(fileName1, std::ifstream::in);

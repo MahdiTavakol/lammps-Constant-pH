@@ -44,6 +44,7 @@
 #include <cmath>
 #include <cstring>
 #include <random>
+#include <array>
 
 using namespace LAMMPS_NS;
 using namespace FixConst;
@@ -69,9 +70,10 @@ enum {
  ---------------------------------------------------------------------- */
 
 FixNHConstantPH::FixNHConstantPH(LAMMPS *lmp, int narg, char **arg) :
-    FixNH(lmp, narg, arg), 
-    fix_constant_pH(nullptr), fix_constant_pH_id(nullptr), 
-    x_lambdas(nullptr), v_lambdas(nullptr), a_lambdas(nullptr), m_lambdas(nullptr)
+    FixNH{lmp, narg, arg}, 
+    fix_constant_pH{nullptr}, fix_constant_pH_id{nullptr}, 
+    x_lambdas{nullptr}, v_lambdas{nullptr}, a_lambdas{nullptr}, m_lambdas{nullptr},
+    lambda_thermostat_type{NONE_LAMBDA}
 {
   if (narg < 5) utils::missing_cmd_args(FLERR, std::string("fix ") + style, error);
   
@@ -83,7 +85,6 @@ FixNHConstantPH::FixNHConstantPH(LAMMPS *lmp, int narg, char **arg) :
 
   while (iarg < narg) {
     if (strcmp(arg[iarg],"fix_constant_pH_id") == 0) {
-       lambda_thermostat_type = NONE_LAMBDA;
        lambda_integration_flags = 0;
        fix_constant_pH_id = utils::strdup(arg[iarg+1]);
        iarg += 2;
@@ -111,7 +112,7 @@ FixNHConstantPH::FixNHConstantPH(LAMMPS *lmp, int narg, char **arg) :
        total_charge = utils::numeric(FLERR,arg[iarg+3],false,lmp);
        iarg += 4;
     } else if (strcmp(arg[iarg],"lambda_every") == 0) {
-       lambda_every = utils::numeric(FLERR,arg[iarg+1],false,lmp);
+       lambda_every = utils::inumeric(FLERR,arg[iarg+1],false,lmp);
        if (lambda_every <= 0)
           error->one(FLERR,"The lambda_every parameter must be positive");
        iarg+=2; 
@@ -139,8 +140,8 @@ void FixNHConstantPH::init()
 {
   FixNH::init();
 
-  
-  fix_constant_pH = static_cast<FixConstantPH*>(modify->get_fix_by_id(fix_constant_pH_id));
+  // dynamic_cast so that if it is not of FixConstantPH* type, no coversion happens!
+  fix_constant_pH = dynamic_cast<FixConstantPH*>(modify->get_fix_by_id(fix_constant_pH_id)); 
   fix_constant_pH->return_nparams(n_lambdas);
 
   allocate_lambda_storage();
@@ -149,6 +150,18 @@ void FixNHConstantPH::init()
 
   zeta_nose_hoover = 0.0;
 }
+
+/* ----------------------------------------------------------------------
+    allocating the storage of the lambda parameters
+   ---------------------------------------------------------------------- */
+   
+   void FixNHConstantPH::allocate_lambda_storage()
+   {
+     memory->create(x_lambdas,n_lambdas,3,"nh_constant_pH:x_lambdas");
+     memory->create(v_lambdas,n_lambdas,3,"nh_constant_pH:v_lambdas");
+     memory->create(a_lambdas,n_lambdas,3,"nh_constant_pH:a_lambdas");
+     memory->create(m_lambdas,n_lambdas,3,"nh_constant_pH:m_lambdas");
+   }
 
 /* ----------------------------------------------------------------------
     deallocating the storage of the lambda parameters
@@ -167,17 +180,6 @@ void FixNHConstantPH::deallocate_lambda_storage()
   m_lambdas = nullptr; 
 }
 
-/* ----------------------------------------------------------------------
-    allocating the storage of the lambda parameters
-   ---------------------------------------------------------------------- */
-   
-void FixNHConstantPH::allocate_lambda_storage()
-{
-  memory->create(x_lambdas,n_lambdas,3,"nh_constant_pH:x_lambdas");
-  memory->create(v_lambdas,n_lambdas,3,"nh_constant_pH:v_lambdas");
-  memory->create(a_lambdas,n_lambdas,3,"nh_constant_pH:a_lambdas");
-  memory->create(m_lambdas,n_lambdas,3,"nh_constant_pH:m_lambdas");
-}
 
 /* ----------------------------------------------------------------------
    updating the lambda parameters from the fix constant_pH
@@ -187,7 +189,7 @@ void FixNHConstantPH::update_lambda_params()
 {
   int n_lambdas_current;
   fix_constant_pH->return_nparams(n_lambdas_current);
-  // We need to check if the number of lambdas have changed
+  // We need to check if the number of lambdas has changed
   if (n_lambdas != n_lambdas_current) {
     n_lambdas = n_lambdas_current;
     deallocate_lambda_storage();
@@ -205,9 +207,7 @@ void FixNHConstantPH::nve_v()
   FixNH::nve_v();
   
   bigint ntimestep = update->ntimestep;
-  
   update_lambda_params();
-
   for (int i = 0; i < n_lambdas; i++) 
      for (int j = 0; j < 3; j++)
         v_lambdas[i][j] += dtf * a_lambdas[i][j];
@@ -229,6 +229,7 @@ void FixNHConstantPH::nve_v()
 void FixNHConstantPH::nve_x()
 {
   FixNH::nve_x();
+
   bigint ntimestep = update->ntimestep;
   update_lambda_params();
   for (int i = 0; i < n_lambdas; i++)
@@ -283,11 +284,11 @@ void FixNHConstantPH::nh_v_temp()
      
 
   // Temperature
-  double t_lambda_current, t_lambda_current_1, t_lambda_current_2;
+  std::array<double,3> t_lambda_current;
   double t_lambda_target = t_target;
-  fix_constant_pH->return_T_lambda(t_lambda_current_1,0);
-  fix_constant_pH->return_T_lambda(t_lambda_current_2,1);
-  fix_constant_pH->return_T_lambda(t_lambda_current,2);
+  fix_constant_pH->return_T_lambda(t_lambda_current[1],0);
+  fix_constant_pH->return_T_lambda(t_lambda_current[2],1);
+  fix_constant_pH->return_T_lambda(t_lambda_current[0],2);
   
   if (lambda_thermostat_type == LAMBDA_ANDERSEN && comm->me == 0) {
     double P = dt/t_andersen;
@@ -313,7 +314,7 @@ void FixNHConstantPH::nh_v_temp()
               if (x_lambdas[i][j] > 1.0 && v_lambdas[i][j] > 0.0)
                  x_lambdas[i][j] -= 1.0;            
            }
-      }
+         }
       // Dealing with the buffer
       if (lambda_integration_flags & BUFFER) {
         double r = static_cast<double>(rand())/ RAND_MAX;
@@ -351,14 +352,14 @@ void FixNHConstantPH::nh_v_temp()
     }
 
     
-    double t_lambda_new_1 = t_lambda_current_1;
-    double t_lambda_new_2 = t_lambda_current_2;
-    t_lambda_new_1 +=  (1-zeta_bussi)*(t_lambda_target*(r11*r11+sum_r21)/n_lambdas-t_lambda_current_1);
-    t_lambda_new_1 += 2*r11*std::sqrt((t_lambda_target*t_lambda_current_1/n_lambdas)*(1-zeta_bussi)*zeta_bussi);
-    t_lambda_new_2 +=  (1-zeta_bussi)*(t_lambda_target*(r12*r12+sum_r22)/(2*n_lambdas)-t_lambda_current_2);
-    t_lambda_new_2 += 2*r12*std::sqrt((t_lambda_target*t_lambda_current_2/(2*n_lambdas))*(1-zeta_bussi)*zeta_bussi);
-    double alpha_bussi1 = std::sqrt(t_lambda_new_1 / t_lambda_current_1);
-    double alpha_bussi2 = std::sqrt(t_lambda_new_2 / t_lambda_current_2);
+    double t_lambda_new_1 = t_lambda_current[1];
+    double t_lambda_new_2 = t_lambda_current[2];
+    t_lambda_new_1 +=  (1-zeta_bussi)*(t_lambda_target*(r11*r11+sum_r21)/n_lambdas-t_lambda_current[1]);
+    t_lambda_new_1 += 2*r11*std::sqrt((t_lambda_target*t_lambda_current[1]/n_lambdas)*(1-zeta_bussi)*zeta_bussi);
+    t_lambda_new_2 +=  (1-zeta_bussi)*(t_lambda_target*(r12*r12+sum_r22)/(2*n_lambdas)-t_lambda_current[2]);
+    t_lambda_new_2 += 2*r12*std::sqrt((t_lambda_target*t_lambda_current[2]/(2*n_lambdas))*(1-zeta_bussi)*zeta_bussi);
+    double alpha_bussi1 = std::sqrt(t_lambda_new_1 / t_lambda_current[1]);
+    double alpha_bussi2 = std::sqrt(t_lambda_new_2 / t_lambda_current[2]);
 
     if (which == NOBIAS) {
 
@@ -390,7 +391,7 @@ void FixNHConstantPH::nh_v_temp()
        error->one(FLERR,"The bias keyword for the fix_nh_constant_pH has not been implemented yet!");
     }
   } else if (lambda_thermostat_type == LAMBDA_NOSEHOOVER && comm->me == 0) {  
-     zeta_nose_hoover += dt * (t_lambda_current - t_lambda_target);
+     zeta_nose_hoover += dt * (t_lambda_current[0] - t_lambda_target);
 
      if (which == NOBIAS) {
         // first the lambdas

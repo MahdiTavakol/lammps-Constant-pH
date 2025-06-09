@@ -67,12 +67,12 @@ static constexpr double tol = 1e-5;
 /* ---------------------------------------------------------------------- */
 
 FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
-    Fix(lmp, narg, arg), lambdas(nullptr), v_lambdas(nullptr), a_lambdas(nullptr),
-    m_lambdas(nullptr), H_lambdas(nullptr), GFF(nullptr), fix_adaptive_protonation_id(nullptr),
-    fixgpu(nullptr), q_orig(nullptr), f_orig(nullptr), peatom_orig(nullptr), pvatom_orig(nullptr),
-    keatom_orig(nullptr), kvatom_orig(nullptr), 
-    qOWs(-0.834),qHWs(0.278),mu(0.0),ncommands(0),flags(0),fp_flags(0), write_lambda_nevery(1),
-    GFF_flag(false), print_Udwp_flag(false), n_lambdas(1)
+    Fix{lmp, narg, arg}, lambdas{nullptr}, v_lambdas{nullptr}, a_lambdas{nullptr},
+    m_lambdas{nullptr}, H_lambdas{nullptr}, GFF{nullptr}, fix_adaptive_protonation_id{nullptr},
+    fixgpu{nullptr}, q_orig{nullptr}, f_orig{nullptr}, peatom_orig{nullptr}, pvatom_orig{nullptr},
+    keatom_orig{nullptr}, kvatom_orig{nullptr}, 
+    qOWs{-0.834},qHWs{0.278},mu{0.0},ncommands{0},flags{0},fp_flags{0}, write_lambda_nevery{1},
+    GFF_flag{false}, print_Udwp_flag{false}, n_lambdas{1}
 {
   if (narg < 9) utils::missing_cmd_args(FLERR, "fix constant_pH", error);
 
