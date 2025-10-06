@@ -34,6 +34,7 @@
 #include "timer.h"
 #include "update.h"
 
+#include <array>
 #include <cstring>
 #include <iomanip>
 #include <map>
@@ -175,10 +176,13 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
       if (comm->me == 0) H_lambda_fp.open(arg[iarg + 1], std::ofstream::out);
       iarg += 2;
     } else if (strcmp(arg[iarg], "lambda_s_file") == 0) {
+      if (narg < iarg + 3) utils::missing_cmd_args(FLERR, "fix constant_pH", error);
       fp_flags |= LAMBDA_S_FP;
       if (comm->me == 0) {
         lambda_1_fp.open(arg[iarg + 1], std::ofstream::out);
-        lambda_2_fp.open(arg[iarg + 1], std::ofstream::out);
+        lambda_2_fp.open(arg[iarg + 2], std::ofstream::out);
+        if (!lambda_1_fp.is_open() || !lambda_2_fp.is_open())
+          error->one(FLERR,"Cannot open lambda_s_file outputs: {},{}",arg[iarg+1],arg[iarg+2]);
       }
       iarg += 3;
     } else if (strcmp(arg[iarg], "commands") == 0) {
@@ -316,7 +320,8 @@ void FixConstantPH::setup(int /*vflag*/)
   allocate_storage();
 
   // I have put this part here on purpose so if the fix_adaptive_protonation reads the initial molids, it is set here
-  fix_adaptive_protonation->get_n_protonable(this->n_lambdas);
+  if (flag & ADAPTIVE)
+    fix_adaptive_protonation->get_n_protonable(this->n_lambdas);
 
   set_lambdas();
 }
@@ -441,12 +446,7 @@ void FixConstantPH::set_lambdas()
       lambdas[i][j] = 0.0;
       v_lambdas[i][j] = 0.0;
       a_lambdas[i][j] = 0.0;
-
-      if (j == 0)
-        m_lambdas[i][j] =
-            20.0;    // m_lambda == 20.0u taken from https://www.mpinat.mpg.de/627830/usage
-      else
-        m_lambdas[i][j] = 20.0;    // To see if the hot-cold spot problem is solved.
+      m_lambdas[i][j] = 20.0; // m_lambda == 20.0u taken from https://www.mpinat.mpg.de/627830/usage
     }
   }
 
@@ -469,43 +469,57 @@ void FixConstantPH::set_lambdas()
 
 void FixConstantPH::initialize_lambda()
 {
-  int ntypes = atom->ntypes;
   int nlocal = atom->nlocal;
   double *q = atom->q;
+  int *type = atom->type;
 
   double **pH1qs = pH_structure_storage->pH1qs;
   double **pH2qs = pH_structure_storage->pH2qs;
   int *protonable = pH_structure_storage->protonable
                         .get();    // Not safe, you should use std::shared_ptr instead..
 
-  double pH1qtotal = 0.0;
-  double pH2qtotal = 0.0;
-
-  for (int i = 1; i < ntypes + 1; i++) {
-    if (protonable[i]) {
-      // Here I suppose that the q_total is the same for all the strutures
-      pH1qtotal += pH1qs[i][0];
-      pH2qtotal += pH2qs[i][0];
-    }
-  }
 
   std::unique_ptr<double []> q_local = std::make_unique<double []>(n_lambdas);
+  std::unique_ptr<double []> q_local_pH1 = std::make_unique<double []>(n_lambdas);
+  std::unique_ptr<double []> q_local_pH2 = std::make_unique<double []>(n_lambdas);
   std::unique_ptr<double []> q_total = std::make_unique<double []>(n_lambdas);
+  std::unique_ptr<double []> q_total_pH1 = std::make_unique<double []>(n_lambdas);
+  std::unique_ptr<double []> q_total_pH2 = std::make_unique<double []>(n_lambdas);
+  std::fill_n(q_local.get(),n_lambdas,0.0);
+  std::fill_n(q_local_pH1.get(),n_lambdas,0.0);
+  std::fill_n(q_local_pH2.get(),n_lambdas,0.0);
 
-
-  for (int j = 0; j < n_lambdas; j++) {
-    q_local[j] = 0.0;
-    q_total[j] = 0.0;
-    int molid_j = molids[j];
-    for (int i = 0; i < nlocal; i++) {
-      if (atom->molecule[i] == molid_j) { q_local[j] += q[i]; }
+  for (int i = 0; i < nlocal; i++) {
+    int type_i = type[i];
+    if (!protonable[type_i]) continue;
+    for (int j = 0; j < n_lambdas; j++) {
+      int molid_j = molids[j];
+      int type_i = type[i];
+      if (atom->molecule[i] == molid_j) {
+        q_local[j] += q[i];
+        q_local_pH1[j] += pH1qs[type_i][0];
+        q_local_pH2[j] += pH2qs[type_i][0];
+      }
     }
   }
 
-  MPI_Allreduce(q_local.get(), q_total.get(), n_lambdas, MPI_DOUBLE, MPI_SUM, world);
+  MPI_Allreduce(q_local.get(),q_total.get(),n_lambdas,MPI_DOUBLE,MPI_SUM,world);
+  MPI_Allreduce(q_local_pH1.get(),q_total_pH1.get(),n_lambdas,MPI_DOUBLE,MPI_SUM,world);
+  MPI_Allreduce(q_local_pH2.get(),q_total_pH2.get(),n_lambdas,MPI_DOUBLE,MPI_SUM,world);
 
-  for (int j = 0; j < n_lambdas; j++)
-    lambdas[j][0] = (q_total[j] - pH1qtotal) / (pH2qtotal - pH1qtotal);
+  constexpr double eps = 1e-8;
+  for (int j = 0; j < n_lambdas; j++) {
+    if (std::abs(q_total_pH1[j] - q_total_pH2[j]) > eps) {
+      lambdas[j][0] = 0.0;
+      continue;
+    }
+    double lambda_j = (q_total[j]-q_total_pH1[j])/(q_total_pH2[j]-q_total_pH1[j]);
+    if (lambda_j < 0.0 || lambda_j > 1.0) {
+      error->warning(FLERR,"out of range value for the initialization of the lambda {}, The simulation might crash!",lambda_j)
+      lambdas[j][0] = MAX(0.0,MIN(1.0,lambda_j));
+    } else
+    lambdas[j][0] = lambda_j;
+  }
 }
 
 /* ---------------------------------------------------------------------- */
@@ -805,11 +819,9 @@ void FixConstantPH::check_num_OWs_HWs()
 {
   int *type = atom->type;
   int nlocal = atom->nlocal;
-  
-  std::unique_ptr<int []> num_local = std::make_unique<int []>(2);
-  std::unique_ptr<int []> num_total = std::make_unique<int []>(2);
-  std::fill(num_local.get(),num_local.get()+2,0.0);
-  std::fill(num_total.get(),num_total.get()+2,0.0);
+
+  std::array<int,2> num_local{0,0};
+  std::array<int,2> num_total{0,0};
 
 
   for (int i = 0; i < nlocal; i++) {
@@ -817,7 +829,7 @@ void FixConstantPH::check_num_OWs_HWs()
     if (type[i] == typeOWs) num_local[1]++;
   }
 
-  MPI_Allreduce(num_local.get(), num_total.get(), 2, MPI_INT, MPI_SUM, world);
+  MPI_Allreduce(num_local.data(), num_total.data(), 2, MPI_INT, MPI_SUM, world);
   num_HWs = num_total[0];
   num_OWs = num_total[1];
 
@@ -848,16 +860,16 @@ void FixConstantPH::calculate_dUs()
   double U1, U2, U3, U4, U5;
   double dU1, dU2, dU3, dU4, dU5;
   for (int j = 0; j < n_lambdas; j++) {
-    U1 = -k * exp(-(lambdas[j][0] - 1.0 - mu - b) * (lambdas[j][0] - 1.0 - mu - b) / (2.0 * a * a));
-    U2 = -k * exp(-(lambdas[j][0] + mu + b) * (lambdas[j][0] + mu + b) / (2.0 * a * a));
-    U3 = d * exp(-(lambdas[j][0] - 0.5) * (lambdas[j][0] - 0.5) / (2.0 * s * s));
+    U1 = -k * std::exp(-(lambdas[j][0] - 1.0 - mu - b) * (lambdas[j][0] - 1.0 - mu - b) / (2.0 * a * a));
+    U2 = -k * std::exp(-(lambdas[j][0] + mu + b) * (lambdas[j][0] + mu + b) / (2.0 * a * a));
+    U3 = d * std::exp(-(lambdas[j][0] - 0.5) * (lambdas[j][0] - 0.5) / (2.0 * s * s));
     U4 = 0.5 * w * (1.0 - erff(r * (lambdas[j][0] + m)));
     U5 = 0.5 * w * (1.0 + erff(r * (lambdas[j][0] - 1.0 - m)));
     dU1 = -((lambdas[j][0] - 1.0 - b) / (a * a)) * U1;
     dU2 = -((lambdas[j][0] + b) / (a * a)) * U2;
     dU3 = -((lambdas[j][0] - 0.5) / (s * s)) * U3;
-    dU4 = -0.5 * w * r * 2 * exp(-r * r * (lambdas[j][0] + m) * (lambdas[j][0] + m)) / sqrt(M_PI);
-    dU5 = 0.5 * w * r * 2 * exp(-r * r * (lambdas[j][0] - 1 - m) * (lambdas[j][0] - 1.0 - m)) /
+    dU4 = -0.5 * w * r * 2 * std::exp(-r * r * (lambdas[j][0] + m) * (lambdas[j][0] + m)) / sqrt(M_PI);
+    dU5 = 0.5 * w * r * 2 * std::exp(-r * r * (lambdas[j][0] - 1 - m) * (lambdas[j][0] - 1.0 - m)) /
         sqrt(M_PI);
 
     Us[j] = U1 + U2 + U3 + U4 + U5;
@@ -866,18 +878,18 @@ void FixConstantPH::calculate_dUs()
 
   if (flags & BUFFER) {
     U1 = -k_buff *
-        exp(-(lambda_buff - 1.0 - b_buff) * (lambda_buff - 1.0 - b) / (2.0 * a_buff * a_buff));
-    U2 = -k_buff * exp(-(lambda_buff + b_buff) * (lambda_buff + b_buff) / (2.0 * a_buff * a_buff));
-    U3 = d_buff * exp(-(lambda_buff - 0.5) * (lambda_buff - 0.5) / (2 * s_buff * s_buff));
+        std::exp(-(lambda_buff - 1.0 - b_buff) * (lambda_buff - 1.0 - b_buff) / (2.0 * a_buff * a_buff));
+    U2 = -k_buff * std::exp(-(lambda_buff + b_buff) * (lambda_buff + b_buff) / (2.0 * a_buff * a_buff));
+    U3 = d_buff * std::exp(-(lambda_buff - 0.5) * (lambda_buff - 0.5) / (2 * s_buff * s_buff));
     U4 = 0.5 * w_buff * (1.0 - erff(r_buff * (lambda_buff + m_buff)));
     U5 = 0.5 * w_buff * (1.0 + erff(r_buff * (lambda_buff - 1.0 - m_buff)));
     dU1 = -((lambda_buff - 1.0 - b_buff) / (a_buff * a_buff)) * U1;
     dU2 = -((lambda_buff + b_buff) / (a_buff * a_buff)) * U2;
     dU3 = -((lambda_buff - 0.5) / (s_buff * s_buff)) * U3;
     dU4 = -0.5 * w_buff * r_buff * 2 *
-        exp(-r_buff * r_buff * (lambda_buff + m_buff) * (lambda_buff + m_buff)) / sqrt(M_PI);
+    std::exp(-r_buff * r_buff * (lambda_buff + m_buff) * (lambda_buff + m_buff)) / sqrt(M_PI);
     dU5 = 0.5 * w_buff * r_buff * 2 *
-        exp(-r_buff * r_buff * (lambda_buff - 1.0 - m_buff) * (lambda_buff - 1.0 - m_buff)) /
+    std::exp(-r_buff * r_buff * (lambda_buff - 1.0 - m_buff) * (lambda_buff - 1.0 - m_buff)) /
         sqrt(M_PI);
 
     U_buff = U1 + U2 + U3 + U4 + U5;
@@ -1019,7 +1031,7 @@ template <int direction> void FixConstantPH::backup_restore_qfev()
 
   int nall = atom->nlocal + atom->nghost;
   int natom = atom->nlocal;
-  if (force->newton || force->kspace->tip4pflag) natom += atom->nghost;
+  if (force->newton || (force->kspace && force->kspace->tip4pflag)) natom += atom->nghost;
 
   double **f = atom->f;
   for (i = 0; i < natom; i++)
@@ -1063,7 +1075,7 @@ template <int direction> void FixConstantPH::backup_restore_qfev()
 /* --------------------------------------------------------------
    modify just q of one lambda
    Warning: It selects the proper configurations for pH1 and pH2
-   based on lambadas[:][1] and lambdas[:][2]!
+   based on lambdas[:][1] and lambdas[:][2]!
    -------------------------------------------------------------- */
 
 void FixConstantPH::modify_qs(double scale, int j)
@@ -1092,12 +1104,14 @@ void FixConstantPH::modify_qs(double scale, int j)
 
   int indx11 = std::floor(lambdas[j][1] * pHnStructures1 - 0.5);
   int indx12 = std::ceil(lambdas[j][1] * pHnStructures1 - 0.5);
-  double scale1 = (lambdas[j][1] * pHnStructures1 - 0.5 - static_cast<double>(indx11)) /
-      (static_cast<double>(indx12) - static_cast<double>(indx11));
+  double denom1 = static_cast<double>(indx12) - static_cast<double>(indx11);
+  double scale1 = (denom1 == 0.0) ? 0.0: (lambdas[j][1] * pHnStructures1 - 0.5 - static_cast<double>(indx11)) /
+      denom1;
   int indx21 = std::floor(lambdas[j][2] * pHnStructures2 - 0.5);
   int indx22 = std::ceil(lambdas[j][2] * pHnStructures2 - 0.5);
+  double scale2 = (denom2 == 0.0)? 0.0 :static_cast<double>(indx22) - static_cast<double>(indx21)
   double scale2 = (lambdas[j][2] * pHnStructures2 - 0.5 - static_cast<double>(indx21)) /
-      (static_cast<double>(indx22) - static_cast<double>(indx21));
+      denom2;
 
   for (int i = 0; i < nlocal; i++) {
     int molid_i = atom->molecule[i];
@@ -1355,8 +1369,8 @@ void FixConstantPH::init_GFF()
   memory->create(GFF, GFF_size, 2, "constant_pH:GFF");
   int i = -1;
 
-  while (std::getline(fp, line) && ++i < GFF_size) {
-
+  while (std::getline(fp, line) && i < GFF_size) {    
+    i++;
     double _lambda, _GFF;
     std::stringstream iss2(line);
     std::string token;
@@ -1513,7 +1527,7 @@ void FixConstantPH::initialize_v_lambda(const double _T_lambda)
   this->calculate_T_lambda();
   scaling_factor = std::sqrt(_T_lambda / T_lambdas[2]);
 
-  double v_cm;
+  double v_cm = 0.0;
   for (int i = 0; i < n_lambdas; i++) v_cm += v_lambdas[i][0];
 
   if (flags & BUFFER) v_cm += N_buff * v_lambda_buff;
@@ -1595,7 +1609,6 @@ void FixConstantPH::calculate_T_lambda()
 double FixConstantPH::compute_q_total()
 {
   double *q = atom->q;
-  double nlocal = atom->nlocal;
   double q_local = 0.0;
   double tolerance = 1e-6;    //0.001;
 
