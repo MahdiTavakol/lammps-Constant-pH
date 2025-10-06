@@ -472,6 +472,7 @@ void FixConstantPH::initialize_lambda()
   int nlocal = atom->nlocal;
   double *q = atom->q;
   int *type = atom->type;
+  int *molecule = atom->molecule;
 
   double **pH1qs = pH_structure_storage->pH1qs;
   double **pH2qs = pH_structure_storage->pH2qs;
@@ -495,7 +496,7 @@ void FixConstantPH::initialize_lambda()
     for (int j = 0; j < n_lambdas; j++) {
       int molid_j = molids[j];
       int type_i = type[i];
-      if (atom->molecule[i] == molid_j) {
+      if (molecule[i] == molid_j) {
         q_local[j] += q[i];
         q_local_pH1[j] += pH1qs[type_i][0];
         q_local_pH2[j] += pH2qs[type_i][0];
@@ -509,13 +510,13 @@ void FixConstantPH::initialize_lambda()
 
   constexpr double eps = 1e-8;
   for (int j = 0; j < n_lambdas; j++) {
-    if (std::abs(q_total_pH1[j] - q_total_pH2[j]) > eps) {
+    if (std::abs(q_total_pH1[j] - q_total_pH2[j]) < eps) {
       lambdas[j][0] = 0.0;
       continue;
     }
     double lambda_j = (q_total[j]-q_total_pH1[j])/(q_total_pH2[j]-q_total_pH1[j]);
     if (lambda_j < 0.0 || lambda_j > 1.0) {
-      error->warning(FLERR,"out of range value for the initialization of the lambda {}, The simulation might crash!",lambda_j)
+      error->warning(FLERR,"out of range value for the initialization of the lambda {}, The simulation might crash!",lambda_j);
       lambdas[j][0] = MAX(0.0,MIN(1.0,lambda_j));
     } else
     lambdas[j][0] = lambda_j;
