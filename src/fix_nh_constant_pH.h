@@ -26,7 +26,6 @@
 #include "fix_constant_pH.h"
 #include "fix_nh.h"
 
-
 namespace LAMMPS_NS {
 
 class FixNHConstantPH : public FixNH {
@@ -37,35 +36,33 @@ class FixNHConstantPH : public FixNH {
   double memory_usage() override;
 
  protected:
-
   // integration functions (x and lambdas)
   void nve_x() override;
   void nve_v() override;
   void nh_v_temp() override;
-  
+
   // functions related to lambdas
   void deallocate_lambda_storage();
   void allocate_lambda_storage();
   void update_lambda_params();
-  
+
   // random number function
   double random_normal(double mean, double stddev);
   // constraining total charge through change lambdas and lambda_buff
-  template <int mode>
-  void constrain_lambdas();
-  // computing the total charge 
+  template <int mode> void constrain_lambdas();
+  // computing the total charge
   double compute_q_total();
 
-  // lambda variables from the fix constant pH  
+  // lambda variables from the fix constant pH
   FixConstantPH *fix_constant_pH;
   char *fix_constant_pH_id;
-  
+
   // lambdas variables --> It should have its own class
-  double** x_lambdas, **v_lambdas, **a_lambdas, **m_lambdas;
+  double **x_lambdas, **v_lambdas, **a_lambdas, **m_lambdas;
   double T_lambda;
   int n_lambdas;
   int lambda_every;
-  
+
   // Buffer parameters
   double x_lambda_buff, v_lambda_buff, a_lambda_buff, m_lambda_buff;
   int N_buff;
@@ -84,11 +81,10 @@ class FixNHConstantPH : public FixNH {
   // Parameter for Bussi thermostat
   double tau_t_bussi;
   double zeta_bussi;
-  
+
   // Parameters for Nose-Hoover thermostat
   double Q_lambda_nose_hoover;
   double zeta_nose_hoover;
-
 };
 
 }    // namespace LAMMPS_NS

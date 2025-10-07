@@ -361,6 +361,7 @@ FixNH::FixNH(LAMMPS *lmp, int narg, char **arg) :
     } else if (strcmp(arg[iarg],"psllod") == 0) {
       iarg += 2;
 
+    // the following keywords are parsed in the fix_nh_constant_pH.cpp
     } else if (strcmp(arg[iarg],"fix_constant_pH_id") == 0) {
       iarg += 2;
     } else if (strcmp(arg[iarg],"lambda_andersen") == 0) {
@@ -375,6 +376,8 @@ FixNH::FixNH(LAMMPS *lmp, int narg, char **arg) :
       iarg+=4;
     } else if (strcmp(arg[iarg],"lambda_every") == 0) {
       iarg+=2;
+
+    // unknown keywords
     } else error->all(FLERR,"Unknown fix {} keyword: {}", style, arg[iarg]);
   }
 

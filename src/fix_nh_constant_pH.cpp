@@ -65,6 +65,8 @@ enum {
        CONSTRAIN=1<<1,
      };
 
+static constexpr double etol = 1e-6; 
+
 /* ----------------------------------------------------------------------
    NVT,NPH,NPT integrators for improved Nose-Hoover equations of motion
  ---------------------------------------------------------------------- */
@@ -104,8 +106,6 @@ FixNHConstantPH::FixNHConstantPH(LAMMPS *lmp, int narg, char **arg) :
        lambda_integration_flags |= BUFFER;
        iarg++;
     } else if (strcmp(arg[iarg],"constrain_total_charge") == 0) {
-       if (!(lambda_integration_flags & BUFFER))
-          error->one(FLERR,"Constrain total charge in absence of a buffer is not supported yet!");
        lambda_integration_flags |= CONSTRAIN;
        mols_charge_change = utils::numeric(FLERR,arg[iarg+1],false,lmp);
        buff_charge_change = utils::numeric(FLERR,arg[iarg+2],false,lmp);
@@ -121,6 +121,9 @@ FixNHConstantPH::FixNHConstantPH(LAMMPS *lmp, int narg, char **arg) :
        ++iarg;
     }
   }
+
+  if (lambda_integration_flags & (BUFFER | CONSTRAIN) == CONSTRAIN)
+   error->one(FLERR,"Constrain total charge in absence of a buffer is not supported yet!");
 
   if (fix_constant_pH_id == nullptr) error->all(FLERR, "Invalid fix_nh constant_pH");
 
@@ -155,13 +158,13 @@ void FixNHConstantPH::init()
     allocating the storage of the lambda parameters
    ---------------------------------------------------------------------- */
    
-   void FixNHConstantPH::allocate_lambda_storage()
-   {
-     memory->create(x_lambdas,n_lambdas,3,"nh_constant_pH:x_lambdas");
-     memory->create(v_lambdas,n_lambdas,3,"nh_constant_pH:v_lambdas");
-     memory->create(a_lambdas,n_lambdas,3,"nh_constant_pH:a_lambdas");
-     memory->create(m_lambdas,n_lambdas,3,"nh_constant_pH:m_lambdas");
-   }
+void FixNHConstantPH::allocate_lambda_storage()
+{
+  memory->create(x_lambdas,n_lambdas,3,"nh_constant_pH:x_lambdas");
+  memory->create(v_lambdas,n_lambdas,3,"nh_constant_pH:v_lambdas");
+  memory->create(a_lambdas,n_lambdas,3,"nh_constant_pH:a_lambdas");
+  memory->create(m_lambdas,n_lambdas,3,"nh_constant_pH:m_lambdas");
+}
 
 /* ----------------------------------------------------------------------
     deallocating the storage of the lambda parameters
@@ -190,6 +193,11 @@ void FixNHConstantPH::update_lambda_params()
   int n_lambdas_current;
   fix_constant_pH->return_nparams(n_lambdas_current);
   // We need to check if the number of lambdas has changed
+  // If the protonation states have change while the n_lambdas
+  // remained fixed it does not matter here since the fix_constant_pH
+  // takes care of this situation.
+  // Here we are just checking if there is enough space in the storage
+  // to keep all the lambdas!
   if (n_lambdas != n_lambdas_current) {
     n_lambdas = n_lambdas_current;
     deallocate_lambda_storage();
@@ -206,20 +214,20 @@ void FixNHConstantPH::nve_v()
 {
   FixNH::nve_v();
   
-  bigint ntimestep = update->ntimestep;
+  // Getting the lambda_parameters from the fix_constant_pH.
   update_lambda_params();
   for (int i = 0; i < n_lambdas; i++) 
-     for (int j = 0; j < 3; j++)
-        v_lambdas[i][j] += dtf * a_lambdas[i][j];
+   for (int j = 0; j < 3; j++)
+    v_lambdas[i][j] += dtf * a_lambdas[i][j];
   
-   
-  fix_constant_pH->reset_params(x_lambdas,v_lambdas,a_lambdas,m_lambdas);
+ // Returning the modified parameters to the fix_constant_pH.
+ fix_constant_pH->reset_params(x_lambdas,v_lambdas,a_lambdas,m_lambdas);
 
-  if (lambda_integration_flags & BUFFER) {
-     fix_constant_pH->return_buff_params(x_lambda_buff,v_lambda_buff,a_lambda_buff,m_lambda_buff,N_buff);
-     v_lambda_buff += dtf * a_lambda_buff;
-     fix_constant_pH->reset_buff_params(x_lambda_buff,v_lambda_buff,a_lambda_buff, m_lambda_buff);
-  }
+ if (lambda_integration_flags & BUFFER) {
+  fix_constant_pH->return_buff_params(x_lambda_buff,v_lambda_buff,a_lambda_buff,m_lambda_buff,N_buff);
+  v_lambda_buff += dtf * a_lambda_buff;
+  fix_constant_pH->reset_buff_params(x_lambda_buff,v_lambda_buff,a_lambda_buff, m_lambda_buff);
+ }
 }
 
 /* ----------------------------------------------------------------------
@@ -230,11 +238,11 @@ void FixNHConstantPH::nve_x()
 {
   FixNH::nve_x();
 
-  bigint ntimestep = update->ntimestep;
+  // Getting the lambda_parameters from the fix_constant_pH.
   update_lambda_params();
   for (int i = 0; i < n_lambdas; i++)
-     for (int j = 0; j < 3; j++)
-        x_lambdas[i][j] += dtv * v_lambdas[i][j];
+   for (int j = 0; j < 3; j++)
+    x_lambdas[i][j] += dtv * v_lambdas[i][j];
   
      
   // Resets the parameters for x_lambdas to be used in the constrain
@@ -259,7 +267,6 @@ void FixNHConstantPH::nh_v_temp()
   FixNH::nh_v_temp();
   // The timestep, the current step and the kT of course! 
   double dt = update->dt;
-  bigint ntimestep = update->ntimestep;
   double kT = force->boltz * t_target;
   // remove the center of mass velocity
   double v_cm = 0.0;
@@ -330,6 +337,8 @@ void FixNHConstantPH::nh_v_temp()
       // This needs to be implemented
       error->one(FLERR,"The bias keyword for the fix_nh_constant_pH has not been implemented yet!");
     }
+
+
   } else if (lambda_thermostat_type == LAMBDA_BUSSI  && comm->me == 0) {
     //tau_t_bussi should be 1000
      
@@ -423,6 +432,8 @@ void FixNHConstantPH::nh_v_temp()
   if (n_lambdas == 0)
      return;
  
+  // v_lambdas[0] is the location of the contigous memory allocated 
+  // for the double ** v_lambdas
   MPI_Bcast(v_lambdas[0],n_lambdas*3,MPI_DOUBLE,0,world);
   if (lambda_integration_flags & BUFFER)
      MPI_Bcast(&v_lambda_buff,1,MPI_DOUBLE,0,world);  
@@ -449,7 +460,7 @@ void FixNHConstantPH::nh_v_temp()
 }
 
 /* ---------------------------------------------------------------------
-   applies the shake algorithm to the sum of the lambdas 
+   Applies the shake algorithm to the sum of the lambdas 
 
    It adds a  constraint according to the Donnine et al JCTC 2016 
    equation (13).
@@ -466,7 +477,6 @@ void FixNHConstantPH::constrain_lambdas()
 {
    double omega = 0.0;
    double domega;
-   double etol = 1e-6;
    double q_total;
    double sigma_lambda;
    double sigma_mass_inverse;
@@ -549,7 +559,6 @@ double FixNHConstantPH::compute_q_total()
    double nlocal = atom->nlocal;
    double q_local = 0.0;
    double q_total = 0.0;
-   double tolerance = 1e-6; //0.001;
 
    for (int i = 0; i <nlocal; i++)
       q_local += q[i];
