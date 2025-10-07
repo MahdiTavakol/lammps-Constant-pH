@@ -10,7 +10,6 @@
 
    See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
-/* ---------- v0.10.15----------------- */
 // Please remove unnecessary includes
 #include "fix_adaptive_protonation.h"
 
@@ -143,7 +142,9 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
   MPI_Allreduce(&nmolecules_local, &nmolecules_total, 1, MPI_INT, MPI_MAX, world);
   nmolecules = nmolecules_total;
 
+  // Adding another molecule id for atoms with molecule[i] == 0
   nmolecules++;
+  // molecule_id is in 1-based indexing
   for (int i = 0; i < nlocal; i++) {
     if (molecule[i] == 0) molecule[i] = nmolecules;
   }
@@ -165,6 +166,8 @@ FixAdaptiveProtonation::~FixAdaptiveProtonation()
 {
   if (vector_atom) delete[] vector_atom;
 
+  // this is not needed since I am using std::unique_ptr
+  // In destructin it will be deallocated on its own.
   deallocate_storage();
 
   vector_atom = nullptr;
@@ -184,12 +187,13 @@ int FixAdaptiveProtonation::setmask()
 
 void FixAdaptiveProtonation::init()
 {
+  // Checking if the atom style contains the molecules information
+  if (atom->molecular != 1) error->all(FLERR, "Illegal atom style in the fix adpative protonation");
+
   // Reading the pH structure files
   pH_structure_storage = std::make_unique<constant_pH_structures>(lmp, fileName1, fileName2);
   pH_structure_storage->read_pH_structure_files();
 
-  // Checking if the atom style contains the molecules information
-  if (atom->molecular != 1) error->all(FLERR, "Illegal atom style in the fix adpative protonation");
 
   // Request a full neighbor list
   int list_flags = NeighConst::REQ_OCCASIONAL | NeighConst::REQ_FULL;
@@ -204,6 +208,7 @@ void FixAdaptiveProtonation::init()
    Setup
    --------------------------------------------------------------------------------------- */
 
+// that is so weired overriding with an empty function --> Should be removed!
 void FixAdaptiveProtonation::setup(int /*vflag*/) {}
 
 /* ---------------------------------------------------------------------------------------
@@ -213,31 +218,6 @@ void FixAdaptiveProtonation::setup(int /*vflag*/) {}
 void FixAdaptiveProtonation::init_list(int /*id*/, NeighList *ptr)
 {
   list = ptr;
-}
-
-/* --------------------------------------------------------------------------------------- */
-
-int FixAdaptiveProtonation::pack_forward_comm(int n, int *list, double *buf, int /*pbc_flag*/, int * /*pbc*/)
-{
-  int i,j,m;
-
-  m = 0;
-  for (i = 0; i < n; i++) {
-    j = list[i];
-    buf[m++] = vector_atom[j];
-  }
-  return m;
-}
-
-/* -------------------------------------------------------------------------------------- */
-
-void FixAdaptiveProtonation::unpack_forward_comm(int n, int first, double *buf)
-{
-  int i,m,last;
-
-  m = 0;
-  last = first + n;
-  for (i = first; i < last; i++) vector_atom[i] = buf[m++];
 }
 
 /* --------------------------------------------------------------------------------------- */
@@ -268,6 +248,7 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
   }
 
   MPI_Allreduce(&nmolecules_local, &nmolecules_total, 1, MPI_INT, MPI_MAX, world);
+  nmolecules_total++;
 
   if (nmolecules_total > nmolecules) {
     nmolecules = nmolecules_total;
@@ -277,7 +258,6 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
 
   // Counting the number of water molecules surrounding the protonable molecules
   mark_protonation_deprotonation();
-
 
   // This is required since the fix_constant_pH.cpp does not deal with those molecules in the solid
   modify_protonation_state();
@@ -292,15 +272,14 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
 
 void FixAdaptiveProtonation::end_of_step()
 {
-   if (neighbor->ago == 0)
-      mark_protonation_deprotonation();
+  if (neighbor->ago == 0) mark_protonation_deprotonation();
 }
 
 /* ----------------------------------------------------------------------------------------
    Writing molids into a file
    ---------------------------------------------------------------------------------------- */
 
-void FixAdaptiveProtonation::write_molids(const std::string& file_name) const
+void FixAdaptiveProtonation::write_molids(const std::string &file_name) const
 {
   if (comm->me == 0) {
     if (file_name.empty()) error->one(FLERR, "The wrong file name in fix adaptive protonation");
@@ -344,11 +323,11 @@ void FixAdaptiveProtonation::allocate_storage()
   molecule_size_local = make_unique<int[]>(nmolecules + 1);
   fill(protonable_molids.get(), protonable_molids.get() + nmolecules, -1);
   fill(mark.get(), mark.get() + nmolecules + 1, 0);
+  fill(mark_prev.get(), mark_prev.get() + nmolecules + 1, -1);
   fill(mark_local.get(), mark_local.get() + nmolecules + 1, 0);
   fill(molecule_size.get(), molecule_size.get() + nmolecules + 1, 0);
   fill(molecule_size_local.get(), molecule_size_local.get() + nmolecules + 1, 0);
-  fill(mark_prev.get(), mark_prev.get() + nmolecules + 1,-1);
-   /* I put it on purpose so in the first step every molecule changes unless 
+  /* I put it on purpose so in the first step every molecule changes unless 
     * INIT_MIDS is set in which case the read_init_mids() function rewrites this.
     */
 }
@@ -364,8 +343,7 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
   int inum, jnum;
   int wnum;    // number of surrounding water molecules
 
-  int *protonable = pH_structure_storage->protonable.get();
-  // Not safe, you should use std::shared_ptr instead..
+  const int* protonable = pH_structure_storage->protonable.get();
 
   inum = list->inum;    // I do not need ghost atoms for inum. however, I need them in jnum
   ilist = list->ilist;
@@ -449,7 +427,7 @@ void FixAdaptiveProtonation::set_molecule_id()
         error->warning(FLERR, "Bond atom missing in fix AdaptiveProtonation");
         continue;
       }
-      molecule[i] = MIN(molecule[i], molecule[j]);    // I am not sure about header for the MIN
+      molecule[i] = MIN(molecule[i], molecule[j]);    // The header for the MIN is defined in the pointers.h
       molecule[j] = molecule[i];
     }
   }
@@ -474,7 +452,7 @@ void FixAdaptiveProtonation::set_molecule_id()
 
 void FixAdaptiveProtonation::read_molids_file()
 {
-   using std::getline, std::string, std::stoi, std::fill;
+  using std::getline, std::string, std::stoi, std::fill;
   /*
     *  File format
     *  comment_1
@@ -500,7 +478,6 @@ void FixAdaptiveProtonation::read_molids_file()
     // Checking that if there is enough space in the allocated arrays
     if (n_protonable > nmolecules) error->one(FLERR, "Unknown error");
 
-
     for (int i = 0; i < n_protonable; i++) {
       if (!getline(init_molid_file, line))
         error->one(FLERR, "Error in reading the init_molid_file");
@@ -514,9 +491,8 @@ void FixAdaptiveProtonation::read_molids_file()
   MPI_Bcast(protonable_molids.get(), n_protonable, MPI_INT, 0, world);
 
   fill(mark_prev.get(), mark_prev.get() + nmolecules + 1, 0);    // zero is for SOLID
-  for (int i = 0; i < n_protonable; i++)
-    mark_prev[protonable_molids[i]] = SOLVENT;
-    // protonable molecules are exposed to the SOLVENT.
+  for (int i = 0; i < n_protonable; i++) mark_prev[protonable_molids[i]] = SOLVENT;
+  // protonable molecules are exposed to the SOLVENT.
 }
 
 /* ----------------------------------------------------------------------------------------
@@ -630,6 +606,33 @@ void FixAdaptiveProtonation::set_mark_prev()
 {
   for (int i = 0; i < nmolecules + 1; i++) mark_prev[i] = mark[i];
 }
+
+/* --------------------------------------------------------------------------------------- */
+
+int FixAdaptiveProtonation::pack_forward_comm(int n, int *list, double *buf, int /*pbc_flag*/,
+  int * /*pbc*/)
+{
+  int i, j, m;
+
+  m = 0;
+  for (i = 0; i < n; i++) {
+    j = list[i];
+    buf[m++] = vector_atom[j];
+  }
+  return m;
+}
+
+/* -------------------------------------------------------------------------------------- */
+
+void FixAdaptiveProtonation::unpack_forward_comm(int n, int first, double *buf)
+{
+  int i, m, last;
+
+  m = 0;
+  last = first + n;
+  for (i = first; i < last; i++) vector_atom[i] = buf[m++];
+}
+
 
 /* --------------------------------------------------------------------------
    Output the changes in the number of hydrogen atoms
