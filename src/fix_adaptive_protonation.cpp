@@ -177,7 +177,6 @@ int FixAdaptiveProtonation::setmask()
 {
   int mask = 0;
   mask |= INITIAL_INTEGRATE;
-  mask |= END_OF_STEP;
   return mask;
 }
 
@@ -267,14 +266,6 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
   set_mark_prev();
 }
 
-/* ---------------------------------------------------------------------------------------- 
-   Updating the wnum values just in case that atom exchange has happened in this step
-   ---------------------------------------------------------------------------------------- */
-
-void FixAdaptiveProtonation::end_of_step()
-{
-  if (neighbor->ago == 0) mark_protonation_deprotonation();
-}
 
 /* ----------------------------------------------------------------------------------------
    Writing molids into a file
@@ -304,8 +295,8 @@ void FixAdaptiveProtonation::deallocate_storage()
   mark.reset();
   mark_prev.reset();
   mark_local.reset();
-  molecule_size.reset();
-  molecule_size_local.reset();
+  protonable_size.reset();
+  protonable_size_local.reset();
 }
 
 /* ----------------------------------------------------------------------------------------
@@ -320,8 +311,8 @@ void FixAdaptiveProtonation::allocate_storage()
   mark = make_unique<int[]>(nmolecules + 1);
   mark_prev = make_unique<int[]>(nmolecules + 1);
   mark_local = make_unique<int[]>(nmolecules + 1);
-  molecule_size = make_unique<int[]>(nmolecules + 1);
-  molecule_size_local = make_unique<int[]>(nmolecules + 1);
+  protonable_size = make_unique<int[]>(nmolecules + 1);
+  protonable_size_local = make_unique<int[]>(nmolecules + 1);
   fill_n(protonable_molids.get(), nmolecules, -1);
   fill_n(mark.get(), nmolecules + 1, 0);
   fill_n(mark_prev.get(), nmolecules + 1, -1);
@@ -374,14 +365,13 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
       j &= NEIGHMASK;
 
       if (type[j] == typeOW)
-        vector_atom[i]++;    // Just considering the Oxygens. It is possible that both O and H from the same water molecule are close to this atom.
+        vector_atom[i] += 1.0;;    // Just considering the Oxygens. It is possible that both O and H from the same water molecule are close to this atom.
     }
     if (vector_atom[i] >= threshold) {
       mark_local[molecule[i]] += SOLVENT;
     } else {
       mark_local[molecule[i]] += SOLID;
     }
-    vector_atom[i] = static_cast<double>(wnum);
   }
 
   // Reducing the values from various cpus
@@ -616,12 +606,13 @@ void FixAdaptiveProtonation::set_mark_prev()
 int FixAdaptiveProtonation::pack_forward_comm(int n, int *list, double *buf, int /*pbc_flag*/,
   int * /*pbc*/)
 {
+  int *molecule = atom->molecule;
   int i, j, m;
 
   m = 0;
   for (i = 0; i < n; i++) {
     j = list[i];
-    buf[m++] = vector_atom[j];
+    buf[m++] = molecule[j];
   }
   return m;
 }
@@ -630,11 +621,12 @@ int FixAdaptiveProtonation::pack_forward_comm(int n, int *list, double *buf, int
 
 void FixAdaptiveProtonation::unpack_forward_comm(int n, int first, double *buf)
 {
+  int *molecule = atom->molecule;
   int i, m, last;
 
   m = 0;
   last = first + n;
-  for (i = first; i < last; i++) vector_atom[i] = buf[m++];
+  for (i = first; i < last; i++) molecule[i] = buf[m++];
 }
 
 

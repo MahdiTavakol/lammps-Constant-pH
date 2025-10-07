@@ -35,9 +35,7 @@ class FixAdaptiveProtonation : public Fix {
   ~FixAdaptiveProtonation() override;
   int setmask() override;
   void init() override;
-  void setup(int) override;
   void initial_integrate(int) override;
-  void end_of_step() override;
   double compute_scalar() override;
   double compute_vector(int) override;
   double memory_usage() override;
@@ -90,8 +88,8 @@ class FixAdaptiveProtonation : public Fix {
   std::unique_ptr<int[]> mark_per_mol;   
   // If one atom have mark == 1 all the atoms of that molecule should have mark == 1
 
-  std::unique_ptr<int[]> molecule_size;    // used to average the mark for each molecule
-  std::unique_ptr<int[]> molecule_size_local;
+  std::unique_ptr<int[]> protonable_size;    // used to average the mark for each molecule
+  std::unique_ptr<int[]> protonable_size_local;
 
   // Tracking the changes in the q_total
   double q_change;
