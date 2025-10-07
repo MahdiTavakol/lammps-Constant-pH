@@ -205,13 +205,6 @@ void FixAdaptiveProtonation::init()
 }
 
 /* ---------------------------------------------------------------------------------------
-   Setup
-   --------------------------------------------------------------------------------------- */
-
-// that is so weired overriding with an empty function --> Should be removed!
-void FixAdaptiveProtonation::setup(int /*vflag*/) {}
-
-/* ---------------------------------------------------------------------------------------
     It is need to access the neighbor list
    --------------------------------------------------------------------------------------- */
 
@@ -365,7 +358,7 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
       j &= NEIGHMASK;
 
       if (type[j] == typeOW)
-        vector_atom[i] += 1.0;;    // Just considering the Oxygens. It is possible that both O and H from the same water molecule are close to this atom.
+        vector_atom[i] += 1.0;    // Just considering the Oxygens. It is possible that both O and H from the same water molecule are close to this atom.
     }
     if (vector_atom[i] >= threshold) {
       mark_local[molecule[i]] += SOLVENT;
@@ -394,6 +387,8 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
     else
       mark[i] = NEITHER;
   }
+
+  comm->forward_comm(this);
 }
 
 /* ----------------------------------------------------------------------------------------
@@ -437,7 +432,6 @@ void FixAdaptiveProtonation::set_molecule_id()
    for atom exchange here.
    */
 
-  comm->forward_comm(this);
 }
 
 /* ----------------------------------------------------------------------------------------
@@ -606,13 +600,12 @@ void FixAdaptiveProtonation::set_mark_prev()
 int FixAdaptiveProtonation::pack_forward_comm(int n, int *list, double *buf, int /*pbc_flag*/,
   int * /*pbc*/)
 {
-  int *molecule = atom->molecule;
   int i, j, m;
 
   m = 0;
   for (i = 0; i < n; i++) {
     j = list[i];
-    buf[m++] = molecule[j];
+    buf[m++] = vector_atom[j];
   }
   return m;
 }
@@ -621,12 +614,11 @@ int FixAdaptiveProtonation::pack_forward_comm(int n, int *list, double *buf, int
 
 void FixAdaptiveProtonation::unpack_forward_comm(int n, int first, double *buf)
 {
-  int *molecule = atom->molecule;
   int i, m, last;
 
   m = 0;
   last = first + n;
-  for (i = first; i < last; i++) molecule[i] = buf[m++];
+  for (i = first; i < last; i++) vector_atom[i] = buf[m++];
 }
 
 
