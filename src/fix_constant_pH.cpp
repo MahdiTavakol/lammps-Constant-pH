@@ -320,7 +320,7 @@ void FixConstantPH::setup(int /*vflag*/)
   allocate_storage();
 
   // I have put this part here on purpose so if the fix_adaptive_protonation reads the initial molids, it is set here
-  if (flag & ADAPTIVE)
+  if (flags & ADAPTIVE)
     fix_adaptive_protonation->get_n_protonable(this->n_lambdas);
 
   set_lambdas();
@@ -407,8 +407,8 @@ void FixConstantPH::delete_lambdas()
   Us.reset();
   dUs.reset();
   lambdas_j.reset();
-  molids.reset();
   GFF_lambdas.reset();
+  molids.reset();
 }
 
 /* ----------------------------------------------------------------------
@@ -474,18 +474,24 @@ void FixConstantPH::initialize_lambda()
   int *type = atom->type;
   int *molecule = atom->molecule;
 
+  // These three are not safe for the pH*qs I should
+  // use the mdspan with std::unique_ptr and 
+  // for the protonable I have to use std::unique_ptr
+  // and set up the get functions to return a cons ref
+  // to them as std::unique_ptr is not copyable.
   double **pH1qs = pH_structure_storage->pH1qs;
   double **pH2qs = pH_structure_storage->pH2qs;
   int *protonable = pH_structure_storage->protonable
-                        .get();    // Not safe, you should use std::shared_ptr instead..
+                        .get(); 
 
 
-  std::unique_ptr<double []> q_local = std::make_unique<double []>(n_lambdas);
+  std::unique_ptr<double []>     q_local = std::make_unique<double []>(n_lambdas);
   std::unique_ptr<double []> q_local_pH1 = std::make_unique<double []>(n_lambdas);
   std::unique_ptr<double []> q_local_pH2 = std::make_unique<double []>(n_lambdas);
-  std::unique_ptr<double []> q_total = std::make_unique<double []>(n_lambdas);
+  std::unique_ptr<double []>     q_total = std::make_unique<double []>(n_lambdas);
   std::unique_ptr<double []> q_total_pH1 = std::make_unique<double []>(n_lambdas);
   std::unique_ptr<double []> q_total_pH2 = std::make_unique<double []>(n_lambdas);
+
   std::fill_n(q_local.get(),n_lambdas,0.0);
   std::fill_n(q_local_pH1.get(),n_lambdas,0.0);
   std::fill_n(q_local_pH2.get(),n_lambdas,0.0);
@@ -495,9 +501,8 @@ void FixConstantPH::initialize_lambda()
     if (!protonable[type_i]) continue;
     for (int j = 0; j < n_lambdas; j++) {
       int molid_j = molids[j];
-      int type_i = type[i];
       if (molecule[i] == molid_j) {
-        q_local[j] += q[i];
+        q_local[j]     += q[i];
         q_local_pH1[j] += pH1qs[type_i][0];
         q_local_pH2[j] += pH2qs[type_i][0];
       }
@@ -508,9 +513,8 @@ void FixConstantPH::initialize_lambda()
   MPI_Allreduce(q_local_pH1.get(),q_total_pH1.get(),n_lambdas,MPI_DOUBLE,MPI_SUM,world);
   MPI_Allreduce(q_local_pH2.get(),q_total_pH2.get(),n_lambdas,MPI_DOUBLE,MPI_SUM,world);
 
-  constexpr double eps = 1e-8;
   for (int j = 0; j < n_lambdas; j++) {
-    if (std::abs(q_total_pH1[j] - q_total_pH2[j]) < eps) {
+    if (std::abs(q_total_pH1[j] - q_total_pH2[j]) < tol) {
       lambdas[j][0] = 0.0;
       continue;
     }
@@ -674,9 +678,8 @@ void FixConstantPH::return_H_lambdas(double *_H_lambdas) const
 
 void FixConstantPH::return_T_lambda(double &_T_lambda, int component)
 {
-  calculate_T_lambda();
-
   if (component < 0 || component > 2) error->one(FLERR, "Illegal function input");
+  calculate_T_lambda();
   _T_lambda = this->T_lambdas[component];
 }
 
@@ -977,8 +980,8 @@ void FixConstantPH::deallocate_storage()
   if (f_orig) memory->destroy(f_orig);
   if (peatom_orig) memory->destroy(peatom_orig);
   if (pvatom_orig) memory->destroy(pvatom_orig);
-  /* If kspace->force is true these two have been already allocated and 
-     here is no need to check it since the lammps destructor first destructs
+  /* If kspace->force is true these two have been already allocated (they are true) and 
+     there is no need to check it since the lammps destructor first destructs
      the kspace so that "if (force->kspace)" in the destructor for 
      ComputeFEEConstantPH leads to an error!
   */
@@ -1110,9 +1113,9 @@ void FixConstantPH::modify_qs(double scale, int j)
       denom1;
   int indx21 = std::floor(lambdas[j][2] * pHnStructures2 - 0.5);
   int indx22 = std::ceil(lambdas[j][2] * pHnStructures2 - 0.5);
-  double scale2 = (denom2 == 0.0)? 0.0 :static_cast<double>(indx22) - static_cast<double>(indx21)
-  double scale2 = (lambdas[j][2] * pHnStructures2 - 0.5 - static_cast<double>(indx21)) /
-      denom2;
+  double denom2 = static_cast<double>(indx22)-static_cast<double>(indx21);
+  double scale2 = (denom2 == 0.0) ? 0.0: (lambdas[j][2] * pHnStructures2 - 0.5 - static_cast<double>(indx21)) /
+  denom2;
 
   for (int i = 0; i < nlocal; i++) {
     int molid_i = atom->molecule[i];
@@ -1611,13 +1614,13 @@ double FixConstantPH::compute_q_total()
 {
   double *q = atom->q;
   double q_local = 0.0;
-  double tolerance = 1e-6;    //0.001;
+  int nlocal = atom->nlocal;
 
   for (int i = 0; i < nlocal; i++) q_local += q[i];
 
   MPI_Allreduce(&q_local, &q_total, 1, MPI_DOUBLE, MPI_SUM, world);
 
-  if (std::abs(q_total) > tolerance && comm->me == 0)
+  if (std::abs(q_total) > tol && comm->me == 0)
     error->warning(FLERR, "q_total in fix constant-pH is non-zero: {} from {}", q_total, comm->me);
 
   return q_total;
