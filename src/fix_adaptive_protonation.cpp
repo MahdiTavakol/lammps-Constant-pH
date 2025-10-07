@@ -31,7 +31,6 @@
 #include "variable.h"
 
 #include "angle.h"
-#include "atom.h"
 #include "bond.h"
 #include "dihedral.h"
 #include "force.h"
@@ -60,7 +59,7 @@ enum { F_NONE, RESET_MID = 1 << 1, INIT_MID = 1 << 2 };
 FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg) :
     Fix(lmp, narg, arg), n_protonable{0}
 {
-  if (narg < 7) utils::missing_cmd_args(FLERR, "fix adaptive_protonation", error);
+  if (narg < 8) utils::missing_cmd_args(FLERR, "fix adaptive_protonation", error);
 
   nevery = utils::numeric(FLERR, arg[3], false, lmp);
 
@@ -107,14 +106,13 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
   scalar_flag = 1;
   vector_flag = 1;
   peratom_flag = 1;
+  comm_forward = 1;
   size_vector = 3;
   size_peratom_cols = 0;
   peratom_freq = nevery;
   extscalar = 0;
   extvector = 0;
 
-  // Enabling the comm_forward method
-  //comm_forward = 1;
 
   /* This part used to be in the setup() function, 
     * however since this fix adaptive protonation is
@@ -189,6 +187,9 @@ void FixAdaptiveProtonation::init()
 {
   // Checking if the atom style contains the molecules information
   if (atom->molecular != 1) error->all(FLERR, "Illegal atom style in the fix adpative protonation");
+
+  // The atom_style should contain the charge information.
+  if (!atom->q_flag) error->all(FLERR, "Atom style has no charges for adaptive_protonation");
 
   // Reading the pH structure files
   pH_structure_storage = std::make_unique<constant_pH_structures>(lmp, fileName1, fileName2);
@@ -314,19 +315,19 @@ void FixAdaptiveProtonation::deallocate_storage()
 
 void FixAdaptiveProtonation::allocate_storage()
 {
-  using std::make_unique, std::fill;
+  using std::make_unique, std::fill_n;
   protonable_molids = make_unique<int[]>(nmolecules);
   mark = make_unique<int[]>(nmolecules + 1);
   mark_prev = make_unique<int[]>(nmolecules + 1);
   mark_local = make_unique<int[]>(nmolecules + 1);
   molecule_size = make_unique<int[]>(nmolecules + 1);
   molecule_size_local = make_unique<int[]>(nmolecules + 1);
-  fill(protonable_molids.get(), protonable_molids.get() + nmolecules, -1);
-  fill(mark.get(), mark.get() + nmolecules + 1, 0);
-  fill(mark_prev.get(), mark_prev.get() + nmolecules + 1, -1);
-  fill(mark_local.get(), mark_local.get() + nmolecules + 1, 0);
-  fill(molecule_size.get(), molecule_size.get() + nmolecules + 1, 0);
-  fill(molecule_size_local.get(), molecule_size_local.get() + nmolecules + 1, 0);
+  fill_n(protonable_molids.get(), nmolecules, -1);
+  fill_n(mark.get(), nmolecules + 1, 0);
+  fill_n(mark_prev.get(), nmolecules + 1, -1);
+  fill_n(mark_local.get(), nmolecules + 1, 0);
+  fill_n(protonable_size.get(), nmolecules + 1, 0);
+  fill_n(protonable_size_local.get(), nmolecules + 1, 0);
   /* I put it on purpose so in the first step every molecule changes unless 
     * INIT_MIDS is set in which case the read_init_mids() function rewrites this.
     */
@@ -341,9 +342,12 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
 {
   int *ilist, *jlist, *numneigh, **firstneigh;
   int inum, jnum;
-  int wnum;    // number of surrounding water molecules
 
   const int* protonable = pH_structure_storage->protonable.get();
+
+  // resetting the mark_local and molecule_size_local before going through atoms
+  std::fill_n(mark_local.get(),nmolecules+1,0);
+  std::fill_n(protonable_size_local.get(),nmolecules+1,0);
 
   inum = list->inum;    // I do not need ghost atoms for inum. however, I need them in jnum
   ilist = list->ilist;
@@ -354,16 +358,14 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
   int *molecule = atom->molecule;
 
   for (int ii = 0; ii < inum; ii++) {
-    wnum = 0.0;
     int i = ilist[ii];
-    molecule_size_local[molecule[i]] = molecule_size_local[molecule[i]] + 1;
+    vector_atom[i] = 0.0;
 
     // Check if this atom is protonable --> if not do not bother with it.
     if (protonable[type[i]] == 0) {
-      mark_local[molecule[i]] = NEITHER;
-      vector_atom[i] = 0;
       continue;
-    }
+    } else
+      protonable_size_local[molecule[i]]++;
 
     jlist = firstneigh[i];
     jnum = numneigh[i];
@@ -372,9 +374,9 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
       j &= NEIGHMASK;
 
       if (type[j] == typeOW)
-        wnum++;    // Just considering the Oxygens. It is possible that both O and H from the same water molecule are close to this atom.
+        vector_atom[i]++;    // Just considering the Oxygens. It is possible that both O and H from the same water molecule are close to this atom.
     }
-    if (wnum >= threshold) {
+    if (vector_atom[i] >= threshold) {
       mark_local[molecule[i]] += SOLVENT;
     } else {
       mark_local[molecule[i]] += SOLID;
@@ -384,15 +386,15 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
 
   // Reducing the values from various cpus
   MPI_Allreduce(mark_local.get(), mark.get(), nmolecules + 1, MPI_INT, MPI_SUM, world);
-  MPI_Allreduce(molecule_size_local.get(), molecule_size.get(), nmolecules + 1, MPI_INT, MPI_SUM,
+  MPI_Allreduce(protonable_size_local.get(), protonable_size.get(), nmolecules + 1, MPI_INT, MPI_SUM,
                 world);
 
   for (int i = 1; i < nmolecules + 1; i++) {
-    if (molecule_size[i] == 0) {
+    if (protonable_size[i] == 0) {
       mark[i] = NEITHER;
       continue;
     }
-    double test_condition = static_cast<double>(mark[i]) / static_cast<double>(molecule_size[i]);
+    double test_condition = static_cast<double>(mark[i]) / static_cast<double>(protonable_size[i]);
     if (test_condition >= 0 && test_condition <= 0.5)
       mark[i] = SOLID;
     else if (test_condition > 0.5 && test_condition <= 1)
@@ -444,6 +446,8 @@ void FixAdaptiveProtonation::set_molecule_id()
    Of course if the molecules are long spanning multiple procs there is a need
    for atom exchange here.
    */
+
+  comm->forward_comm(this);
 }
 
 /* ----------------------------------------------------------------------------------------
