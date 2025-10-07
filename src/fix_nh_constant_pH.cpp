@@ -48,13 +48,8 @@
 using namespace LAMMPS_NS;
 using namespace FixConst;
 
-static constexpr double DELTAFLIP = 0.1;
-static constexpr double TILTMAX = 1.5;
-static constexpr double EPSILON = 1.0e-6;
 
 enum{NOBIAS,BIAS};
-enum{NONE,XYZ,XY,YZ,XZ};
-enum{ISO,ANISO,TRICLINIC};
 
 // enums for the lambda integration
 enum {LAMBDA_NONE,LAMBDA_ANDERSEN,LAMBDA_BUSSI,LAMBDA_NOSEHOOVER};
@@ -77,10 +72,7 @@ FixNHConstantPH::FixNHConstantPH(LAMMPS *lmp, int narg, char **arg) :
     lambda_integration_flags{0},lambda_thermostat_type{NONE_LAMBDA},
     ranMarsSeed{1111}
 {
-  if (narg < 5) utils::missing_cmd_args(FLERR, std::string("fix ") + style, error);
-  
-  lambda_thermostat_type = NONE_LAMBDA;
-  
+  if (narg < 5) utils::missing_cmd_args(FLERR, std::string("fix ") + style, error);  
 
   int iarg = 3;
 
@@ -145,19 +137,14 @@ FixNHConstantPH::~FixNHConstantPH()
 void FixNHConstantPH::init()
 {
   FixNH::init();
-
   // dynamic_cast so that if it is not of FixConstantPH* type, no coversion happens!
   fix_constant_pH = dynamic_cast<FixConstantPH*>(modify->get_fix_by_id(fix_constant_pH_id));
   if (!fix_constant_pH)
-   error->all(FLERR,"fix %s is not a FixConstantPH", fix_constant_pH_id); 
+   error->all(FLERR,"fix {} is not a FixConstantPH", fix_constant_pH_id); 
 
   fix_constant_pH->return_nparams(n_lambdas);
-
   allocate_lambda_storage();
-
-
   zeta_nose_hoover = 0.0;
-
   ranMars = std::make_unique<RanMars>(lmp,ranMarsSeed);
 }
 
@@ -334,23 +321,19 @@ void FixNHConstantPH::nh_v_temp()
       for (int i = 0; i < n_lambdas; i++) 
         for (int j = 0; j < 3; j++) {
            double r = ranMars->uniform();
-           //double r = static_cast<double>(rand())/ RAND_MAX;
            if (r < P) {
               double mean = 0.0;
               double sigma = std::sqrt(kT/(m_lambdas[i][j]*mvv2e));
               v_lambdas[i][j] = ranMars->gaussian(mean,sigma);
-              //v_lambdas[i][j] = random_normal(mean, sigma);
            }
          }
       // Dealing with the buffer
       if (lambda_integration_flags & BUFFER) {
-        //double r = static_cast<double>(rand())/ RAND_MAX;
         double r = ranMars->uniform();
         if (r < P) {
            double mean = 0.0;
            double sigma = std::sqrt(kT/(N_buff*m_lambda_buff*mvv2e));
            v_lambda_buff = ranMars->gaussian(mean,sigma);
-           //v_lambda_buff = random_normal(mean,sigma);
         }
       }
       checkOutBounds();
@@ -369,19 +352,15 @@ void FixNHConstantPH::nh_v_temp()
     
     double r11 = ranMars->gaussian(0.0,1.0);
     double r12 = ranMars->gaussian(0.0,1.0);
-    //double r11 = random_normal(0,1);
-    //double r12 = random_normal(0,1);
     double sum_r21 = 0.0;
     double sum_r22 = 0.0;
 
     for (int j = 1; j < n_lambdas; j++) {
        double r = ranMars->gaussian(0.0,1.0);
-       //double r = random_normal(0,1);
        sum_r21 += r*r;
     }
     for (int j = 1; j < 2*n_lambdas; j++) {
        double r = ranMars->gaussian(0.0,1.0);
-       //double r = random_normal(0,1);
        sum_r22 += r*r;
     }
 
@@ -461,7 +440,6 @@ void FixNHConstantPH::nh_v_temp()
      v_lambda_buff -= v_cm; 
   
   fix_constant_pH->reset_params(x_lambdas,v_lambdas,a_lambdas,m_lambdas);
-
   if (lambda_integration_flags & BUFFER) fix_constant_pH->reset_buff_params(x_lambda_buff,v_lambda_buff,a_lambda_buff, m_lambda_buff);
 }
 
