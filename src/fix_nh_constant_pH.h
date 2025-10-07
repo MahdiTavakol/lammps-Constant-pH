@@ -25,6 +25,7 @@
 #include "fix.h"    // IWYU pragma: export
 #include "fix_constant_pH.h"
 #include "fix_nh.h"
+#include "random_mars.h"
 
 namespace LAMMPS_NS {
 
@@ -46,8 +47,6 @@ class FixNHConstantPH : public FixNH {
   void allocate_lambda_storage();
   void update_lambda_params();
 
-  // random number function
-  double random_normal(double mean, double stddev);
   // constraining total charge through change lambdas and lambda_buff
   template <int mode> void constrain_lambdas();
   // computing the total charge
@@ -85,6 +84,10 @@ class FixNHConstantPH : public FixNH {
   // Parameters for Nose-Hoover thermostat
   double Q_lambda_nose_hoover;
   double zeta_nose_hoover;
+
+ private:
+  std::unique_ptr<RanMars> ranMars;
+  int ranMarsSeed;
 };
 
 }    // namespace LAMMPS_NS

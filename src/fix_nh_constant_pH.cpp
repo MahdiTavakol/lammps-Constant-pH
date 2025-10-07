@@ -43,7 +43,6 @@
 
 #include <cmath>
 #include <cstring>
-#include <random>
 #include <array>
 
 using namespace LAMMPS_NS;
@@ -75,19 +74,18 @@ FixNHConstantPH::FixNHConstantPH(LAMMPS *lmp, int narg, char **arg) :
     FixNH{lmp, narg, arg}, 
     fix_constant_pH{nullptr}, fix_constant_pH_id{nullptr}, 
     x_lambdas{nullptr}, v_lambdas{nullptr}, a_lambdas{nullptr}, m_lambdas{nullptr},
-    lambda_thermostat_type{NONE_LAMBDA}
+    lambda_integration_flags{0},lambda_thermostat_type{NONE_LAMBDA},
+    ranMarsSeed{1111}
 {
   if (narg < 5) utils::missing_cmd_args(FLERR, std::string("fix ") + style, error);
   
   lambda_thermostat_type = NONE_LAMBDA;
-  lambda_integration_flags = 0;
   
 
   int iarg = 3;
 
   while (iarg < narg) {
     if (strcmp(arg[iarg],"fix_constant_pH_id") == 0) {
-       lambda_integration_flags = 0;
        fix_constant_pH_id = utils::strdup(arg[iarg+1]);
        iarg += 2;
     } else if (strcmp(arg[iarg],"lambda_andersen") == 0) {
@@ -114,15 +112,20 @@ FixNHConstantPH::FixNHConstantPH(LAMMPS *lmp, int narg, char **arg) :
     } else if (strcmp(arg[iarg],"lambda_every") == 0) {
        lambda_every = utils::inumeric(FLERR,arg[iarg+1],false,lmp);
        if (lambda_every <= 0)
-          error->one(FLERR,"The lambda_every parameter must be positive");
+         error->one(FLERR,"The lambda_every parameter must be positive");
        iarg+=2; 
+    } else if (strcmp(arg[iarg],"lambda_seed") == 0) {
+      ranMarsSeed = utils::inumeric(FLERR,arg[iarg+1],false,lmp);
+      if (ranMarsSeed <= 0)
+         error->one(FLERR,"The constant_pH seed must be positive");
+      iarg+=2;
     } else {
        // skip to next argument; argument check for unknown keywords is done in FixNH
        ++iarg;
     }
   }
 
-  if (lambda_integration_flags & (BUFFER | CONSTRAIN) == CONSTRAIN)
+  if ((lambda_integration_flags & (BUFFER | CONSTRAIN)) == CONSTRAIN)
    error->one(FLERR,"Constrain total charge in absence of a buffer is not supported yet!");
 
   if (fix_constant_pH_id == nullptr) error->all(FLERR, "Invalid fix_nh constant_pH");
@@ -144,14 +147,18 @@ void FixNHConstantPH::init()
   FixNH::init();
 
   // dynamic_cast so that if it is not of FixConstantPH* type, no coversion happens!
-  fix_constant_pH = dynamic_cast<FixConstantPH*>(modify->get_fix_by_id(fix_constant_pH_id)); 
+  fix_constant_pH = dynamic_cast<FixConstantPH*>(modify->get_fix_by_id(fix_constant_pH_id));
+  if (!fix_constant_pH)
+   error->all(FLERR,"fix %s is not a FixConstantPH", fix_constant_pH_id); 
+
   fix_constant_pH->return_nparams(n_lambdas);
 
   allocate_lambda_storage();
 
-  std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
   zeta_nose_hoover = 0.0;
+
+  ranMars = std::make_unique<RanMars>(lmp,ranMarsSeed);
 }
 
 /* ----------------------------------------------------------------------
@@ -296,6 +303,27 @@ void FixNHConstantPH::nh_v_temp()
   fix_constant_pH->return_T_lambda(t_lambda_current[1],0);
   fix_constant_pH->return_T_lambda(t_lambda_current[2],1);
   fix_constant_pH->return_T_lambda(t_lambda_current[0],2);
+
+  auto checkOutBounds = [&](void)
+  {
+    for (int i = 0; i < n_lambdas; i++) {
+      if (x_lambdas[i][0] < -0.1 || x_lambdas[i][0] > 1.1)
+       v_lambdas[i][0] = -(x_lambdas[i][0]/std::abs(x_lambdas[i][0]))*std::abs(v_lambdas[i][0]);
+
+      for (int j = 1; j < 3; j++) {
+       if (x_lambdas[i][j] < 0.0 && v_lambdas[i][j] < 0.0)
+          x_lambdas[i][j] += 1.0;
+       if (x_lambdas[i][j] > 1.0 && v_lambdas[i][j] > 0.0)
+          x_lambdas[i][j] -= 1.0;
+     }
+    }
+
+    if (lambda_integration_flags & BUFFER) {
+       if (x_lambda_buff < -0.1 || x_lambda_buff > 1.1)
+          v_lambda_buff = -(x_lambda_buff/std::abs(x_lambda_buff))*std::abs(v_lambda_buff);
+    }
+  };
+
   
   if (lambda_thermostat_type == LAMBDA_ANDERSEN && comm->me == 0) {
     double P = dt/t_andersen;
@@ -305,34 +333,27 @@ void FixNHConstantPH::nh_v_temp()
       // Dealing with lambdas
       for (int i = 0; i < n_lambdas; i++) 
         for (int j = 0; j < 3; j++) {
-           double r = static_cast<double>(rand())/ RAND_MAX;
+           double r = ranMars->uniform();
+           //double r = static_cast<double>(rand())/ RAND_MAX;
            if (r < P) {
               double mean = 0.0;
               double sigma = std::sqrt(kT/(m_lambdas[i][j]*mvv2e));
-              v_lambdas[i][j] = random_normal(mean, sigma);
-           }
-           if (j == 0) {
-              if (x_lambdas[i][j] < -0.1 || x_lambdas[i][j] > 1.1)
-                 v_lambdas[i][j] = -(x_lambdas[i][j]/std::abs(x_lambdas[i][j]))*std::abs(v_lambdas[i][j]);
-           }
-           if (j > 0) {
-              if (x_lambdas[i][j] < 0.0 && v_lambdas[i][j] < 0.0)
-                 x_lambdas[i][j] += 1.0;
-              if (x_lambdas[i][j] > 1.0 && v_lambdas[i][j] > 0.0)
-                 x_lambdas[i][j] -= 1.0;            
+              v_lambdas[i][j] = ranMars->gaussian(mean,sigma);
+              //v_lambdas[i][j] = random_normal(mean, sigma);
            }
          }
       // Dealing with the buffer
       if (lambda_integration_flags & BUFFER) {
-        double r = static_cast<double>(rand())/ RAND_MAX;
+        //double r = static_cast<double>(rand())/ RAND_MAX;
+        double r = ranMars->uniform();
         if (r < P) {
            double mean = 0.0;
            double sigma = std::sqrt(kT/(N_buff*m_lambda_buff*mvv2e));
-           v_lambda_buff = random_normal(mean,sigma);
+           v_lambda_buff = ranMars->gaussian(mean,sigma);
+           //v_lambda_buff = random_normal(mean,sigma);
         }
-        if (x_lambda_buff < -0.1 || x_lambda_buff > 1.1)
-           v_lambda_buff = -(x_lambda_buff/std::abs(x_lambda_buff))*std::abs(v_lambda_buff);
       }
+      checkOutBounds();
     } else if (which == BIAS) {
       // This needs to be implemented
       error->one(FLERR,"The bias keyword for the fix_nh_constant_pH has not been implemented yet!");
@@ -346,17 +367,21 @@ void FixNHConstantPH::nh_v_temp()
     // Calculate the Bussi scaling factor
     zeta_bussi = std::exp(-dt/tau_t_bussi);
     
-    double r11 = random_normal(0,1);
-    double r12 = random_normal(0,1);
+    double r11 = ranMars->gaussian(0.0,1.0);
+    double r12 = ranMars->gaussian(0.0,1.0);
+    //double r11 = random_normal(0,1);
+    //double r12 = random_normal(0,1);
     double sum_r21 = 0.0;
     double sum_r22 = 0.0;
 
     for (int j = 1; j < n_lambdas; j++) {
-       double r = random_normal(0,1);
+       double r = ranMars->gaussian(0.0,1.0);
+       //double r = random_normal(0,1);
        sum_r21 += r*r;
     }
     for (int j = 1; j < 2*n_lambdas; j++) {
-       double r = random_normal(0,1);
+       double r = ranMars->gaussian(0.0,1.0);
+       //double r = random_normal(0,1);
        sum_r22 += r*r;
     }
 
@@ -370,31 +395,21 @@ void FixNHConstantPH::nh_v_temp()
     double alpha_bussi1 = std::sqrt(t_lambda_new_1 / t_lambda_current[1]);
     double alpha_bussi2 = std::sqrt(t_lambda_new_2 / t_lambda_current[2]);
 
+
     if (which == NOBIAS) {
 
        // first, the lambdas
        for (int i = 0; i < n_lambdas; i++) {
           v_lambdas[i][0] *= alpha_bussi1;
           for (int j = 1; j < 3; j++) {
-             v_lambdas[i][j] *= alpha_bussi2;
-
-             if (j == 0) {
-               if (x_lambdas[i][j] < -0.1 || x_lambdas[i][j] > 1.1)
-                 v_lambdas[i][j] = -(x_lambdas[i][j]/std::abs(x_lambdas[i][j]))*std::abs(v_lambdas[i][j]);
-             } else {
-               if (x_lambdas[i][j] < 0.0 && v_lambdas[i][j] < 0.0)
-                 x_lambdas[i][j] += 1.0;
-               if (x_lambdas[i][j] > 1.0 && v_lambdas[i][j] > 0.0)
-                 x_lambdas[i][j] -= 1.0;
-             }
+            v_lambdas[i][j] *= alpha_bussi2;
           }
        }
        // and then the buffer 
        if (lambda_integration_flags & BUFFER) {
           v_lambda_buff *= alpha_bussi1;
-          if (x_lambda_buff < -0.1 || x_lambda_buff > 1.1)
-            v_lambda_buff = -(x_lambda_buff/std::abs(x_lambda_buff))*std::abs(v_lambda_buff);
        }
+       checkOutBounds();
     } else if (which == BIAS) {
        // This needs to be implemented
        error->one(FLERR,"The bias keyword for the fix_nh_constant_pH has not been implemented yet!");
@@ -407,21 +422,12 @@ void FixNHConstantPH::nh_v_temp()
         for (int i = 0; i < n_lambdas; i++) 
            for (int j = 0; j < 3; j++) {
               v_lambdas[i][j] *= std::exp(-zeta_nose_hoover * dt);
-           
-              if (j == 0) {
-                if (x_lambdas[i][j] < -0.1 || x_lambdas[i][j] > 1.1)
-                  v_lambdas[i][j] = -(x_lambdas[i][j]/std::abs(x_lambdas[i][j]))*std::abs(v_lambdas[i][j]);
-              }
-              else {
-                if (x_lambdas[i][j] < 0.0 && v_lambdas[i][j] < 0.0)
-                  x_lambdas[i][j] += 1.0;
-                if (x_lambdas[i][j] > 1.0 && v_lambdas[i][j] > 0.0)
-                  x_lambdas[i][j] -= 1.0;
-           }
         }
         // and then the buffer
         if (lambda_integration_flags & BUFFER)
            v_lambda_buff *= std::exp(-zeta_nose_hoover * dt);
+
+        checkOutBounds();
            
      } else if (which == BIAS) {
         // This needs to be implemented
@@ -556,7 +562,7 @@ void FixNHConstantPH::constrain_lambdas()
 double FixNHConstantPH::compute_q_total()
 {
    double * q = atom->q;
-   double nlocal = atom->nlocal;
+   int nlocal = atom->nlocal;
    double q_local = 0.0;
    double q_total = 0.0;
 
@@ -568,16 +574,6 @@ double FixNHConstantPH::compute_q_total()
    return q_total;
 }
 
-/* ----------------------------------------------------------------------
-   random number generator
-   ---------------------------------------------------------------------- */
-
-double FixNHConstantPH::random_normal(double mean, double stddev)
-{
-  static std::mt19937 generator(std::random_device{}());
-  std::normal_distribution<double> distribution(mean, stddev);
-  return distribution(generator);
-}
 
 /* ----------------------------------------------------------------------
    memory usage
@@ -586,7 +582,7 @@ double FixNHConstantPH::random_normal(double mean, double stddev)
 double FixNHConstantPH::memory_usage()
 {
   double bytes = 0.0;
-  bytes += 4.0*n_lambdas*sizeof(double); // x_lambdas, v_lambdas, a_lambdas and m_lambdas
+  bytes += 4.0*3.0*n_lambdas*sizeof(double); // x_lambdas, v_lambdas, a_lambdas and m_lambdas
   if (irregular) bytes += irregular->memory_usage();
   return bytes;
 }
