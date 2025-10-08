@@ -26,6 +26,7 @@ FixStyle(adaptive_protonation,FixAdaptiveProtonation);
 #include "fix.h"
 
 #include <fstream>
+#include <array>
 
 namespace LAMMPS_NS {
 
@@ -77,10 +78,10 @@ class FixAdaptiveProtonation : public Fix {
   class NeighList *list;
 
   /*
-       * -1 ---> NEITHER
-       *  0 ---> SOLID
-       *  1 ---> SOLVENT
-       */
+   * -1 ---> NEITHER
+   *  0 ---> SOLID
+   *  1 ---> SOLVENT
+   */
 
   std::unique_ptr<int[]> mark;
   std::unique_ptr<int[]> mark_local;
@@ -88,7 +89,8 @@ class FixAdaptiveProtonation : public Fix {
   std::unique_ptr<int[]> mark_per_mol;   
   // If one atom have mark == 1 all the atoms of that molecule should have mark == 1
 
-  std::unique_ptr<int[]> protonable_size;    // used to average the mark for each molecule
+  // used to average the mark for each molecule
+  std::unique_ptr<int[]> protonable_size;    
   std::unique_ptr<int[]> protonable_size_local;
 
   // Tracking the changes in the q_total

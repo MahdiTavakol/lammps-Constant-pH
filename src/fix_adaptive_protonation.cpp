@@ -97,7 +97,7 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
       error->all(FLERR, "Unknown keyword");
   }
 
-  if ((flags & RESET_MID) && (flags & INIT_MID))
+  if (flags & (RESET_MID | INIT_MID))
     error->one(FLERR,
                "It is not possible to have both the initial_molids and reset_molecule_ids keywords "
                "in the fix adaptive_protonation");
@@ -300,11 +300,11 @@ void FixAdaptiveProtonation::deallocate_storage()
 void FixAdaptiveProtonation::allocate_storage()
 {
   using std::make_unique, std::fill_n;
-  protonable_molids = make_unique<int[]>(nmolecules);
-  mark = make_unique<int[]>(nmolecules + 1);
-  mark_prev = make_unique<int[]>(nmolecules + 1);
-  mark_local = make_unique<int[]>(nmolecules + 1);
-  protonable_size = make_unique<int[]>(nmolecules + 1);
+  protonable_molids     = make_unique<int[]>(nmolecules);
+  mark                  = make_unique<int[]>(nmolecules + 1);
+  mark_prev             = make_unique<int[]>(nmolecules + 1);
+  mark_local            = make_unique<int[]>(nmolecules + 1);
+  protonable_size       = make_unique<int[]>(nmolecules + 1);
   protonable_size_local = make_unique<int[]>(nmolecules + 1);
   fill_n(protonable_molids.get(), nmolecules, -1);
   fill_n(mark.get(), nmolecules + 1, 0);

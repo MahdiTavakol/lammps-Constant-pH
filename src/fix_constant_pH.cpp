@@ -519,7 +519,7 @@ void FixConstantPH::initialize_lambda()
       continue;
     }
     double lambda_j = (q_total[j]-q_total_pH1[j])/(q_total_pH2[j]-q_total_pH1[j]);
-    if (lambda_j < 0.0 || lambda_j > 1.0) {
+    if (lambda_j < -0.1 || lambda_j > 1.1) {
       error->warning(FLERR,"out of range value for the initialization of the lambda {}, The simulation might crash!",lambda_j);
       lambdas[j][0] = MAX(0.0,MIN(1.0,lambda_j));
     } else
