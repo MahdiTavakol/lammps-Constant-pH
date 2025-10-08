@@ -324,6 +324,7 @@ void FixConstantPH::setup(int /*vflag*/)
     fix_adaptive_protonation->get_n_protonable(this->n_lambdas);
 
   set_lambdas();
+  if (!(fp_flags & NONE_FP)) write_lambdas_header();
 }
 
 /* ----------------------------------------------------------------------
