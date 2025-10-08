@@ -97,7 +97,7 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
       error->all(FLERR, "Unknown keyword");
   }
 
-  if (flags & (RESET_MID | INIT_MID))
+  if ((flags & RESET_MID) && (flags & INIT_MID))
     error->one(FLERR,
                "It is not possible to have both the initial_molids and reset_molecule_ids keywords "
                "in the fix adaptive_protonation");
