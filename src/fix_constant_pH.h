@@ -28,7 +28,7 @@ FixStyle(constant_pH,FixConstantPH);
 #include "pair.h"
 
 namespace LAMMPS_NS {
-
+  
 class FixConstantPH : public Fix {
   friend class FixNHConstantPH;
   friend class ComputeGFFConstantPH;
