@@ -83,12 +83,15 @@ class FixConstantPH : public Fix {
   std::unique_ptr<int[]> molids;
   int n_lambdas;
 
+  double mass_lambda;
+
   // Temp array to change lambdas in order to get HAs and HBs
   std::unique_ptr<double[]> lambdas_j;
 
   // The smoothing function
   std::unique_ptr<double[]> fs;
   std::unique_ptr<double[]> dfs;
+
 
   // Parameters for the forcefield modifiction term
   bool GFF_flag;

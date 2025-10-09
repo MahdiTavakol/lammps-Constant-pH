@@ -52,7 +52,7 @@ enum {
   ZEROCHARGE = 1 << 2,
   CONSTRAIN = 1 << 3,
   COMMANDS = 1 << 4,
-  INTERMEDIATE = 1 << 5
+  INTERMEDIATE = 1 << 5,
 };
 
 enum {
@@ -69,7 +69,8 @@ static constexpr double tol = 1e-5;
 
 FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
     Fix{lmp, narg, arg}, lambdas{nullptr}, v_lambdas{nullptr}, a_lambdas{nullptr},
-    m_lambdas{nullptr}, H_lambdas{nullptr}, GFF{nullptr}, fix_adaptive_protonation_id{nullptr},
+    m_lambdas{nullptr}, H_lambdas{nullptr}, mass_lambda{20.0},
+    GFF{nullptr}, m_lambda_buff{20.0}, fix_adaptive_protonation_id{nullptr},
     fixgpu{nullptr}, q_orig{nullptr}, f_orig{nullptr}, peatom_orig{nullptr}, pvatom_orig{nullptr},
     keatom_orig{nullptr}, kvatom_orig{nullptr}, 
     qOWs{-0.834},qHWs{0.278},mu{0.0},ncommands{0},flags{0},fp_flags{0}, write_lambda_nevery{1},
@@ -197,6 +198,11 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
       flags |= INTERMEDIATE;
       if (comm->me == 0) { intermediate_file_name = arg[iarg + 1]; }
       iarg += 2;
+    } else if (strcmp(arg[iarg],"m_lambda") == 0)  {
+      if (narg < iarg + 2) utils::missing_cmd_args(FLERR,"fix constant_pH",error);
+      mass_lambda = utils::numeric(FLERR,arg[iarg+1],false,lmp);
+      m_lambda_buff = utils::numeric(FLERR,arg[iarg+2],false,lmp);
+      iarg += 2;
     } else {
       error->all(FLERR, "Unknown fix constant_pH keyword: {}", arg[iarg]);
     }
@@ -293,7 +299,6 @@ void FixConstantPH::setup(int /*vflag*/)
   if (flags & BUFFER) {
     lambda_buff = 1.0;
     v_lambda_buff = 0.0;
-    m_lambda_buff = 20.0;
 
     modify_q_buff(lambda_buff);
     compute_q_total();
@@ -447,7 +452,7 @@ void FixConstantPH::set_lambdas()
       lambdas[i][j] = 0.0;
       v_lambdas[i][j] = 0.0;
       a_lambdas[i][j] = 0.0;
-      m_lambdas[i][j] = 20.0; // m_lambda == 20.0u taken from https://www.mpinat.mpg.de/627830/usage
+      m_lambdas[i][j] = mass_lambda; // m_lambda == 20.0u taken from https://www.mpinat.mpg.de/627830/usage
     }
   }
 
