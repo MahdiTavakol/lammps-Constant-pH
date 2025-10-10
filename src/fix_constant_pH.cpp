@@ -857,10 +857,34 @@ void FixConstantPH::check_num_OWs_HWs()
 
 void FixConstantPH::calculate_dfs()
 {
-  for (int j = 0; j < n_lambdas; j++) {
-    fs[j] = 1.0 / (1 + exp(-50 * (lambdas[j][0] - 0.5)));
-    dfs[j] = 50 * exp(-50 * (lambdas[j][0] - 0.5)) * (fs[j] * fs[j]);
+  //Taken from https://gitlab.com/gromacs-constantph/constantph/-/blob/main/gromacs-constantph/src/gromacs/applied_forces/constant_ph/constant_ph.cpp
+  const double k = 5.0*r;
+  const double x0 = 2.0*a;
+
+  auto step = [&](double& x) {
+    if (pH>pK) {
+      x = 1.0 / (1 + exp(-k * (x+x0-1.0)));
+    } else if (pH<pK) {
+      x =  1.0 / (1 + exp(-k * (x-x0)));
+    } else
+      x = 0.0;
   }
+
+  auto dstep = [&](double& x) {
+    double arg;
+    if (pH>pK) {
+      arg = exp(-k*(x+x0-1.0));
+    } else if (pH<pK) {
+      arg = exp(-k*(x-x0));;
+    }
+    else {
+      arg = 0.0;
+    }
+    x =  k * arg/((1.0+arg)*(1.0+arg));
+  }
+
+  std::for_each(fs,fs+n_lambdas,step);
+  std::for_each(dfs,dfs+n_lambdas,dstep);
 }
 
 /* ----------------------------------------------------------------------- */
