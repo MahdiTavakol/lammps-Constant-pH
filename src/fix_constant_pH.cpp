@@ -203,7 +203,7 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
       if (narg < iarg + 2) utils::missing_cmd_args(FLERR,"fix constant_pH",error);
       mass_lambda = utils::numeric(FLERR,arg[iarg+1],false,lmp);
       m_lambda_buff = utils::numeric(FLERR,arg[iarg+2],false,lmp);
-      iarg += 2;
+      iarg += 3;
     } else {
       error->all(FLERR, "Unknown fix constant_pH keyword: {}", arg[iarg]);
     }
@@ -863,14 +863,14 @@ void FixConstantPH::calculate_dfs()
   const double x0 = 2.0 * a;
 
   // If pH == pK, everything is zero; skip work.
-  if (pH == pK) {
+  if (std::abs(pH -pK) < 1e-12) {
       std::fill(fs.get(),fs.get()+n_lambdas,0.0);
       std::fill(dfs.get(),dfs.get()+n_lambdas,0.0);
       return;
   }
 
   auto step = [&](double &x) {
-      if (pH > pK)      x = 1.0 / (1.0 + std::exp(-k * (x + x0 - 1.0)));
+      if (pH < pK)      x = 1.0 / (1.0 + std::exp(-k * (x + x0 - 1.0)));
       else /* pH < pK */x = 1.0 / (1.0 + std::exp(-k * (x - x0)));
   };
 
