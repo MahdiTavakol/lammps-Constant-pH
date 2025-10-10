@@ -34,6 +34,7 @@
 #include "timer.h"
 #include "update.h"
 
+#include <algorithm>
 #include <array>
 #include <cstring>
 #include <iomanip>
@@ -858,33 +859,31 @@ void FixConstantPH::check_num_OWs_HWs()
 void FixConstantPH::calculate_dfs()
 {
   //Taken from https://gitlab.com/gromacs-constantph/constantph/-/blob/main/gromacs-constantph/src/gromacs/applied_forces/constant_ph/constant_ph.cpp
-  const double k = 5.0*r;
-  const double x0 = 2.0*a;
+  const double k  = 5.0 * r;   // ensure k > 0 if you want an increasing step
+  const double x0 = 2.0 * a;
 
-  auto step = [&](double& x) {
-    if (pH>pK) {
-      x = 1.0 / (1 + exp(-k * (x+x0-1.0)));
-    } else if (pH<pK) {
-      x =  1.0 / (1 + exp(-k * (x-x0)));
-    } else
-      x = 0.0;
+  // If pH == pK, everything is zero; skip work.
+  if (pH == pK) {
+      std::fill(fs.get(),fs.get()+n_lambdas,0.0);
+      std::fill(dfs.get(),dfs.get()+n_lambdas,0.0);
+      return;
   }
 
-  auto dstep = [&](double& x) {
-    double arg;
-    if (pH>pK) {
-      arg = exp(-k*(x+x0-1.0));
-    } else if (pH<pK) {
-      arg = exp(-k*(x-x0));;
-    }
-    else {
-      arg = 0.0;
-    }
-    x =  k * arg/((1.0+arg)*(1.0+arg));
-  }
+  auto step = [&](double &x) {
+      if (pH > pK)      x = 1.0 / (1.0 + std::exp(-k * (x + x0 - 1.0)));
+      else /* pH < pK */x = 1.0 / (1.0 + std::exp(-k * (x - x0)));
+  };
 
-  std::for_each(fs,fs+n_lambdas,step);
-  std::for_each(dfs,dfs+n_lambdas,dstep);
+  auto dstep = [&](double s) {
+      return k * s * (1.0 - s);
+  }; 
+
+  // Map x -> sigma(x) in-place into fs
+  std::for_each(fs.get(), fs.get()+n_lambdas, step);
+
+  // Derivative from sigma: k * s * (1 - s)
+  std::transform(fs.get(), fs.get()+n_lambdas, dfs.get(), dstep);
+
 }
 
 /* ----------------------------------------------------------------------- */
