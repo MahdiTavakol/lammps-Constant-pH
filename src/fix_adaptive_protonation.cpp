@@ -377,25 +377,21 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
 
 void FixAdaptiveProtonation::set_molecule_id()
 {
-  int natom = atom->nlocal + atom->nghost;
   int nlocal = atom->nlocal;
-  int nmax = atom->nmax;
   int *molecule = atom->molecule;
   int *num_bond = atom->num_bond;
   int **bond_atom = atom->bond_atom;
-  int *tag = atom->tag;    // atom-id
-
+   
   bool changed;
-  for (int iter= 0; iter < 10; iter++) {
+  for (int iter = 0; iter < 10; iter++) {
     changed = false;
     for (int i = 0; i < nlocal; i++) {
       int mi = molecule[i];
       for (int k = 0; k < num_bond[i]; k++) {
-        const int jtag = bond_atom[i][k];
-        const int j = atom->map(jtag);
+        const int j = atom->map(bond_atom[i][k]);
         if (j < 0) continue;
-        int mmin = MIN(mi,molecule[j]);
-        if (mmin != mi) {
+        const int mmin = MIN(mi, molecule[j]);
+        if (mmin != mi) { 
           mi = mmin;
           changed = true;
         }
@@ -403,7 +399,7 @@ void FixAdaptiveProtonation::set_molecule_id()
       molecule[i] = mi;
     }
     int any = changed ? 1 : 0, any_global = 0;
-    MPI_Allreduce(&any,&any_global,1,MPI_INT,MPI_MAX,world);
+    MPI_Allreduce(&any, &any_global, 1, MPI_INT, MPI_MAX, world);
     if (!any_global) break;
     neighbor->exchange();
   }
@@ -490,10 +486,11 @@ void FixAdaptiveProtonation::modify_protonation_state()
   // I am not sure if this is necessary or not.
   double **pH1qs = pH_structure_storage->pH1qs;
   double **pH2qs = pH_structure_storage->pH2qs;
+  const int *protonable = pH_structure_storage->protonable.get();
 
   for (int i = 0; i < nlocal; i++) {
+    if (!protonable[type[i]]) continue;
     switch (mark[molecule[i]]) {
-      if (!protonable[type[i]]) continue;
       case NEITHER:    // Not protonable ----> nothing to do here
         break;
 
