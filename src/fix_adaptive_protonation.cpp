@@ -34,6 +34,7 @@ enum { F_NONE, RESET_MID = 1 << 1, INIT_MID = 1 << 2 };
 
 static constexpr double frac_low  = 0.4;
 static constexpr double frac_high = 0.6;
+static constexpr int max_moleset_iter = 10;
 
 /* --------------------------------------------------------------------------------------- */
 
@@ -404,7 +405,7 @@ void FixAdaptiveProtonation::set_molecule_id()
   int **bond_atom = atom->bond_atom;
    
   bool changed;
-  for (int iter = 0; iter < 10; iter++) {
+  for (int iter = 0; iter < max_moleset_iter; iter++) {
     changed = false;
     for (int i = 0; i < nlocal; i++) {
       int mi = molecule[i];
@@ -422,7 +423,7 @@ void FixAdaptiveProtonation::set_molecule_id()
     int any = changed ? 1 : 0, any_global = 0;
     MPI_Allreduce(&any, &any_global, 1, MPI_INT, MPI_MAX, world);
     if (!any_global) break;
-    neighbor->exchange();
+    comm->exchange();
   }
 }
 
