@@ -384,32 +384,26 @@ void FixAdaptiveProtonation::set_molecule_id()
   int **bond_atom = atom->bond_atom;
   int *tag = atom->tag;    // atom-id
 
-  for (int i = 0; i < nlocal; i++) {
-    for (int k = 0; k < num_bond[i]; k++) {
-      int jtag = bond_atom[i][k];    // the tag (atom-id) of kth bonds of atom i
-      int j = atom->map(jtag);
-      if (j == -1) {
-        error->warning(FLERR, "Bond atom missing in fix AdaptiveProtonation");
-        continue;
+  bool changed;
+  for (int iter= 0; iter < 10; iter++) {
+    changed = false;
+    for (int i = 0; i < nlocal; i++) {
+      int mi = molecule[i];
+      for (int k = 0; k < num_bond[i]; k++) {
+        if (j < 0) continue;
+        int mmin = MIN(mi,molecule[j]);
+        if (mmin != mi) {
+          mi = mmin;
+          changed = true;
+        }
       }
-      molecule[i] = MIN(molecule[i], molecule[j]);    // The header for the MIN is defined in the pointers.h
-      molecule[j] = molecule[i];
+      molecule[i] = mi;
     }
+    int any = changed ? 1 : 0, any_global = 0;
+    MPI_Allreduce(&any,&any_global,1,MPI_INT,MPI_MAX,world);
+    if (!any_global) break;
+    neighbor->exchange();
   }
-
-  // You need to think about neighbor exchange;
-  /*
-   no need for an exchange 
-   as LAMMPS itself takes care of exchange.
-
-   if atom i is in the proc n connected to atom j in proc n both of the atoms 
-   will be among the ghost atoms of the other atom. And as the minimum of the molecule_id
-   is the same in both the procs both the atoms would end up having the same 
-   molecule id and so there is no need for an atom exchange.
-   Of course if the molecules are long spanning multiple procs there is a need
-   for atom exchange here.
-   */
-
 }
 
 /* ----------------------------------------------------------------------------------------
