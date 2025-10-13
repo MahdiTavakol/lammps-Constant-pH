@@ -1516,9 +1516,10 @@ void FixConstantPH::write_lambdas_header()
       *(file.fp) << "n_lambdas=" << n_lambdas << std::endl;
       for (int i = 0; i < n_lambdas - 1; i++) *(file.fp) << "lambda-" << molids[i] << ",";
       *(file.fp) << "lambda-" << molids[n_lambdas - 1];
-      if (file.flag == LAMBDA_S_FP)
+      if (file.flag == LAMBDA_S_FP) {
+        *(file.fp) << std::endl;
         continue;
-      else if (flags & BUFFER)
+      } else if (flags & BUFFER)
         *(file.fp) << ",lambda-buffer";
       *(file.fp) << std::endl;
     }
@@ -1539,8 +1540,9 @@ void FixConstantPH::write_lambdas()
   if (comm->me != 0) return;    // Only rank 0 writes
 
   if (fp_flags & H_LAMBDA_FP && H_lambda_fp) {
-    for (int i = 0; i < n_lambdas; i++) H_lambda_fp << H_lambdas[i] << ",";
-    if (flaga && BUFFER) H_lambda_fp << H_lambda_buff;
+    for (int i = 0; i < n_lambdas -1; i++) H_lambda_fp << H_lambdas[i] << ",";
+    H_lambdas[n_lambdas-1];
+    if (flags && BUFFER) H_lambda_fp << "," << H_lambda_buff;
     H_lambda_fp << std::endl;
   }
 
@@ -1560,9 +1562,10 @@ void FixConstantPH::write_lambdas()
     if (fp_flags & file.flag && file.fp) {
       for (int i = 0; i < n_lambdas - 1; i++) *(file.fp) << file.content[i][file.j] << ",";
       *(file.fp) << file.content[n_lambdas - 1][file.j];
-      if (file.flag == LAMBDA_S_FP)
+      if (file.flag == LAMBDA_S_FP) {
+        *(file.fp) << std::endl;
         continue;
-      else if (flags & BUFFER)
+      } else if (flags & BUFFER)
         *(file.fp) << "," << file.buff_value;
       *(file.fp) << std::endl;
     }
@@ -1790,7 +1793,7 @@ double FixConstantPH::compute_array(int i, int j)
     case 8:
       // 9
       calculate_T_lambda();
-      if (j < 0 || j > 2) error->one(FLERR, "Out of range access");
+      if (j >= 0 && j <= 2) error->one(FLERR, "Out of range access");
       return T_lambdas[j];
     case 9:
       // 10
