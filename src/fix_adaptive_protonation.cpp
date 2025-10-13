@@ -201,6 +201,7 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
     * Building the neighbor list
     * every nevery steps 
     */
+  if (!list) error->all(FLERR, "Neighbor list not initialized for adaptive_protonation");
   neighbor->build_one(list);
 
   if (atom->nmax > nmax) {
@@ -390,6 +391,8 @@ void FixAdaptiveProtonation::set_molecule_id()
     for (int i = 0; i < nlocal; i++) {
       int mi = molecule[i];
       for (int k = 0; k < num_bond[i]; k++) {
+        const int jtag = bond_atom[i][k];
+        const int j = atom->map(jtag);
         if (j < 0) continue;
         int mmin = MIN(mi,molecule[j]);
         if (mmin != mi) {
@@ -490,6 +493,7 @@ void FixAdaptiveProtonation::modify_protonation_state()
 
   for (int i = 0; i < nlocal; i++) {
     switch (mark[molecule[i]]) {
+      if (!protonable[type[i]]) continue;
       case NEITHER:    // Not protonable ----> nothing to do here
         break;
 
