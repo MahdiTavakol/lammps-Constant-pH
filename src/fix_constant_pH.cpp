@@ -1540,9 +1540,9 @@ void FixConstantPH::write_lambdas()
   if (comm->me != 0) return;    // Only rank 0 writes
 
   if (fp_flags & H_LAMBDA_FP && H_lambda_fp) {
-    for (int i = 0; i < n_lambdas -1; i++) H_lambda_fp << H_lambdas[i] << ",";
-    H_lambdas[n_lambdas-1];
-    if (flags && BUFFER) H_lambda_fp << "," << H_lambda_buff;
+    for (int i = 0; i < n_lambdas - 1; i++) H_lambda_fp << H_lambdas[i] << ",";
+    H_lambda_fp << H_lambdas[n_lambdas - 1];
+    if (flags & BUFFER) H_lambda_fp << "," << H_lambda_buff;
     H_lambda_fp << std::endl;
   }
 
@@ -1793,8 +1793,8 @@ double FixConstantPH::compute_array(int i, int j)
     case 8:
       // 9
       calculate_T_lambda();
-      if (j >= 0 && j <= 2) error->one(FLERR, "Out of range access");
-      return T_lambdas[j];
+      if (j >= 0 && j <= 2) return T_lambdas[j];
+      return -1.0; 
     case 9:
       // 10
       if (j < n_lambdas)
