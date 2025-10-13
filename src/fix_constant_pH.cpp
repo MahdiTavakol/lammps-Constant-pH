@@ -69,7 +69,8 @@ static constexpr double tol = 1e-5;
 /* ---------------------------------------------------------------------- */
 
 FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
-    Fix{lmp, narg, arg}, lambdas{nullptr}, v_lambdas{nullptr}, a_lambdas{nullptr},
+    Fix{lmp, narg, arg}, random_number_seed{1152}, 
+    lambdas{nullptr}, v_lambdas{nullptr}, a_lambdas{nullptr},
     m_lambdas{nullptr}, H_lambdas{nullptr}, mass_lambda{20.0},
     GFF{nullptr}, m_lambda_buff{20.0}, fix_adaptive_protonation_id{nullptr},
     fixgpu{nullptr}, q_orig{nullptr}, f_orig{nullptr}, peatom_orig{nullptr}, pvatom_orig{nullptr},
