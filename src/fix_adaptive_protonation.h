@@ -41,8 +41,6 @@ class FixAdaptiveProtonation : public Fix {
   double compute_vector(int) override;
   double memory_usage() override;
   void init_list(int, class NeighList *) override;
-  int pack_forward_comm(int, int *, double *, int, int *) override;
-  void unpack_forward_comm(int, int, double *) override;
 
 
   // Getting the number of protonable molids;
