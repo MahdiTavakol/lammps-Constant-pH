@@ -106,8 +106,6 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
 
   nmolecules = 0;
 
-  if (flags & RESET_MID) set_molecule_id();
-
   int nlocal = atom->nlocal;
   int *molecule = atom->molecule;
 
@@ -183,6 +181,8 @@ void FixAdaptiveProtonation::init()
   neighbor->add_request(this, list_flags);
 
   std::fill(nchanges.begin(), nchanges.end(), 0);
+
+  if (flags & RESET_MID) set_molecule_id();
 }
 
 /* ---------------------------------------------------------------------------------------
@@ -354,6 +354,8 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
   MPI_Allreduce(protonable_size_local.get(), protonable_size.get(), nmolecules + 1, MPI_INT, MPI_SUM,
                 world);
 
+  constexpr double eps = 0.01;
+
   for (int i = 1; i < nmolecules + 1; i++) {
     if (!protonable_size[i]) {
       mark[i] = NEITHER;
@@ -364,7 +366,7 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
       mark[i] = SOLID;
     else if (test_condition >= frac_high && test_condition <= 1)
       mark[i] = SOLVENT;
-    else if (test_condition > 1 || test_condition < -1)
+    else if (test_condition > 1 + eps || test_condition < -1 - eps)
       error->one(FLERR, "Error in fix adaptive_protonation: You should never have reached here!");
     else {
       int prev = mark_prev[i];
