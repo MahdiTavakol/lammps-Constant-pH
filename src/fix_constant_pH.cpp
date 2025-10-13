@@ -35,6 +35,7 @@
 #include "update.h"
 
 #include <algorithm>
+#include <cmath>
 #include <array>
 #include <cstring>
 #include <iomanip>
@@ -900,14 +901,14 @@ void FixConstantPH::calculate_dUs()
     U1 = -k * std::exp(-(lambdas[j][0] - 1.0 - mu - b) * (lambdas[j][0] - 1.0 - mu - b) / (2.0 * a * a));
     U2 = -k * std::exp(-(lambdas[j][0] + mu + b) * (lambdas[j][0] + mu + b) / (2.0 * a * a));
     U3 = d * std::exp(-(lambdas[j][0] - 0.5) * (lambdas[j][0] - 0.5) / (2.0 * s * s));
-    U4 = 0.5 * w * (1.0 - erff(r * (lambdas[j][0] + m)));
-    U5 = 0.5 * w * (1.0 + erff(r * (lambdas[j][0] - 1.0 - m)));
+    U4 = 0.5 * w * (1.0 - std::erf(r * (lambdas[j][0] + m)));
+    U5 = 0.5 * w * (1.0 + std::erf(r * (lambdas[j][0] - 1.0 - m)));
     dU1 = -((lambdas[j][0] - 1.0 - b) / (a * a)) * U1;
     dU2 = -((lambdas[j][0] + b) / (a * a)) * U2;
     dU3 = -((lambdas[j][0] - 0.5) / (s * s)) * U3;
-    dU4 = -0.5 * w * r * 2 * std::exp(-r * r * (lambdas[j][0] + m) * (lambdas[j][0] + m)) / sqrt(M_PI);
+    dU4 = -0.5 * w * r * 2 * std::exp(-r * r * (lambdas[j][0] + m) * (lambdas[j][0] + m)) / std::sqrt(M_PI);
     dU5 = 0.5 * w * r * 2 * std::exp(-r * r * (lambdas[j][0] - 1 - m) * (lambdas[j][0] - 1.0 - m)) /
-        sqrt(M_PI);
+        std::sqrt(M_PI);
 
     Us[j] = U1 + U2 + U3 + U4 + U5;
     dUs[j] = dU1 + dU2 + dU3 + dU4 + dU5;
@@ -918,16 +919,16 @@ void FixConstantPH::calculate_dUs()
         std::exp(-(lambda_buff - 1.0 - b_buff) * (lambda_buff - 1.0 - b_buff) / (2.0 * a_buff * a_buff));
     U2 = -k_buff * std::exp(-(lambda_buff + b_buff) * (lambda_buff + b_buff) / (2.0 * a_buff * a_buff));
     U3 = d_buff * std::exp(-(lambda_buff - 0.5) * (lambda_buff - 0.5) / (2 * s_buff * s_buff));
-    U4 = 0.5 * w_buff * (1.0 - erff(r_buff * (lambda_buff + m_buff)));
-    U5 = 0.5 * w_buff * (1.0 + erff(r_buff * (lambda_buff - 1.0 - m_buff)));
+    U4 = 0.5 * w_buff * (1.0 - std::erf(r_buff * (lambda_buff + m_buff)));
+    U5 = 0.5 * w_buff * (1.0 + std::erf(r_buff * (lambda_buff - 1.0 - m_buff)));
     dU1 = -((lambda_buff - 1.0 - b_buff) / (a_buff * a_buff)) * U1;
     dU2 = -((lambda_buff + b_buff) / (a_buff * a_buff)) * U2;
     dU3 = -((lambda_buff - 0.5) / (s_buff * s_buff)) * U3;
     dU4 = -0.5 * w_buff * r_buff * 2 *
-    std::exp(-r_buff * r_buff * (lambda_buff + m_buff) * (lambda_buff + m_buff)) / sqrt(M_PI);
+    std::exp(-r_buff * r_buff * (lambda_buff + m_buff) * (lambda_buff + m_buff)) / std::sqrt(M_PI);
     dU5 = 0.5 * w_buff * r_buff * 2 *
     std::exp(-r_buff * r_buff * (lambda_buff - 1.0 - m_buff) * (lambda_buff - 1.0 - m_buff)) /
-        sqrt(M_PI);
+        std::sqrt(M_PI);
 
     U_buff = U1 + U2 + U3 + U4 + U5;
     dU_buff = dU1 + dU2 + dU3 + dU4 + dU5;
@@ -940,16 +941,16 @@ void FixConstantPH::calculate_dU(const double &_lambda, double &_U, double &_dU)
 {
   double U1, U2, U3, U4, U5;
   double dU1, dU2, dU3, dU4, dU5;
-  U1 = -k * exp(-(_lambda - 1 - b) * (_lambda - 1 - b) / (2 * a * a));
-  U2 = -k * exp(-(_lambda + b) * (_lambda + b) / (2 * a * a));
-  U3 = d * exp(-(_lambda - 0.5) * (_lambda - 0.5) / (2 * s * s));
-  U4 = 0.5 * w * (1 - erff(r * (_lambda + m)));
-  U5 = 0.5 * w * (1 + erff(r * (_lambda - 1 - m)));
+  U1 = -k * std::exp(-(_lambda - 1 - b) * (_lambda - 1 - b) / (2 * a * a));
+  U2 = -k * std::exp(-(_lambda + b) * (_lambda + b) / (2 * a * a));
+  U3 = d * std::exp(-(_lambda - 0.5) * (_lambda - 0.5) / (2 * s * s));
+  U4 = 0.5 * w * (1 - std::erf(r * (_lambda + m)));
+  U5 = 0.5 * w * (1 + std::erf(r * (_lambda - 1 - m)));
   dU1 = -((_lambda - 1 - b) / (a * a)) * U1;
   dU2 = -((_lambda + b) / (a * a)) * U2;
   dU3 = -((_lambda - 0.5) / (s * s)) * U3;
-  dU4 = -0.5 * w * r * 2 * exp(-r * r * (_lambda + m) * (_lambda + m)) / sqrt(M_PI);
-  dU5 = 0.5 * w * r * 2 * exp(-r * r * (_lambda - 1 - m) * (_lambda - 1 - m)) / sqrt(M_PI);
+  dU4 = -0.5 * w * r * 2 * std::exp(-r * r * (_lambda + m) * (_lambda + m)) / std::sqrt(M_PI);
+  dU5 = 0.5 * w * r * 2 * std::exp(-r * r * (_lambda - 1 - m) * (_lambda - 1 - m)) / std::sqrt(M_PI);
 
   _U = U1 + U2 + U3 + U4 + U5;
   _dU = dU1 + dU2 + dU3 + dU4 + dU5;
@@ -1499,6 +1500,8 @@ void FixConstantPH::compute_f_lambda_charge_interpolation()
 
 void FixConstantPH::write_lambdas_header()
 {
+  if (!(flags & ADAPTIVE) && !molids)
+    error->all(FLERR, "fix constant_pH requires either 'molids' or 'Fix_adaptive_protonation'.");
   if (comm->me != 0) return;    // Only rank 0 writes
 
   const struct {
@@ -1529,6 +1532,9 @@ void FixConstantPH::write_lambdas_header()
 
 void FixConstantPH::write_lambdas()
 {
+  if (!(flags & ADAPTIVE) && !molids)
+    error->all(FLERR, "fix constant_pH requires either 'molids' or 'Fix_adaptive_protonation'.");
+
   if (comm->me != 0) return;    // Only rank 0 writes
 
   if (fp_flags & H_LAMBDA_FP && H_lambda_fp) {
