@@ -861,8 +861,8 @@ void FixConstantPH::check_num_OWs_HWs()
 void FixConstantPH::calculate_dfs()
 {
   //Taken from https://gitlab.com/gromacs-constantph/constantph/-/blob/main/gromacs-constantph/src/gromacs/applied_forces/constant_ph/constant_ph.cpp
-  const double k  = 5.0 * r;   // ensure k > 0 if you want an increasing step
-  const double x0 = 2.0 * a;
+  const double k_step  = 5.0 * r;   // ensure k > 0 if you want an increasing step
+  const double x0_step  = 2.0 * a;
 
   // If pH == pK, everything is zero; skip work.
   if (std::abs(pH -pK) < 1e-12) {
@@ -872,12 +872,12 @@ void FixConstantPH::calculate_dfs()
   }
 
   auto step = [&](double &x) {
-      if (pH < pK)      x = 1.0 / (1.0 + std::exp(-k * (x + x0 - 1.0)));
-      else /* pH > pK */x = 1.0 / (1.0 + std::exp(-k * (x - x0)));
+      if (pH < pK)      x = 1.0 / (1.0 + std::exp(-k_step  * (x + x0_step  - 1.0)));
+      else /* pH > pK */x = 1.0 / (1.0 + std::exp(-k_step  * (x - x0_step )));
   };
 
   auto dstep = [&](double s) {
-      return k * s * (1.0 - s);
+      return k_step  * s * (1.0 - s);
   };
   
   for (int i = 0; i < n_lambdas; i++)
