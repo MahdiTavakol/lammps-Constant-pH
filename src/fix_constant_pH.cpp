@@ -941,13 +941,13 @@ void FixConstantPH::calculate_dU(const double &_lambda, double &_U, double &_dU)
 {
   double U1, U2, U3, U4, U5;
   double dU1, dU2, dU3, dU4, dU5;
-  U1 = -k * std::exp(-(_lambda - 1 - b) * (_lambda - 1 - b) / (2 * a * a));
-  U2 = -k * std::exp(-(_lambda + b) * (_lambda + b) / (2 * a * a));
+  U1 = -k * std::exp(-(_lambda - 1 - mu - b) * (_lambda - 1 - mu - b) / (2 * a * a));
+  U2 = -k * std::exp(-(_lambda + mu + b) * (_lambda + mu + b) / (2 * a * a));
   U3 = d * std::exp(-(_lambda - 0.5) * (_lambda - 0.5) / (2 * s * s));
   U4 = 0.5 * w * (1 - std::erf(r * (_lambda + m)));
   U5 = 0.5 * w * (1 + std::erf(r * (_lambda - 1 - m)));
-  dU1 = -((_lambda - 1 - b) / (a * a)) * U1;
-  dU2 = -((_lambda + b) / (a * a)) * U2;
+  dU1 = -((_lambda - 1 - mu - b) / (a * a)) * U1;
+  dU2 = -((_lambda + mu + b) / (a * a)) * U2;
   dU3 = -((_lambda - 0.5) / (s * s)) * U3;
   dU4 = -0.5 * w * r * 2 * std::exp(-r * r * (_lambda + m) * (_lambda + m)) / std::sqrt(M_PI);
   dU5 = 0.5 * w * r * 2 * std::exp(-r * r * (_lambda - 1 - m) * (_lambda - 1 - m)) / std::sqrt(M_PI);
