@@ -220,8 +220,8 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
   fixgpu = nullptr;
 
   array_flag = 1;
-  size_array_rows = 12;
-  size_array_cols = 3 * n_lambdas + 1;
+  size_array_rows = 11;
+  size_array_cols = 3 * n_lambdas + ((flags & BUFFER) ? 1 : 0);
   peratom_flag = 1;
   size_peratom_cols = 0;
   peratom_freq = nevery;
@@ -1158,9 +1158,9 @@ void FixConstantPH::modify_qs(double scale, int j)
   int denom1 = indx12 - indx11;
   int denom2 = indx22 - indx21;
 
-  double scale1 = (denom1 == 0.0) ? 0.0: (lambdas[j][1] * pHnStructures1 - 0.5 - static_cast<double>(indx11)) /
+  double scale1 = (denom1 == 0) ? 0.0: (lambdas[j][1] * pHnStructures1 - 0.5 - static_cast<double>(indx11)) /
     static_cast<double>(denom1);
-  double scale2 = (denom2 == 0.0) ? 0.0: (lambdas[j][2] * pHnStructures2 - 0.5 - static_cast<double>(indx21)) /
+  double scale2 = (denom2 == 0) ? 0.0: (lambdas[j][2] * pHnStructures2 - 0.5 - static_cast<double>(indx21)) /
     static_cast<double>(denom2);
 
 
@@ -1517,9 +1517,10 @@ void FixConstantPH::write_lambdas_header()
       for (int i = 0; i < n_lambdas - 1; i++) *(file.fp) << "lambda-" << molids[i] << ",";
       *(file.fp) << "lambda-" << molids[n_lambdas - 1];
       if (file.flag == LAMBDA_S_FP)
-        *(file.fp) << std::endl;
-      else
-        *(file.fp) << ",lambda-buffer" << std::endl;
+        continue;
+      else if (flags & BUFFER)
+        *(file.fp) << ",lambda-buffer";
+      *(file.fp) << std::endl;
     }
   }
 }
@@ -1539,7 +1540,8 @@ void FixConstantPH::write_lambdas()
 
   if (fp_flags & H_LAMBDA_FP && H_lambda_fp) {
     for (int i = 0; i < n_lambdas; i++) H_lambda_fp << H_lambdas[i] << ",";
-    H_lambda_fp << H_lambda_buff << std::endl;
+    if (flaga && BUFFER) H_lambda_fp << H_lambda_buff;
+    H_lambda_fp << std::endl;
   }
 
   const struct {
@@ -1559,9 +1561,10 @@ void FixConstantPH::write_lambdas()
       for (int i = 0; i < n_lambdas - 1; i++) *(file.fp) << file.content[i][file.j] << ",";
       *(file.fp) << file.content[n_lambdas - 1][file.j];
       if (file.flag == LAMBDA_S_FP)
-        *(file.fp) << std::endl;
-      else
-        *(file.fp) << "," << file.buff_value << std::endl;
+        continue;
+      else if (flags & BUFFER)
+        *(file.fp) << "," << file.buff_value;
+      *(file.fp) << std::endl;
     }
   }
 }
@@ -1607,6 +1610,7 @@ void FixConstantPH::initialize_v_lambda(const double _T_lambda)
 
 
   MPI_Bcast(v_lambdas[0], n_lambdas * 3, MPI_DOUBLE, 0, world);
+  if (flags & BUFFER) MPI_Bcast(&v_lambda_buff,1,MPI_DOUBLE,0,world);
 }
 
 /* --------------------------------------------------------------------- */
@@ -1615,7 +1619,7 @@ void FixConstantPH::calculate_T_lambda()
 {
   double KE_lambdas[3] = {0.0, 0.0, 0.0};    // lambdas[0][;], lambdas[1:][;], lambdas[;][;]
   double Nfs[3];
-  double k = force->boltz;
+  double kB = force->boltz;
   double mvv2e = force->mvv2e;
 
   Nfs[0] = static_cast<double>(n_lambdas);
@@ -1649,17 +1653,17 @@ void FixConstantPH::calculate_T_lambda()
       T_lambdas[1] = 0.0;
       T_lambdas[2] = 0.0;
     }
-    if (k == 0) error->one(FLERR, "The k value is zero");
+    if (kB == 0) error->one(FLERR, "The k value is zero");
     if (Nfs[0])
-      T_lambdas[0] = 2 * KE_lambdas[0] / (Nfs[0] * k);
+      T_lambdas[0] = 2 * KE_lambdas[0] / (Nfs[0] * kB);
     else
       T_lambdas[0] = 0.0;
     if (Nfs[1])
-      T_lambdas[1] = 2 * KE_lambdas[1] / (Nfs[1] * k);
+      T_lambdas[1] = 2 * KE_lambdas[1] / (Nfs[1] * kB);
     else
       T_lambdas[1] = 0.0;
     if (Nfs[2])
-      T_lambdas[2] = 2 * KE_lambdas[2] / (Nfs[2] * k);
+      T_lambdas[2] = 2 * KE_lambdas[2] / (Nfs[2] * kB);
     else
       T_lambdas[2] = 0.0;
   }
@@ -1723,7 +1727,7 @@ double FixConstantPH::compute_array(int i, int j)
       // 1
       if (j < n_lambdas)
         return HAs[j];
-      else if (j == n_lambdas)
+      else if ((j == n_lambdas) && (flags & BUFFER))
         return N_buff * HA_buff;
       else
         return -1.0;
@@ -1731,7 +1735,7 @@ double FixConstantPH::compute_array(int i, int j)
       // 2
       if (j < n_lambdas)
         return HBs[j];
-      else if (j == n_lambdas)
+      else if ((j == n_lambdas) && (flags & BUFFER))
         return N_buff * HB_buff;
       else
         return -1.0;
@@ -1739,7 +1743,7 @@ double FixConstantPH::compute_array(int i, int j)
       // 3
       if (j < n_lambdas)
         return dfs[j] * kT * log(10) * (pK - pH);
-      else if (j == n_lambdas)
+      else if ((j == n_lambdas) && (flags & BUFFER))
         return 0.0;
       else
         return -1.0;
@@ -1747,7 +1751,7 @@ double FixConstantPH::compute_array(int i, int j)
       // 4
       if (j < n_lambdas)
         return kj2kcal * dUs[j];
-      else if (j == n_lambdas)
+      else if ((j == n_lambdas) && (flags & BUFFER))
         return dU_buff;
       else
         return -1.0;
@@ -1755,7 +1759,7 @@ double FixConstantPH::compute_array(int i, int j)
       // 5
       if (j < n_lambdas)
         return GFF_lambdas[j];
-      else if (j == n_lambdas)
+      else if ((j == n_lambdas) && (flags & BUFFER))
         return 0.0;
       else
         return -1.0;
@@ -1763,7 +1767,7 @@ double FixConstantPH::compute_array(int i, int j)
       // 6
       if (j < 3 * n_lambdas)
         return lambdas[j % n_lambdas][j / n_lambdas];
-      else if (j == 3 * n_lambdas)
+      else if ((j == 3 * n_lambdas) && (flags & BUFFER))
         return lambda_buff;
       else
         return -1.0;
@@ -1771,7 +1775,7 @@ double FixConstantPH::compute_array(int i, int j)
       // 7
       if (j < 3 * n_lambdas)
         return v_lambdas[j % n_lambdas][j / n_lambdas];
-      else if (j == 3 * n_lambdas)
+      else if ((j == 3 * n_lambdas) && (flags & BUFFER))
         return v_lambda_buff;
       else
         return -1.0;
@@ -1779,7 +1783,7 @@ double FixConstantPH::compute_array(int i, int j)
       // 8
       if (j < 3 * n_lambdas)
         return a_lambdas[j % n_lambdas][j / n_lambdas];
-      else if (j == 3 * n_lambdas)
+      else if ((j == 3 * n_lambdas) && (flags & BUFFER))
         return a_lambda_buff;
       else
         return -1.0;
@@ -1792,7 +1796,7 @@ double FixConstantPH::compute_array(int i, int j)
       // 10
       if (j < n_lambdas)
         return H_lambdas[j];
-      else if (j == n_lambdas)
+      else if ((j == n_lambdas) && (flags & BUFFER))
         return H_lambda_buff;
       else
         return -1.0;
