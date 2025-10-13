@@ -87,7 +87,7 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
   scalar_flag = 1;
   vector_flag = 1;
   peratom_flag = 1;
-  comm_forward = 1;
+  comm_forward = 0;
   size_vector = 3;
   size_peratom_cols = 0;
   peratom_freq = nevery;
@@ -375,7 +375,6 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
     }
   }
 
-  comm->forward_comm(this);
 }
 
 /* ----------------------------------------------------------------------------------------
@@ -575,33 +574,6 @@ void FixAdaptiveProtonation::set_mark_prev()
 {
   for (int i = 0; i < nmolecules + 1; i++) mark_prev[i] = mark[i];
 }
-
-/* --------------------------------------------------------------------------------------- */
-
-int FixAdaptiveProtonation::pack_forward_comm(int n, int *list, double *buf, int /*pbc_flag*/,
-  int * /*pbc*/)
-{
-  int i, j, m;
-
-  m = 0;
-  for (i = 0; i < n; i++) {
-    j = list[i];
-    buf[m++] = vector_atom[j];
-  }
-  return m;
-}
-
-/* -------------------------------------------------------------------------------------- */
-
-void FixAdaptiveProtonation::unpack_forward_comm(int n, int first, double *buf)
-{
-  int i, m, last;
-
-  m = 0;
-  last = first + n;
-  for (i = first; i < last; i++) vector_atom[i] = buf[m++];
-}
-
 
 /* --------------------------------------------------------------------------
    Output the changes in the number of hydrogen atoms
