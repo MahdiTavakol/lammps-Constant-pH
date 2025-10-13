@@ -14,6 +14,7 @@
 
 #include "atom.h"
 #include "comm.h"
+#include "domain.h"
 #include "error.h"
 #include "math_const.h"
 #include "neighbor.h"
@@ -352,6 +353,7 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
       double dx = x[i][0]-x[j][0];
       double dy = x[i][1]-x[j][1];
       double dz = x[i][2]-x[j][2];
+      domain->minimum_image(dx,dy,dz);
       double rsq = std::sqrt(dx*dx+dy*dy+dz*dz);
       if (rsq < rprobe)
         vector_atom[i] += 1.0;    // Just considering the Oxygens. It is possible that both O and H from the same water molecule are close to this atom.

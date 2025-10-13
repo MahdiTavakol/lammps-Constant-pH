@@ -69,7 +69,7 @@ ComputeSoluteCoordination::ComputeSoluteCoordination(LAMMPS* lmp, int narg, char
 
   int iarg = 4;
   while (iarg < narg) {
-    if (strcmp(iarg,"cutoff") == 0) {
+    if (strcmp(arg[iarg],"cutoff") == 0) {
       rprobe = utils::numeric(FLERR, arg[iarg+1], false, lmp);
       iarg += 2;
     } else {
@@ -113,10 +113,16 @@ void ComputeSoluteCoordination::init_list(int /*id*/, NeighList* ptr)
 
 void ComputeSoluteCoordination::compute_peratom()
 {
-   // Building the neighbor
-  neighbor->build_one(list);
- 
+  int *ilist, *jlist, *numneigh, **firstneigh;
+  int inum, jnum;
+  int wnum; // number of surrounding water molecules
   int* type = atom->type;
+  double** x = atom->x;
+  
+  
+  // Building the neighbor
+  neighbor->build_one(list);
+
   invoked_peratom = update->ntimestep;
 
 
@@ -129,9 +135,7 @@ void ComputeSoluteCoordination::compute_peratom()
   std::fill_n(vector_atom,nmax,0.0);
 
 
-  int *ilist, *jlist, *numneigh, **firstneigh;
-  int inum, jnum;
-  int wnum; // number of surrounding water molecules
+
 
   inum = list->inum; // I do not ghost atoms for inum. however, I need them in jnum
   ilist = list->ilist;
@@ -156,6 +160,7 @@ void ComputeSoluteCoordination::compute_peratom()
       double dx = x[i][0]-x[j][0];
       double dy = x[i][1]-x[j][1];
       double dz = x[i][2]-x[j][2];
+      domain->minimum_image(dx,dy,dz);
       double rsq = std::sqrt(dx*dx+dy*dy+dz*dz);
       if (rsq < rprobe)
         wnum++;    // Just considering the Oxygens. It is possible that both O and H from the same water molecule are close to this atom.
