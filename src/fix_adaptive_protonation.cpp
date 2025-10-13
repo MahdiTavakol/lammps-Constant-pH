@@ -32,6 +32,9 @@ using namespace MathConst;
 enum { NEITHER = -1, SOLID = 0, SOLVENT = 1 };
 enum { F_NONE, RESET_MID = 1 << 1, INIT_MID = 1 << 2 };
 
+constexpr double frac_low  = 0.4;
+constexpr double frac_high = 0.6;
+
 /* --------------------------------------------------------------------------------------- */
 
 FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg) :
@@ -352,19 +355,17 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
                 world);
 
   for (int i = 1; i < nmolecules + 1; i++) {
-    if (protonable_size[i] == 0) {
+    if (!protonable_size[i]) {
       mark[i] = NEITHER;
       continue;
     }
     double test_condition = static_cast<double>(mark[i]) / static_cast<double>(protonable_size[i]);
-    if (test_condition >= 0 && test_condition <= 0.5)
+    if (test_condition >= 0 && test_condition <= frac_low)
       mark[i] = SOLID;
-    else if (test_condition > 0.5 && test_condition <= 1)
+    else if (test_condition >= frac_high && test_condition <= 1)
       mark[i] = SOLVENT;
     else if (test_condition > 1 || test_condition < -1)
       error->one(FLERR, "Error in fix adaptive_protonation: You should never have reached here!");
-    else
-      mark[i] = NEITHER;
   }
 
   comm->forward_comm(this);
