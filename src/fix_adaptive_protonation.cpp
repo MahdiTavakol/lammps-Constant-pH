@@ -210,6 +210,7 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
     if (vector_atom) delete[] vector_atom;
     vector_atom = nullptr;
     vector_atom = new double[nmax];
+    std::fill_n(vector_atom,nmax,0);
   }
 
   // If I do not put this to zero, it will have a very large value making the if statement false.
@@ -306,12 +307,14 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
 {
   int *ilist, *jlist, *numneigh, **firstneigh;
   int inum, jnum;
+  int nlocal = atom->nlocal;
 
   const int* protonable = pH_structure_storage->protonable.get();
 
   // resetting the mark_local and molecule_size_local before going through atoms
   std::fill_n(mark_local.get(),nmolecules+1,0);
   std::fill_n(protonable_size_local.get(),nmolecules+1,0);
+  std::fill_n(vector_atom,nmax,0);
 
   inum = list->inum;    // I do not need ghost atoms for inum. however, I need them in jnum
   ilist = list->ilist;
@@ -323,7 +326,6 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
 
   for (int ii = 0; ii < inum; ii++) {
     int i = ilist[ii];
-    vector_atom[i] = 0.0;
 
     // Check if this atom is protonable --> if not do not bother with it.
     if (protonable[type[i]] == 0) {
