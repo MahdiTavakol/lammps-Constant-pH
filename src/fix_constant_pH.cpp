@@ -468,7 +468,7 @@ void FixConstantPH::set_lambdas()
 
   // Resetting the vector_atom to the default value
   int nmax = atom->nmax;
-  std::fill(vector_atom, vector_atom + nmax, -1);
+  std::fill_n(vector_atom,nmax,-1);
 }
 
 /* ----------------------------------------------------------------------
@@ -1229,11 +1229,11 @@ void FixConstantPH::modify_qs(double **scales)
 
   std::unique_ptr<double []> q_changes_local = std::make_unique<double []>(5);
   std::unique_ptr<double []> q_changes = std::make_unique<double []>(5);
-  std::fill(q_changes_local.get(), q_changes_local.get()+5,0.0);
-  std::fill(q_changes.get(),q_changes.get()+5,0.0);
+  std::fill_n(q_changes_local.get(),5,0.0);
+  std::fill_n(q_changes.get(),5,0.0);
 
+  std::fill_n(vector_atom,nmax,-1);
 
-  std::fill(vector_atom, vector_atom + nmax, -1);
 
   // update the charges
   for (int j = 0; j < n_lambdas; j++) {
