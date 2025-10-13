@@ -10,42 +10,20 @@
 
    See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
-// Please remove unnecessary includes
 #include "fix_adaptive_protonation.h"
 
 #include "atom.h"
-#include "atom_masks.h"
-#include "comm.h"
-#include "domain.h"
 #include "error.h"
-#include "input.h"
-#include "math_const.h"
-#include "memory.h"
-#include "modify.h"
-#include "neigh_list.h"
 #include "neighbor.h"
-#include "output.h"
-#include "region.h"
-#include "respa.h"
+#include "neigh_list.h"
 #include "update.h"
-#include "variable.h"
+#include "comm.h"          // for comm->forward_comm(this)
 
-#include "angle.h"
-#include "bond.h"
-#include "dihedral.h"
-#include "force.h"
-#include "group.h"
-#include "improper.h"
-#include "kspace.h"
-#include "pair.h"
-
-#include "thermo.h"
-#include <cmath>
-#include <cstring>
-#include <sstream>
-#include <stdio.h>
-
-#include <iostream>
+#include <algorithm>       // std::fill, std::fill_n
+#include <array>           // std::array
+#include <cstring>         // std::strcmp
+#include <fstream>         // std::ifstream, std::ofstream
+#include <sstream>         // std::stringstream
 
 using namespace LAMMPS_NS;
 using namespace FixConst;
