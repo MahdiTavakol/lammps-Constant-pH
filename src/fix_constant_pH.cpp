@@ -200,7 +200,7 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
       if (comm->me == 0) { intermediate_file_name = arg[iarg + 1]; }
       iarg += 2;
     } else if (strcmp(arg[iarg],"m_lambda") == 0)  {
-      if (narg < iarg + 2) utils::missing_cmd_args(FLERR,"fix constant_pH",error);
+      if (narg < iarg + 3) utils::missing_cmd_args(FLERR,"fix constant_pH",error);
       mass_lambda = utils::numeric(FLERR,arg[iarg+1],false,lmp);
       m_lambda_buff = utils::numeric(FLERR,arg[iarg+2],false,lmp);
       iarg += 3;
@@ -871,12 +871,15 @@ void FixConstantPH::calculate_dfs()
 
   auto step = [&](double &x) {
       if (pH < pK)      x = 1.0 / (1.0 + std::exp(-k * (x + x0 - 1.0)));
-      else /* pH < pK */x = 1.0 / (1.0 + std::exp(-k * (x - x0)));
+      else /* pH > pK */x = 1.0 / (1.0 + std::exp(-k * (x - x0)));
   };
 
   auto dstep = [&](double s) {
       return k * s * (1.0 - s);
-  }; 
+  };
+  
+  for (int i = 0; i < n_lambdas; i++)
+    fs[i] = lambdas[i][0];
 
   // Map x -> sigma(x) in-place into fs
   std::for_each(fs.get(), fs.get()+n_lambdas, step);
@@ -1137,14 +1140,27 @@ void FixConstantPH::modify_qs(double scale, int j)
 
   int indx11 = std::floor(lambdas[j][1] * pHnStructures1 - 0.5);
   int indx12 = std::ceil(lambdas[j][1] * pHnStructures1 - 0.5);
-  double denom1 = static_cast<double>(indx12) - static_cast<double>(indx11);
-  double scale1 = (denom1 == 0.0) ? 0.0: (lambdas[j][1] * pHnStructures1 - 0.5 - static_cast<double>(indx11)) /
-      denom1;
   int indx21 = std::floor(lambdas[j][2] * pHnStructures2 - 0.5);
   int indx22 = std::ceil(lambdas[j][2] * pHnStructures2 - 0.5);
-  double denom2 = static_cast<double>(indx22)-static_cast<double>(indx21);
+
+  // Wrapping around 
+  while (indx11 < 0) indx11 += pHnStructures1;
+  while (indx12 < 0) indx12 += pHnStructures1;
+  while (indx21 < 0) indx21 += pHnStructures2;
+  while (indx22 < 0) indx22 += pHnStructures2;
+  while (indx11 > pHnStructures1 - 1) indx11 -= pHnStructures1;
+  while (indx12 > pHnStructures1 - 1) indx12 -= pHnStructures1;
+  while (indx21 > pHnStructures2 - 1) indx21 -= pHnStructures2;
+  while (indx22 > pHnStructures2 - 1) indx22 -= pHnStructures2;
+
+  int denom1 = indx12 - indx11;
+  int denom2 = indx22 - indx21;
+
+  double scale1 = (denom1 == 0.0) ? 0.0: (lambdas[j][1] * pHnStructures1 - 0.5 - static_cast<double>(indx11)) /
+    static_cast<double>(denom1);
   double scale2 = (denom2 == 0.0) ? 0.0: (lambdas[j][2] * pHnStructures2 - 0.5 - static_cast<double>(indx21)) /
-  denom2;
+    static_cast<double>(denom2);
+
 
   for (int i = 0; i < nlocal; i++) {
     int molid_i = atom->molecule[i];
@@ -1220,17 +1236,14 @@ void FixConstantPH::modify_qs(double **scales)
 
   // update the charges
   for (int j = 0; j < n_lambdas; j++) {
-
     double scale0 = scales[j][0];
     int indx11 = std::floor(lambdas[j][1] * pHnStructures1 - 0.5);
     int indx12 = std::ceil(lambdas[j][1] * pHnStructures1 - 0.5);
-    double scale1 = (lambdas[j][1] * pHnStructures1 - 0.5 - static_cast<double>(indx11)) /
-        (static_cast<double>(indx12) - static_cast<double>(indx11));
     int indx21 = std::floor(lambdas[j][2] * pHnStructures2 - 0.5);
     int indx22 = std::ceil(lambdas[j][2] * pHnStructures2 - 0.5);
-    double scale2 = (lambdas[j][2] * pHnStructures2 - 0.5 - static_cast<double>(indx21)) /
-        (static_cast<double>(indx22) - static_cast<double>(indx21));
 
+
+    // Wrapping around 
     while (indx11 < 0) indx11 += pHnStructures1;
     while (indx12 < 0) indx12 += pHnStructures1;
     while (indx21 < 0) indx21 += pHnStructures2;
@@ -1239,6 +1252,16 @@ void FixConstantPH::modify_qs(double **scales)
     while (indx12 > pHnStructures1 - 1) indx12 -= pHnStructures1;
     while (indx21 > pHnStructures2 - 1) indx21 -= pHnStructures2;
     while (indx22 > pHnStructures2 - 1) indx22 -= pHnStructures2;
+
+    int denom1 = indx12 - indx11;
+    int denom2 = indx22 - indx21;
+
+    double scale1 = (denom1 == 0) ? 0.0: 
+      (lambdas[j][1] * pHnStructures1 - 0.5 - static_cast<double>(indx11)) /static_cast<double>(denom1);
+    double scale2 = (denom2 == 0) ? 0.0: 
+      (lambdas[j][2] * pHnStructures2 - 0.5 - static_cast<double>(indx21)) /static_cast<double>(denom2);
+
+
 
     for (int i = 0; i < nlocal; i++) {
       int molid_i = atom->molecule[i];
