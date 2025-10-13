@@ -332,7 +332,7 @@ void FixConstantPH::setup(int /*vflag*/)
     fix_adaptive_protonation->get_n_protonable(this->n_lambdas);
 
   set_lambdas();
-  if (fp_flag != NONE_FP) write_lambdas_header();
+  if (fp_flags != NONE_FP) write_lambdas_header();
 }
 
 /* ----------------------------------------------------------------------
@@ -374,7 +374,7 @@ void FixConstantPH::initial_integrate(int /*vflag*/)
         delete_lambdas();
         set_lambdas();
 
-        if (!(fp_flags & NONE_FP)) write_lambdas_header();
+        if (fp_flags != NONE_FP) write_lambdas_header();
       }
     }
   }
@@ -903,8 +903,8 @@ void FixConstantPH::calculate_dUs()
     U3 = d * std::exp(-(lambdas[j][0] - 0.5) * (lambdas[j][0] - 0.5) / (2.0 * s * s));
     U4 = 0.5 * w * (1.0 - std::erf(r * (lambdas[j][0] + m)));
     U5 = 0.5 * w * (1.0 + std::erf(r * (lambdas[j][0] - 1.0 - m)));
-    dU1 = -((lambdas[j][0] - 1.0 - b) / (a * a)) * U1;
-    dU2 = -((lambdas[j][0] + b) / (a * a)) * U2;
+    dU1 = -((lambdas[j][0] - 1.0 - mu - b) / (a * a)) * U1;
+    dU2 = -((lambdas[j][0] + mu + b) / (a * a)) * U2;
     dU3 = -((lambdas[j][0] - 0.5) / (s * s)) * U3;
     dU4 = -0.5 * w * r * 2 * std::exp(-r * r * (lambdas[j][0] + m) * (lambdas[j][0] + m)) / std::sqrt(M_PI);
     dU5 = 0.5 * w * r * 2 * std::exp(-r * r * (lambdas[j][0] - 1 - m) * (lambdas[j][0] - 1.0 - m)) /
@@ -1067,7 +1067,6 @@ template <int direction> void FixConstantPH::backup_restore_qfev()
 {
   int i;
 
-  int nall = atom->nlocal + atom->nghost;
   int natom = atom->nlocal;
   if (force->newton || (force->kspace && force->kspace->tip4pflag)) natom += atom->nghost;
 
