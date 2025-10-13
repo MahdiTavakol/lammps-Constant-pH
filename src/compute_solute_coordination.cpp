@@ -55,20 +55,30 @@ using namespace MathConst;
 
 ComputeSoluteCoordination::ComputeSoluteCoordination(LAMMPS* lmp, int narg, char** arg) : Compute(lmp, narg, arg) 
 {
-   if (narg < 3) utils::missing_cmd_args(FLERR, "fix adaptive_protonation", error);
+  if (narg < 3) utils::missing_cmd_args(FLERR, "fix adaptive_protonation", error);
 
-   peratom_flag = 1;
-   scalar_flag = 0;
-   extscalar = 0;
-   size_peratom_cols = 0;
+  peratom_flag = 1;
+  scalar_flag = 0;
+  extscalar = 0;
+  size_peratom_cols = 0;
 
    
-   typeOW = utils::numeric(FLERR, arg[3], false, lmp);
+  typeOW = utils::numeric(FLERR, arg[3], false, lmp);
 
-   if (typeOW <=0 || typeOW > atom->ntypes) error->all(FLERR,"Wrong atom type");
+  if (typeOW <=0 || typeOW > atom->ntypes) error->all(FLERR,"Wrong atom type");
 
-   nmax = atom->nmax;
-   memory->create(vector_atom, nmax, "solute_coordination:vector_atom");
+  int iarg = 4;
+  while (iarg < narg) {
+    if (strcmp(iarg,"cutoff") == 0) {
+      rprobe = utils::numeric(FLERR, arg[iarg+1], false, lmp);
+      iarg += 2;
+    } else {
+      error->all(FLERR, "Unknown keyword");
+    }
+  }
+
+  nmax = atom->nmax;
+  memory->create(vector_atom, nmax, "solute_coordination:vector_atom");
 }
 
 /* --------------------------------------------------------------------------------------- */
@@ -83,13 +93,11 @@ ComputeSoluteCoordination::~ComputeSoluteCoordination()
 void ComputeSoluteCoordination::init()
 {
    // Request a fulintl neighbor list
-   int list_flags = NeighConst::REQ_OCCASIONAL; // | NeighConst::REQ_FULL;
+   int list_flags = NeighConst::REQ_OCCASIONAL | NeighConst::REQ_FULL;
 
 
    // request for a neighbor list
    neighbor->add_request(this, list_flags);
-
-
 }
 
 /* ---------------------------------------------------------------------------------------
@@ -118,6 +126,8 @@ void ComputeSoluteCoordination::compute_peratom()
     memory->create(vector_atom, nmax, "solute_coordination:vector_atom");
   }
 
+  std::fill_n(vector_atom,nmax,0.0);
+
 
   int *ilist, *jlist, *numneigh, **firstneigh;
   int inum, jnum;
@@ -131,19 +141,25 @@ void ComputeSoluteCoordination::compute_peratom()
 
 
   for (int ii = 0; ii < inum; ii++) {
-     wnum = 0.0;
-     int i = ilist[ii];
+    wnum = 0.0;
+    int i = ilist[ii];
 
-     jlist = firstneigh[i];
-     jnum = numneigh[i];
-     for (int jj = 0; jj < jnum; jj++) {
-       int j = jlist[jj];
-       j &= NEIGHMASK;
+    jlist = firstneigh[i];
+    jnum = numneigh[i];
+    for (int jj = 0; jj < jnum; jj++) {
+      int j = jlist[jj];
+      j &= NEIGHMASK;
 
-       if (type[j] == typeOW)
-         wnum++;  // Just considering the Oxygens. It is possible that both O and H from the same water molecule are close to this atom.
-     }
+      if (type[j] != typeOW)
+        continue;
 
-     vector_atom[i] = wnum;
-   }
+      double dx = x[i][0]-x[j][0];
+      double dy = x[i][1]-x[j][1];
+      double dz = x[i][2]-x[j][2];
+      double rsq = std::sqrt(dx*dx+dy*dy+dz*dz);
+      if (rsq < rprobe)
+        wnum++;    // Just considering the Oxygens. It is possible that both O and H from the same water molecule are close to this atom.
+    }
+    vector_atom[i] = wnum;
+  }
 }

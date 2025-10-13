@@ -42,6 +42,7 @@ class ComputeSoluteCoordination : public Compute {
  private:
   int typeOW;
   int nmax;
+  double rprobe = 3.5;
 
    // Neighborlist is required for accessing neighbors
    class NeighList* list;
