@@ -71,6 +71,7 @@ class FixAdaptiveProtonation : public Fix {
 
   // I need to detect water molecules
   int typeOW;
+  double rprobe = 3.5; // Cutoff value for neighboring waters.
   // The threshold for the number of neighboring water molecules
   double threshold;
 

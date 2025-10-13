@@ -30,8 +30,8 @@ using namespace MathConst;
 enum { NEITHER = -1, SOLID = 0, SOLVENT = 1 };
 enum { F_NONE, RESET_MID = 1 << 1, INIT_MID = 1 << 2 };
 
-constexpr double frac_low  = 0.4;
-constexpr double frac_high = 0.6;
+static constexpr double frac_low  = 0.4;
+static constexpr double frac_high = 0.6;
 
 /* --------------------------------------------------------------------------------------- */
 
@@ -71,6 +71,9 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
         if (!init_molid_file.is_open())
           error->one(FLERR, "Unable to open the intermediate file {}", arg[iarg + 1]);
       }
+      iarg += 2;
+    } else if (strcmp(arg[iarg],"cutoff") == 0) {
+      rprobe = utils::numeric(FLERR, arg[iarg+1], false, lmp);
       iarg += 2;
     } else
       error->all(FLERR, "Unknown keyword");
@@ -308,6 +311,7 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
   int *ilist, *jlist, *numneigh, **firstneigh;
   int inum, jnum;
   int nlocal = atom->nlocal;
+  double** x = atom->x;
 
   const int* protonable = pH_structure_storage->protonable.get();
 
@@ -330,8 +334,9 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
     // Check if this atom is protonable --> if not do not bother with it.
     if (protonable[type[i]] == 0) {
       continue;
-    } else
+    } else {
       protonable_size_local[molecule[i]]++;
+    }
 
     jlist = firstneigh[i];
     jnum = numneigh[i];
@@ -339,9 +344,16 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
       int j = jlist[jj];
       j &= NEIGHMASK;
 
-      if (type[j] == typeOW)
+      if (type[j] != typeOW) continue;
+
+      double dx = x[i][0]-x[j][0];
+      double dy = x[i][1]-x[j][1];
+      double dz = x[i][2]-x[j][2];
+      double rsq = std""sqrt(dx*dx+dy*dy+dz*dz);
+      if (rsq < rprobe)
         vector_atom[i] += 1.0;    // Just considering the Oxygens. It is possible that both O and H from the same water molecule are close to this atom.
     }
+
     if (vector_atom[i] >= threshold) {
       mark_local[molecule[i]] += SOLVENT;
     } else {
