@@ -366,6 +366,11 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
       mark[i] = SOLVENT;
     else if (test_condition > 1 || test_condition < -1)
       error->one(FLERR, "Error in fix adaptive_protonation: You should never have reached here!");
+    else {
+      int prev = mark_prev[i];
+      if (prev == SOLID || prev == SOLVENT) mark[i] = prev;
+      else mark[i] = SOLID;
+    }
   }
 
   comm->forward_comm(this);
