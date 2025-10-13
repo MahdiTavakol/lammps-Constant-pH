@@ -17,13 +17,11 @@
 #include "neighbor.h"
 #include "neigh_list.h"
 #include "update.h"
-#include "comm.h"          // for comm->forward_comm(this)
 
 #include <algorithm>       // std::fill, std::fill_n
 #include <array>           // std::array
 #include <cstring>         // std::strcmp
 #include <fstream>         // std::ifstream, std::ofstream
-#include <sstream>         // std::stringstream
 
 using namespace LAMMPS_NS;
 using namespace FixConst;
@@ -608,5 +606,7 @@ double FixAdaptiveProtonation::compute_vector(int n)
 
 double FixAdaptiveProtonation::memory_usage()
 {
-  return 0.0;
+  const size_t ints = (5*(nmolecules+1) + nmolecules) * sizeof(int);
+  const size_t dbls = static_cast<size_t>(nmax) * sizeof(double);
+  return static_cast<double>(ints + dbls);
 }
