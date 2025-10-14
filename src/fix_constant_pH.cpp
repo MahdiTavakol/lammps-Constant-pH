@@ -67,6 +67,7 @@ enum {
 };
 
 static constexpr double tol = 1e-5;
+static constexpr double max_lambda_buff_0 = 1.05;
 /* ---------------------------------------------------------------------- */
 
 FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
@@ -320,27 +321,28 @@ void FixConstantPH::setup(int /*vflag*/)
   // I have put this part here on purpose so if the fix_adaptive_protonation reads the initial molids, it is set here
   if (flags & ADAPTIVE) { 
     fix_adaptive_protonation->get_n_protonable(n_lambdas);
-    set_lambdas();
   }
 
+  set_lambdas();
+
   if (flags & BUFFER) {
+    lambda_buff = lambda_buff_0;
+    modify_q_buff(lambda_buff);
     double q_total = compute_q_total(true);
-    lambda_buff = -q_total/static_cast<double>(N_buff);
-    if (lambda_buff >= 1.02) {
-      double dlambda_buff = lambda_buff - 1.02;
-      lambda_buff = 1.02;
+    lambda_buff = lambda_buff_0 -q_total/static_cast<double>(N_buff);
+    if (lambda_buff >= max_lambda_buff_0 ) {
+      double dlambda_buff = lambda_buff - max_lambda_buff_0;
+      lambda_buff = max_lambda_buff_0 ;
       error->warning(FLERR,"Reducing the lambda_buff by {} through increase the lambda values.. The simulation might become unstable!",dlambda_buff);
       double dlambda = static_cast<double>(N_buff)*dlambda_buff /static_cast<double>(n_lambdas);
       for (int i = 0; i < n_lambdas; i++)
         lambdas[i][0] += dlambda;
     }
     v_lambda_buff = 0.0;
-
-    modify_q_buff(lambda_buff);
+    reset_qs();
     compute_q_total();
   }
 
-  set_lambdas();
   if (fp_flags != NONE_FP) write_lambdas_header();
 }
 
