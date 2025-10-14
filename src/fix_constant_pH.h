@@ -140,7 +140,7 @@ class FixConstantPH : public Fix {
 
   // The q_total used to calculate the HW charges
   double q_total;
-  double compute_q_total();
+  double compute_q_total(const bool silent = false);
   void check_q_total();
 
   class Fix *fixgpu;

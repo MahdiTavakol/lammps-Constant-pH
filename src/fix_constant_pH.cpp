@@ -297,16 +297,6 @@ void FixConstantPH::init()
 
 void FixConstantPH::setup(int /*vflag*/)
 {
-  if (flags & ADAPTIVE) { fix_adaptive_protonation->get_n_protonable(n_lambdas); }
-
-  if (flags & BUFFER) {
-    lambda_buff = 1.0;
-    v_lambda_buff = 0.0;
-
-    modify_q_buff(lambda_buff);
-    compute_q_total();
-  }
-
   // Checking if we have correct number of hydronium ions
   if (flags & BUFFER) check_num_OWs_HWs();
 
@@ -328,8 +318,27 @@ void FixConstantPH::setup(int /*vflag*/)
   allocate_storage();
 
   // I have put this part here on purpose so if the fix_adaptive_protonation reads the initial molids, it is set here
-  if (flags & ADAPTIVE)
-    fix_adaptive_protonation->get_n_protonable(this->n_lambdas);
+  if (flags & ADAPTIVE) { 
+    fix_adaptive_protonation->get_n_protonable(n_lambdas);
+    set_lambdas();
+  }
+
+  if (flags & BUFFER) {
+    double q_total = compute_q_total(true);
+    lambda_buff = -q_total/static_cast<double>(N_buff);
+    if (lambda_buff >= 1.02) {
+      double dlambda_buff = lambda_buff - 1.02;
+      lambda_buff = 1.02;
+      error->warning(FLERR,"Reducing the lambda_buff by {} through increase the lambda values.. The simulation might become unstable!",dlambda_buff);
+      double dlambda = static_cast<double>(N_buff)*dlambda_buff /static_cast<double>(n_lambdas);
+      for (int i = 0; i < n_lambdas; i++)
+        lambdas[i][0] += dlambda;
+    }
+    v_lambda_buff = 0.0;
+
+    modify_q_buff(lambda_buff);
+    compute_q_total();
+  }
 
   set_lambdas();
   if (fp_flags != NONE_FP) write_lambdas_header();
@@ -1335,9 +1344,7 @@ void FixConstantPH::modify_qs(double **scales)
 void FixConstantPH::modify_q_buff(const double _scale)
 {
   int nlocal = atom->nlocal;
-  int *mask = atom->mask;
   int *type = atom->type;
-  int ntypes = atom->ntypes;
   double *q = atom->q;
 
   // update the charges
@@ -1675,7 +1682,7 @@ void FixConstantPH::calculate_T_lambda()
 
 /* --------------------------------------------------------------------- */
 
-double FixConstantPH::compute_q_total()
+double FixConstantPH::compute_q_total(const bool silent)
 {
   double *q = atom->q;
   double q_local = 0.0;
@@ -1686,7 +1693,7 @@ double FixConstantPH::compute_q_total()
 
   MPI_Allreduce(&q_local, &q_total, 1, MPI_DOUBLE, MPI_SUM, world);
 
-  if (std::abs(q_total) > tol && comm->me == 0)
+  if (std::abs(q_total) > tol && comm->me == 0 && !silent)
     error->warning(FLERR, "q_total in fix constant-pH is non-zero: {} at step {}", q_total, ntimestep);
 
   return q_total;
