@@ -314,7 +314,7 @@ void FixAdaptiveProtonation::allocate_storage()
   protonable_size_local = make_unique<int[]>(nmolecules + 1);
   fill_n(protonable_molids.get(), nmolecules, -1);
   fill_n(mark.get(), nmolecules + 1, 0);
-  fill_n(mark_prev.get(), nmolecules + 1, -1);
+  fill_n(mark_prev.get(), nmolecules + 1,NEITHER);
   fill_n(mark_local.get(), nmolecules + 1, 0);
   fill_n(protonable_size.get(), nmolecules + 1, 0);
   fill_n(protonable_size_local.get(), nmolecules + 1, 0);
@@ -569,8 +569,9 @@ void FixAdaptiveProtonation::modify_protonation_state()
         break;    //  Prevent fall-through
 
       case SOLID:    // The molecule is in the solid
-        // It came from the water ----> deprotonate it or it is the first step
-        if (mark_prev[molecule[i]] == SOLVENT || mark_prev[molecule[i]]== NEITHER) {
+        // It came from the water ----> deprotonate it
+        // I do not want to mess up the initial charge distribution in the interior of the solid
+        if (mark_prev[molecule[i]] == SOLVENT) {
           q_init = q[i];
           q[i] = pH1qs[type[i]][0];
           q_change_local += q[i] - q_init;
