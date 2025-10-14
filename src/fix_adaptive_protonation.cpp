@@ -188,6 +188,9 @@ void FixAdaptiveProtonation::init()
   std::fill(nchanges.begin(), nchanges.end(), 0);
 
   if (flags & RESET_MID) set_molecule_id();
+
+  mark_protonation_deprotonation();
+  modify_protonation_state();
 }
 
 /* ---------------------------------------------------------------------------------------
@@ -204,49 +207,56 @@ void FixAdaptiveProtonation::init_list(int /*id*/, NeighList *ptr)
 void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
 {
   if (update->ntimestep % nevery) return;
+  protonation_deprotonation();
+}
 
+/* ----------------------------------------------------------------------------------------
+    Checking the protonation deprotonation
+   ---------------------------------------------------------------------------------------- */
+
+void FixAdaptiveProtonation::protonation_deprotonation()
+{
   /* 
     * Building the neighbor list
     * every nevery steps 
     */
-  if (!list) error->all(FLERR, "Neighbor list not initialized for adaptive_protonation");
-  neighbor->build_one(list);
-
-  if (atom->nmax > nmax) {
-    nmax = atom->nmax;
-    if (vector_atom) delete[] vector_atom;
-    vector_atom = nullptr;
-    vector_atom = new double[nmax];
-    std::fill_n(vector_atom,nmax,0);
-  }
-
-  // If I do not put this to zero, it will have a very large value making the if statement false.
-  int nmolecules_local = 0;
-  int nmolecules_total;
-
-  for (int i = 0; i < atom->nlocal; i++) {
-    if (atom->molecule[i] > nmolecules_local) nmolecules_local = atom->molecule[i];
-  }
-
-  MPI_Allreduce(&nmolecules_local, &nmolecules_total, 1, MPI_INT, MPI_MAX, world);
-  nmolecules_total++;
-
-  if (nmolecules_total > nmolecules) {
-    nmolecules = nmolecules_total;
-    deallocate_storage();
-    allocate_storage();
-  }
-
-  // Counting the number of water molecules surrounding the protonable molecules
-  mark_protonation_deprotonation();
-
-  // This is required since the fix_constant_pH.cpp does not deal with those molecules in the solid
-  modify_protonation_state();
-
-  // Resetting the mark_prev parameter to help us keep the track of which molecule moves from solid to solvent and vice versa
-  set_mark_prev();
+    if (!list) error->all(FLERR, "Neighbor list not initialized for adaptive_protonation");
+    neighbor->build_one(list);
+  
+    if (atom->nmax > nmax) {
+      nmax = atom->nmax;
+      if (vector_atom) delete[] vector_atom;
+      vector_atom = nullptr;
+      vector_atom = new double[nmax];
+      std::fill_n(vector_atom,nmax,0);
+    }
+  
+    // If I do not put this to zero, it will have a very large value making the if statement false.
+    int nmolecules_local = 0;
+    int nmolecules_total;
+  
+    for (int i = 0; i < atom->nlocal; i++) {
+      if (atom->molecule[i] > nmolecules_local) nmolecules_local = atom->molecule[i];
+    }
+  
+    MPI_Allreduce(&nmolecules_local, &nmolecules_total, 1, MPI_INT, MPI_MAX, world);
+    nmolecules_total++;
+  
+    if (nmolecules_total > nmolecules) {
+      nmolecules = nmolecules_total;
+      deallocate_storage();
+      allocate_storage();
+    }
+  
+    // Counting the number of water molecules surrounding the protonable molecules
+    mark_protonation_deprotonation();
+  
+    // This is required since the fix_constant_pH.cpp does not deal with those molecules in the solid
+    modify_protonation_state();
+  
+    // Resetting the mark_prev parameter to help us keep the track of which molecule moves from solid to solvent and vice versa
+    set_mark_prev();
 }
-
 
 /* ----------------------------------------------------------------------------------------
    Writing molids into a file
@@ -322,7 +332,7 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
   // resetting the mark_local and molecule_size_local before going through atoms
   std::fill_n(mark_local.get(),nmolecules+1,0);
   std::fill_n(protonable_size_local.get(),nmolecules+1,0);
-  std::fill_n(vector_atom,nmax,0);
+  std::fill_n(vector_atom,nmax,0.0);
 
   inum = list->inum;    // I do not need ghost atoms for inum. however, I need them in jnum
   ilist = list->ilist;
