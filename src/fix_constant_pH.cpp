@@ -1680,13 +1680,14 @@ double FixConstantPH::compute_q_total()
   double *q = atom->q;
   double q_local = 0.0;
   int nlocal = atom->nlocal;
+  bigint ntimestep = update->ntimestep;
 
   for (int i = 0; i < nlocal; i++) q_local += q[i];
 
   MPI_Allreduce(&q_local, &q_total, 1, MPI_DOUBLE, MPI_SUM, world);
 
   if (std::abs(q_total) > tol && comm->me == 0)
-    error->warning(FLERR, "q_total in fix constant-pH is non-zero: {} from {}", q_total, comm->me);
+    error->warning(FLERR, "q_total in fix constant-pH is non-zero: {} at step {}", q_total, ntimestep);
 
   return q_total;
 }

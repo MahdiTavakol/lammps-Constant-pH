@@ -189,9 +189,17 @@ void FixAdaptiveProtonation::init()
 
   if (flags & RESET_MID) set_molecule_id();
 
-  mark_protonation_deprotonation();
-  modify_protonation_state();
 }
+
+/* ---------------------------------------------------------------------------------------
+    The neighbor list cannot be made in the init step so we do it here in the setup step
+   --------------------------------------------------------------------------------------- */
+
+void FixAdaptiveProtonation::setup(int /*vflag*/) 
+{
+  protonation_deprotonation();
+}
+
 
 /* ---------------------------------------------------------------------------------------
     It is need to access the neighbor list

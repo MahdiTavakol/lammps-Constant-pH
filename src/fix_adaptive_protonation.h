@@ -36,6 +36,7 @@ class FixAdaptiveProtonation : public Fix {
   ~FixAdaptiveProtonation() override;
   int setmask() override;
   void init() override;
+  void setup(int) override;
   void initial_integrate(int) override;
   double compute_scalar() override;
   double compute_vector(int) override;
