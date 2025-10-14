@@ -521,7 +521,6 @@ void FixAdaptiveProtonation::modify_protonation_state()
   double *q = atom->q;
   int *type = atom->type;
   int *molecule = atom->molecule;
-  std::array<int, 3> nchanges_local = {0, 0, 0};
   double q_change_local = 0;
   double q_init;
 
@@ -530,6 +529,25 @@ void FixAdaptiveProtonation::modify_protonation_state()
   double **pH2qs = pH_structure_storage->pH2qs;
   const int *protonable = pH_structure_storage->protonable.get();
 
+  if (comm->me == 0) {
+    for (int m = 0; m < nmolecules; ++m) {
+
+      const int cur  = mark[m];
+      const int prev = mark_prev[m];
+  
+      if (cur == SOLVENT && (prev == SOLID || prev == NEITHER)) {
+        nchanges[0]++;   // total flips
+        nchanges[1]++;   // to solvent
+      } else if (cur == SOLID && (prev == SOLVENT || prev == NEITHER)) {
+        nchanges[0]++;
+        nchanges[2]++;   // to solid
+      }
+    }
+  }
+
+  MPI_Bcast(nchanges.data(),3,MPI_INT,0,world);
+
+
   for (int i = 0; i < nlocal; i++) {
     if (!protonable[type[i]]) continue;
     switch (mark[molecule[i]]) {
@@ -537,43 +555,30 @@ void FixAdaptiveProtonation::modify_protonation_state()
         break;
 
       case SOLVENT:    // The molecule is in the water
-        switch (mark_prev[molecule[i]]) {
-          case SOLID:      // The molecule was in the solid before
-          case NEITHER:    // First step (initial value of mark_prev is -1)
-            q_init = q[i];
-            q[i] = pH2qs[type[i]][0];
-            q_change_local += q[i] - q_init;
-            nchanges_local[0]++;
-            nchanges_local[1]++;
-            break;
-
-          case SOLVENT:    // The molecule was already in water → do nothing
-            break;
-
-          default:    // Catch unexpected values
-            error->all(FLERR, "Unexpected value in mark_prev[molecule[i]] for SOLVENT case");
-            break;
+        // The molecule was in the solid before or it is the first step
+        if (mark_prev[molecule[i]] == SOLID || mark_prev[molecule[i]]== NEITHER)
+        {
+          q_init = q[i];
+          q[i] = pH2qs[type[i]][0];
+          q_change_local += q[i] - q_init;
         }
+        else if (mark_prev[molecule[i]] == SOLVENT)
+          break;
+        else
+          error->all(FLERR, "Unexpected value in mark_prev[molecule[i]] for SOLVENT case");
         break;    //  Prevent fall-through
 
       case SOLID:    // The molecule is in the solid
-        switch (mark_prev[molecule[i]]) {
-          case SOLVENT:    // It came from the water ----> deprotonate it
-          case NEITHER:    // First step (initial value of mark_prev is -1)
-            q_init = q[i];
-            q[i] = pH1qs[type[i]][0];
-            q_change_local += q[i] - q_init;
-            nchanges_local[0]++;
-            nchanges_local[2]++;
-            break;
-
-          case SOLID:    // It was already in the solid ----> do nothing
-            break;
-
-          default:    // Catch unexpected values
-            error->all(FLERR, "Unexpected value in mark_prev[molecule[i]] for SOLID case");
-            break;
-        }
+        // It came from the water ----> deprotonate it or it is the first step
+        if (mark_prev[molecule[i]] == SOLVENT || mark_prev[molecule[i]]== NEITHER) {
+          q_init = q[i];
+          q[i] = pH1qs[type[i]][0];
+          q_change_local += q[i] - q_init;
+          break;
+        } else if (mark_prev[molecule[i]] == SOLID)
+          break;
+        else
+          error->all(FLERR, "Unexpected value in mark_prev[molecule[i]] for SOLID case");
         break;    //  Prevent fall-through
 
       default:    // Catch unexpected values in `mark[molecule[i]]`
@@ -583,7 +588,6 @@ void FixAdaptiveProtonation::modify_protonation_state()
   }
 
   MPI_Allreduce(&q_change_local, &q_change, 1, MPI_DOUBLE, MPI_SUM, world);
-  MPI_Allreduce(nchanges_local.data(), nchanges.data(), 3, MPI_INT, MPI_SUM, world);
 
   // Check if we need to change n_protonable and protonable_molids
   /*
