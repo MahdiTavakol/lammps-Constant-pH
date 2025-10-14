@@ -528,9 +528,10 @@ void FixAdaptiveProtonation::modify_protonation_state()
   double **pH1qs = pH_structure_storage->pH1qs;
   double **pH2qs = pH_structure_storage->pH2qs;
   const int *protonable = pH_structure_storage->protonable.get();
+  std::fill_n(nchanges.data(),3,0);
 
   if (comm->me == 0) {
-    for (int m = 0; m < nmolecules; ++m) {
+    for (int m = 1; m <= nmolecules; ++m) {
 
       const int cur  = mark[m];
       const int prev = mark_prev[m];
@@ -565,7 +566,7 @@ void FixAdaptiveProtonation::modify_protonation_state()
         else if (mark_prev[molecule[i]] == SOLVENT)
           break;
         else
-          error->all(FLERR, "Unexpected value in mark_prev[molecule[i]] for SOLVENT case");
+          error->all(FLERR, "Unexpected value in mark_prev[molecule[i]] for SOLVENT case: {}",mark_prev[molecule[i]]);
         break;    //  Prevent fall-through
 
       case SOLID:    // The molecule is in the solid
@@ -579,7 +580,7 @@ void FixAdaptiveProtonation::modify_protonation_state()
         } else if (mark_prev[molecule[i]] == SOLID)
           break;
         else
-          error->all(FLERR, "Unexpected value in mark_prev[molecule[i]] for SOLID case");
+          error->all(FLERR, "Unexpected value in mark_prev[molecule[i]] for SOLID case: {}",mark_prev[molecule[i]]);
         break;    //  Prevent fall-through
 
       default:    // Catch unexpected values in `mark[molecule[i]]`
