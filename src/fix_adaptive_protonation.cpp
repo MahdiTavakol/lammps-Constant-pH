@@ -95,7 +95,7 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
   comm_forward = 0;
   maxexchange = 1;
   size_vector = 3;
-  size_peratom_cols = 0;
+  size_peratom_cols = 1;
   peratom_freq = nevery;
   extscalar = 0;
   extvector = 0;
@@ -240,7 +240,9 @@ int FixAdaptiveProtonation::unpack_exchange(int nlocal, double* buf)
 void FixAdaptiveProtonation::grow_arrays(int nmax_new)
 {
   auto q_new = std::make_unique<double []>(nmax_new);
-  std::copy(q_orig.get(),q_orig.get()+MIN(nmax,nmax_new),q_new.get());
+  int keep = std::min(nmax,nmax_new);
+  if (keep > 0) std::copy(q_orig.get(),q_orig.get()+keep,q_new.get());
+  if (keep < nmax_new) std::fill(q_new.get()+keep,q_new.get()+nmax_new,0.0);
   q_orig.swap(q_new);
   nmax = nmax_new;
 }
@@ -269,9 +271,6 @@ void FixAdaptiveProtonation::protonation_deprotonation()
       vector_atom = nullptr;
       vector_atom = new double[nmax];
       std::fill_n(vector_atom,nmax,0);
-      auto new_q = std::make_unique<double []>(nmax);
-      q_orig.swap(new_q);
-      std::fill_n(q_orig.get(),nmax,0.0);
     }
   
     // If I do not put this to zero, it will have a very large value making the if statement false.
@@ -611,6 +610,7 @@ void FixAdaptiveProtonation::modify_protonation_state()
   MPI_Bcast(nchanges.data(),3,MPI_INT,0,world);
 
   double frac = step*nstepInv;
+  double q_new;
 
   for (int i = 0; i < nlocal; i++) {
     if (!protonable[type[i]]) continue;
@@ -623,7 +623,9 @@ void FixAdaptiveProtonation::modify_protonation_state()
         if (mark_prev[molecule[i]] == SOLID || mark_prev[molecule[i]]== NEITHER)
         {
           q_init = q[i];
-          q[i] = q_orig[i] + frac*(pH2qs[type[i]][0]-q_orig[i]);
+          q_new = q_orig[i] + frac*(pH2qs[type[i]][0]-q_orig[i]);
+          if (!std::isdefinite(q_new)) error->one("The q[{}] is inifinite!",i);
+          q[i] = q_new;
           q_change_local += q[i] - q_init;
         }
         else if (mark_prev[molecule[i]] == SOLVENT)
@@ -637,7 +639,9 @@ void FixAdaptiveProtonation::modify_protonation_state()
         // I do not want to mess up the initial charge distribution in the interior of the solid
         if (mark_prev[molecule[i]] == SOLVENT) {
           q_init = q[i];
-          q[i] = q_orig[i] + frac*(pH1qs[type[i]][0]-q_orig[i]);
+          q_new = q_orig[i] + frac*(pH1qs[type[i]][0]-q_orig[i]);
+          if (!std::isdefinite(q_new)) error->one("The q[{}] is inifinite!",i);
+          q[i] = q_new;
           q_change_local += q[i] - q_init;
           break;
         } else if (mark_prev[molecule[i]] == SOLID || mark_prev[molecule[i]] == NEITHER)
