@@ -93,6 +93,7 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
   vector_flag = 1;
   peratom_flag = 1;
   comm_forward = 0;
+  maxexchange = 1;
   size_vector = 3;
   size_peratom_cols = 0;
   peratom_freq = nevery;
@@ -219,6 +220,22 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
 {
   if (update->ntimestep % nevery) return;
   protonation_deprotonation();
+}
+
+/* --------------------------------------------------------------------------------------- 
+    The function to transfer q_orig between ranks
+   --------------------------------------------------------------------------------------- */
+
+int FixAdaptiveProtonation::pack_exchange(int i, double* buf)
+{
+  buf[0] = q_orig[i];
+  return 1;
+}
+
+int FixAdaptiveProtonation::unpack_exchange(int nlocal, double* buf)
+{
+  q_orig[i] = buf[0];
+  return 1;
 }
 
 /* ----------------------------------------------------------------------------------------

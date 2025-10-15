@@ -43,6 +43,9 @@ class FixAdaptiveProtonation : public Fix {
   double memory_usage() override;
   void init_list(int, class NeighList *) override;
 
+  int pack_exchange(int, double *) override;
+  int unpack_exchange(int, double *) override; 
+
   // Reading the molids from a file <--> For the file structure please have a look at the implementation file.
   void read_molids_file();
   // Getting the number of protonable molids;
@@ -94,6 +97,10 @@ class FixAdaptiveProtonation : public Fix {
   std::unique_ptr<int[]> protonable_size;    
   std::unique_ptr<int[]> protonable_size_local;
 
+  // The original value of q -->> used to gradually change the charges
+  std::unique_ptr<double []> q_orig;
+  int rampStep;
+
   // Tracking the changes in the q_total
   double q_change;
 
@@ -116,6 +123,8 @@ class FixAdaptiveProtonation : public Fix {
   void set_molecule_id();
   // protonation_deprotonation
   void protonation_deprotonation();
+  // backing up the initial qs
+  void backup_init_qs();
   // Mark phosphate atoms for protonation/deprotonation
   void mark_protonation_deprotonation();
   // Modifying the protonation state
