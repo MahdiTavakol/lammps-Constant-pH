@@ -232,7 +232,7 @@ int FixAdaptiveProtonation::pack_exchange(int i, double* buf)
   return 1;
 }
 
-int FixAdaptiveProtonation::unpack_exchange(int nlocal, double* buf)
+int FixAdaptiveProtonation::unpack_exchange(int i, double* buf)
 {
   q_orig[i] = buf[0];
   return 1;
@@ -257,6 +257,7 @@ void FixAdaptiveProtonation::protonation_deprotonation()
       vector_atom = nullptr;
       vector_atom = new double[nmax];
       std::fill_n(vector_atom,nmax,0);
+      q_orig = std::make_unique<double []>(nmax);
     }
   
     // If I do not put this to zero, it will have a very large value making the if statement false.
@@ -277,7 +278,7 @@ void FixAdaptiveProtonation::protonation_deprotonation()
     }
   
     // Counting the number of water molecules surrounding the protonable molecules
-    if (update%nevery == 0) {
+    if (update->ntimestep%nevery == 0) {
       rampStep = 1;
       mark_protonation_deprotonation();
       backup_init_qs();
@@ -289,7 +290,7 @@ void FixAdaptiveProtonation::protonation_deprotonation()
   
 
     // Resetting the mark_prev parameter to help us keep the track of which molecule moves from solid to solvent and vice versa
-    if (update%nevery == 0)
+    if (update->ntimestep%nevery == 0)
       set_mark_prev();
 }
 
@@ -447,16 +448,9 @@ void FixAdaptiveProtonation::backup_init_qs()
 {
   int nlocal = atom->nlocal;
   double* q = atom->q;
-  if (atom->nmax > nmax) 
-  {
-    nmax = atom->nmax;
-    q_orig.reset();
-    q_orig = std::make_unique<double []>(nmax);
-  }
 
   for (int i = 0; i < nlocal; i++)
     q_orig[i] = q[i];
-
 }
 
 /* ----------------------------------------------------------------------------------------
