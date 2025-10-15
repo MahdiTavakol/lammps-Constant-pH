@@ -25,6 +25,7 @@
 #include <array>           // std::array
 #include <cstring>         // std::strcmp
 #include <fstream>         // std::ifstream, std::ofstream
+#include <cmath>
 
 using namespace LAMMPS_NS;
 using namespace FixConst;
@@ -609,6 +610,10 @@ void FixAdaptiveProtonation::modify_protonation_state()
 
   MPI_Bcast(nchanges.data(),3,MPI_INT,0,world);
 
+  //double frac = std::min(step*nstepInv,1.0);
+  // I am not clamping it on purpose so that 
+  // I can check if there is any atomic 
+  // exchange that make q_orig irrelevant.
   double frac = step*nstepInv;
   double q_new;
 
@@ -624,7 +629,7 @@ void FixAdaptiveProtonation::modify_protonation_state()
         {
           q_init = q[i];
           q_new = q_orig[i] + frac*(pH2qs[type[i]][0]-q_orig[i]);
-          if (!std::isdefinite(q_new)) error->one("The q[{}] is inifinite!",i);
+          if (!std::isdefinite(q_new)) error->one(FLERR,"The q[{}] is infinite!",i);
           q[i] = q_new;
           q_change_local += q[i] - q_init;
         }
@@ -640,7 +645,7 @@ void FixAdaptiveProtonation::modify_protonation_state()
         if (mark_prev[molecule[i]] == SOLVENT) {
           q_init = q[i];
           q_new = q_orig[i] + frac*(pH1qs[type[i]][0]-q_orig[i]);
-          if (!std::isdefinite(q_new)) error->one("The q[{}] is inifinite!",i);
+          if (!std::isdefinite(q_new)) error->one(FLERR,"The q[{}] is infinite!",i);
           q[i] = q_new;
           q_change_local += q[i] - q_init;
           break;
