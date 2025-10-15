@@ -629,7 +629,7 @@ void FixAdaptiveProtonation::modify_protonation_state()
         {
           q_init = q[i];
           q_new = q_orig[i] + frac*(pH2qs[type[i]][0]-q_orig[i]);
-          if (!std::isdefinite(q_new)) error->one(FLERR,"The q[{}] is infinite!",i);
+          if (!std::isfinite(q_new)) error->one(FLERR,"The q[{}] is infinite!",i);
           q[i] = q_new;
           q_change_local += q[i] - q_init;
         }
@@ -645,7 +645,7 @@ void FixAdaptiveProtonation::modify_protonation_state()
         if (mark_prev[molecule[i]] == SOLVENT) {
           q_init = q[i];
           q_new = q_orig[i] + frac*(pH1qs[type[i]][0]-q_orig[i]);
-          if (!std::isdefinite(q_new)) error->one(FLERR,"The q[{}] is infinite!",i);
+          if (!std::isfinite(q_new)) error->one(FLERR,"The q[{}] is infinite!",i);
           q[i] = q_new;
           q_change_local += q[i] - q_init;
           break;
