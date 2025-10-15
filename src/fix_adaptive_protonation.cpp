@@ -218,7 +218,6 @@ void FixAdaptiveProtonation::init_list(int /*id*/, NeighList *ptr)
 
 void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
 {
-  if (update->ntimestep % nevery) return;
   protonation_deprotonation();
 }
 
@@ -232,10 +231,23 @@ int FixAdaptiveProtonation::pack_exchange(int i, double* buf)
   return 1;
 }
 
-int FixAdaptiveProtonation::unpack_exchange(int i, double* buf)
+int FixAdaptiveProtonation::unpack_exchange(int nlocal, double* buf)
 {
-  q_orig[i] = buf[0];
+  q_orig[nlocal] = buf[0];
   return 1;
+}
+
+void FixAdaptiveProtonation::grow_arrays(int nmax_new)
+{
+  auto q_new = std::make_unique<double []>(nmax_new);
+  std::copy(q_orig.get(),q_orig.get()+MIN(nmax,nmax_new),q_new.get());
+  q_orig.swap(q_new);
+  nmax = nmax_new;
+}
+
+void FixAdaptiveProtonation::copy_arrays(int i, int j , int /*deflag*/)
+{
+  q_orig[j] = q_orig[i];
 }
 
 /* ----------------------------------------------------------------------------------------
@@ -257,7 +269,9 @@ void FixAdaptiveProtonation::protonation_deprotonation()
       vector_atom = nullptr;
       vector_atom = new double[nmax];
       std::fill_n(vector_atom,nmax,0);
-      q_orig = std::make_unique<double []>(nmax);
+      auto new_q = std::make_unique<double []>(nmax);
+      q_orig.swap(new_q);
+      std::fill_n(q_orig.get(),nmax,0.0);
     }
   
     // If I do not put this to zero, it will have a very large value making the if statement false.
@@ -596,6 +610,7 @@ void FixAdaptiveProtonation::modify_protonation_state()
 
   MPI_Bcast(nchanges.data(),3,MPI_INT,0,world);
 
+  double frac = step*nstepInv;
 
   for (int i = 0; i < nlocal; i++) {
     if (!protonable[type[i]]) continue;
@@ -608,7 +623,7 @@ void FixAdaptiveProtonation::modify_protonation_state()
         if (mark_prev[molecule[i]] == SOLID || mark_prev[molecule[i]]== NEITHER)
         {
           q_init = q[i];
-          q[i] = step*(pH2qs[type[i]][0]-q_orig[i])*nstepInv;
+          q[i] = q_orig[i] + frac*(pH2qs[type[i]][0]-q_orig[i]);
           q_change_local += q[i] - q_init;
         }
         else if (mark_prev[molecule[i]] == SOLVENT)
@@ -622,7 +637,7 @@ void FixAdaptiveProtonation::modify_protonation_state()
         // I do not want to mess up the initial charge distribution in the interior of the solid
         if (mark_prev[molecule[i]] == SOLVENT) {
           q_init = q[i];
-          q[i] = step*(pH1qs[type[i]][0]-q_orig[i])*nstepInv;
+          q[i] = q_orig[i] + frac*(pH1qs[type[i]][0]-q_orig[i]);
           q_change_local += q[i] - q_init;
           break;
         } else if (mark_prev[molecule[i]] == SOLID || mark_prev[molecule[i]] == NEITHER)

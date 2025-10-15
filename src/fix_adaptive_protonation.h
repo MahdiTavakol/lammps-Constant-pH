@@ -45,6 +45,8 @@ class FixAdaptiveProtonation : public Fix {
 
   int pack_exchange(int, double *) override;
   int unpack_exchange(int, double *) override; 
+  void grow_arrays(int) override;
+  void copy_arrays(int, int, int) override;
 
   // Reading the molids from a file <--> For the file structure please have a look at the implementation file.
   void read_molids_file();
