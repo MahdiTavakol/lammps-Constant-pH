@@ -229,13 +229,15 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
 int FixAdaptiveProtonation::pack_exchange(int i, double* buf)
 {
   buf[0] = q_orig[i];
-  return 1;
+  buf[1] = vector_atom[i];
+  return 2;
 }
 
 int FixAdaptiveProtonation::unpack_exchange(int nlocal, double* buf)
 {
   q_orig[nlocal] = buf[0];
-  return 1;
+  vector_atom[nlocal] = buf[1];
+  return 2;
 }
 
 void FixAdaptiveProtonation::grow_arrays(int nmax_new)
@@ -245,12 +247,19 @@ void FixAdaptiveProtonation::grow_arrays(int nmax_new)
   if (keep > 0) std::copy(q_orig.get(),q_orig.get()+keep,q_new.get());
   if (keep < nmax_new) std::fill(q_new.get()+keep,q_new.get()+nmax_new,0.0);
   q_orig.swap(q_new);
+
+  double *new_vector_atom = new double[nmax_new];
+  if (keep > 0) std::copy(vector_atom,vector_atom+keep,new_vector_atom);
+  if (keep < nmax_new) std::fill(new_vector_atom+keep,new_vector_atom+nmax_new,0.0);
+  delete [] vector_atom;
+  vector_atom = new_vector_atom;
   nmax = nmax_new;
 }
 
 void FixAdaptiveProtonation::copy_arrays(int i, int j , int /*deflag*/)
 {
   q_orig[j] = q_orig[i];
+  vector_atom[j] = vector_atom[i];
 }
 
 /* ----------------------------------------------------------------------------------------
