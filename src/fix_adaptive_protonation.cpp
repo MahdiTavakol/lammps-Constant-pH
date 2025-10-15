@@ -96,7 +96,7 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
   comm_forward = 0;
   maxexchange = 2;
   size_vector = 3;
-  size_peratom_cols = 1;
+  size_peratom_cols = 0;
   peratom_freq = nevery;
   extscalar = 0;
   extvector = 0;
