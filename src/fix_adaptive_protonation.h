@@ -43,7 +43,8 @@ class FixAdaptiveProtonation : public Fix {
   double memory_usage() override;
   void init_list(int, class NeighList *) override;
 
-
+  // Reading the molids from a file <--> For the file structure please have a look at the implementation file.
+  void read_molids_file();
   // Getting the number of protonable molids;
   void get_n_protonable(int &n_lambdas) const { n_lambdas = this->n_protonable; }
   // Getting the protonable molids (The molids array must be allocated otherwise an error is produced)
@@ -113,8 +114,6 @@ class FixAdaptiveProtonation : public Fix {
   void allocate_storage();
   // Reseting all the molids
   void set_molecule_id();
-  // Reading the molids from a file <--> For the file structure please have a look at the implementation file.
-  void read_molids_file();
   // protonation_deprotonation
   void protonation_deprotonation();
   // Mark phosphate atoms for protonation/deprotonation

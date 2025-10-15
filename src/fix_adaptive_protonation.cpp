@@ -189,6 +189,9 @@ void FixAdaptiveProtonation::init()
 
   if (flags & RESET_MID) set_molecule_id();
 
+  //
+  q_orig = std::make_unique<double []>(nmax);
+
 }
 
 /* ---------------------------------------------------------------------------------------
@@ -257,13 +260,20 @@ void FixAdaptiveProtonation::protonation_deprotonation()
     }
   
     // Counting the number of water molecules surrounding the protonable molecules
-    mark_protonation_deprotonation();
+    if (update%nevery == 0) {
+      rampStep = 1;
+      mark_protonation_deprotonation();
+      backup_init_qs();
+    }
   
     // This is required since the fix_constant_pH.cpp does not deal with those molecules in the solid
     modify_protonation_state();
+    rampStep++;
   
+
     // Resetting the mark_prev parameter to help us keep the track of which molecule moves from solid to solvent and vice versa
-    set_mark_prev();
+    if (update%nevery == 0)
+      set_mark_prev();
 }
 
 /* ----------------------------------------------------------------------------------------
@@ -413,6 +423,26 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
 }
 
 /* ----------------------------------------------------------------------------------------
+   Backup the initial charges
+   ---------------------------------------------------------------------------------------- */
+
+void FixAdaptiveProtonation::backup_init_qs()
+{
+  int nlocal = atom->nlocal;
+  double* q = atom->q;
+  if (atom->nmax > nmax) 
+  {
+    nmax = atom->nmax;
+    q_orig.reset();
+    q_orig = std::make_unique<double []>(nmax);
+  }
+
+  for (int i = 0; i < nlocal; i++)
+    q_orig[i] = q[i];
+
+}
+
+/* ----------------------------------------------------------------------------------------
    Setting separate molecule ids for different phosphate ions 
    It might need to be a separate command in LAMMPS
    ---------------------------------------------------------------------------------------- */
@@ -468,6 +498,8 @@ void FixAdaptiveProtonation::read_molids_file()
 
   string line;
   if (comm->me == 0) {
+    if (!init_molid_file.is_open())
+      error->one(FLERR,"init_molid_file is not open!");
     // n_protonable
     getline(init_molid_file, line);
     n_protonable = stoi(line);
@@ -491,6 +523,9 @@ void FixAdaptiveProtonation::read_molids_file()
   // Then broadcasting the individual molids
   MPI_Bcast(protonable_molids.get(), n_protonable, MPI_INT, 0, world);
 
+  // chaning the mark_prev from NEITHER to 0 does not matter
+  // as in the modify_protonation_state we check if the atom 
+  // type is protonable or not (NEITHER)
   fill(mark_prev.get(), mark_prev.get() + nmolecules + 1, 0);    // zero is for SOLID
   for (int i = 0; i < n_protonable; i++) mark_prev[protonable_molids[i]] = SOLVENT;
   // protonable molecules are exposed to the SOLVENT.
@@ -523,6 +558,8 @@ void FixAdaptiveProtonation::modify_protonation_state()
   int *molecule = atom->molecule;
   double q_change_local = 0;
   double q_init;
+  double step = static_cast<double>(rampStep);
+  double nstepInv = 1.0/static_cast<double>(nevery);
 
   // I am not sure if this is necessary or not.
   double **pH1qs = pH_structure_storage->pH1qs;
@@ -560,7 +597,7 @@ void FixAdaptiveProtonation::modify_protonation_state()
         if (mark_prev[molecule[i]] == SOLID || mark_prev[molecule[i]]== NEITHER)
         {
           q_init = q[i];
-          q[i] = pH2qs[type[i]][0];
+          q[i] = step*(pH2qs[type[i]][0]-q_orig[i])*nstepInv;
           q_change_local += q[i] - q_init;
         }
         else if (mark_prev[molecule[i]] == SOLVENT)
@@ -574,10 +611,10 @@ void FixAdaptiveProtonation::modify_protonation_state()
         // I do not want to mess up the initial charge distribution in the interior of the solid
         if (mark_prev[molecule[i]] == SOLVENT) {
           q_init = q[i];
-          q[i] = pH1qs[type[i]][0];
+          q[i] = step*(pH1qs[type[i]][0]-q_orig[i])*nstepInv;
           q_change_local += q[i] - q_init;
           break;
-        } else if (mark_prev[molecule[i]] == SOLID)
+        } else if (mark_prev[molecule[i]] == SOLID || mark_prev[molecule[i]] == NEITHER)
           break;
         else
           error->all(FLERR, "Unexpected value in mark_prev[molecule[i]] for SOLID case: {}",mark_prev[molecule[i]]);

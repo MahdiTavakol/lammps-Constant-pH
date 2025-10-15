@@ -27,11 +27,12 @@ namespace LAMMPS_NS {
 
 class ComputeSoluteCoordination : public Compute {
  public:
-   ComputeSoluteCoordination(class LAMMPS *, int, char **);
-   ~ComputeSoluteCoordination() override;
-   void init() override;
-   void compute_peratom() override;
-   void init_list(int, class NeighList*) override;
+  ComputeSoluteCoordination(class LAMMPS *, int, char **);
+  ~ComputeSoluteCoordination() override;
+  void init() override;
+  void compute_peratom() override;
+  void init_list(int, class NeighList*) override;
+
 
   int nchunk, ncoord, compress, idsflag, lockcount;
   int computeflag;    // 1 if this compute invokes other computes

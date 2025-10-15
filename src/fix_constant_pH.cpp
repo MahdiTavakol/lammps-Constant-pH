@@ -377,13 +377,23 @@ void FixConstantPH::initial_integrate(int /*vflag*/)
         }
         // <------ add those commands
 
+        // Since there is a possibly to having the fix_adaptive_protonation deleted in 
+        // the commands we need to retrieve it again.
+        fix_adaptive_protonation = dynamic_cast<FixAdaptiveProtonation *>(modify->get_fix_by_id(fix_adaptive_protonation_id));
+        if (!fix_adaptive_protonation)
+          error->all(FLERR, "Wrong fix type in the adaptive keyword for the constant pH");
         // Updating the endstep
         update->endstep = endstep_backup;
-
+        /* Since we might have deleted the fix_adaptive_protonation in the command 
+         *  we reread the molids file 
+         */
         fix_adaptive_protonation->get_n_protonable(this->n_lambdas);
 
         delete_lambdas();
         set_lambdas();
+
+        modify->clearstep_compute();
+        modify->addstep_compute(update->ntimestep);
 
         if (fp_flags != NONE_FP) write_lambdas_header();
       }
@@ -458,6 +468,7 @@ void FixConstantPH::set_lambdas()
     // get_protonable_molids should be modified to be compatible with std::unique_ptr
     fix_adaptive_protonation->get_protonable_molids(molids.get());
   }
+
 
   for (int i = 0; i < n_lambdas; i++) {
     GFF_lambdas[i] = 0.0;
