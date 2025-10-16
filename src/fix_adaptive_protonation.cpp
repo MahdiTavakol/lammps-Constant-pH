@@ -641,11 +641,12 @@ void FixAdaptiveProtonation::modify_protonation_state()
         // The molecule was in the solid before or it is the first step
         if (mark_prev[molecule[i]] == SOLID || mark_prev[molecule[i]]== NEITHER)
         {
-          q_init = q[i];
-          q_new = q_orig[i] + frac*(pH2qs[type[i]][0]-q_orig[i]);
-          if (!std::isfinite(q_new)) error->one(FLERR,"The q[{}] is infinite!",i);
-          q[i] = q_new;
-          q_change_local += q[i] - q_init;
+          // The initial charge is set by the lambda 
+          //q_init = q[i];
+          //q_new = q_orig[i] + frac*(pH2qs[type[i]][0]-q_orig[i]);
+          //if (!std::isfinite(q_new)) error->one(FLERR,"The q[{}] is infinite!",i);
+          //q[i] = q_new;
+          //q_change_local += q[i] - q_init;
         }
         else if (mark_prev[molecule[i]] == SOLVENT)
           break;
