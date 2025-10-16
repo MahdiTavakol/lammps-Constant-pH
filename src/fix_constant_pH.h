@@ -82,8 +82,13 @@ class FixConstantPH : public Fix {
   double T_lambdas[3];
   std::unique_ptr<int[]> molids;
   int n_lambdas;
-
   double mass_lambda;
+  // Lambda arrays for the previous step before the fix_adaptive_protonation
+  double **lambdas_prev, **v_lambdas_prev, **a_lambdas_prev, **m_lambdas_prev, *H_lambdas_prev;
+  std::unique_ptr<int[]> molids_prev;
+  int n_lambdas_prev;
+
+  
 
   // Temp array to change lambdas in order to get HAs and HBs
   std::unique_ptr<double[]> lambdas_j;
@@ -196,7 +201,9 @@ class FixConstantPH : public Fix {
   void restore_epsilon();
   void delete_lambdas();
   void set_lambdas();
-  void initialize_lambda();
+  void delete_lambdas_prev();
+  void set_lambdas_prev();
+  void initialize_lambda(const int& to=0);
   void calculate_dq();
   void calculate_dfs();
   void calculate_dUs();

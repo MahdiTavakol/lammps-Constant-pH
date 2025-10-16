@@ -42,6 +42,7 @@
 #include <map>
 #include <sstream>
 #include <string>
+#include <vector>
 
 using namespace LAMMPS_NS;
 using namespace FixConst;
@@ -73,12 +74,14 @@ static constexpr double max_lambda_buff_0 = 1.05;
 FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
     Fix{lmp, narg, arg}, random_number_seed{1152}, 
     lambdas{nullptr}, v_lambdas{nullptr}, a_lambdas{nullptr},
-    m_lambdas{nullptr}, H_lambdas{nullptr}, mass_lambda{20.0},
+    m_lambdas{nullptr}, H_lambdas{nullptr}, n_lambdas{1},
+    lambdas_prev{nullptr}, v_lambdas_prev{nullptr}, a_lambdas_prev{nullptr},
+    m_lambdas_prev{nullptr}, H_lambdas_prev{nullptr}, n_lambdas_prev{0},
     GFF{nullptr}, m_lambda_buff{20.0}, fix_adaptive_protonation_id{nullptr},
     fixgpu{nullptr}, q_orig{nullptr}, f_orig{nullptr}, peatom_orig{nullptr}, pvatom_orig{nullptr},
     keatom_orig{nullptr}, kvatom_orig{nullptr}, 
     qOWs{-0.834},qHWs{0.278},mu{0.0},ncommands{0},flags{0},fp_flags{0}, write_lambda_nevery{1},
-    GFF_flag{false}, print_Udwp_flag{false}, n_lambdas{1}
+    GFF_flag{false}, print_Udwp_flag{false}
 {
   if (narg < 9) utils::missing_cmd_args(FLERR, "fix constant_pH", error);
 
@@ -389,6 +392,13 @@ void FixConstantPH::initial_integrate(int /*vflag*/)
          */
         fix_adaptive_protonation->get_n_protonable(this->n_lambdas);
 
+        /*
+         * Backing up lambdas, v_lambdas, a_lambdas,
+         * m_lambdas and H_lambdas
+         * If a lambda remains the same during fix_adaptive_protonation,
+         * I do not want to reset their lambdas and v_lambdas;
+         */
+        set_lambdas_prev();
         delete_lambdas();
         set_lambdas();
 
@@ -422,6 +432,22 @@ void FixConstantPH::post_force(int /*vflag*/)
    dependent on the n_lambdas
    ----------------------------------------------------------------------  */
 
+void FixConstantPH::delete_lambdas_prev()
+{
+  if (lambdas_prev)   memory->destroy(lambdas_prev);
+  if (v_lambdas_prev) memory->destroy(v_lambdas_prev);
+  if (a_lambdas_prev) memory->destroy(a_lambdas_prev);
+  if (m_lambdas_prev) memory->destroy(m_lambdas_prev);
+  if (H_lambdas_prev) memory->destroy(H_lambdas_prev);
+  molids_prev.reset();
+  lambdas_prev   = nullptr;
+  v_lambdas_prev = nullptr;
+  a_lambdas_prev = nullptr;
+  m_lambdas_prev = nullptr;
+  H_lambdas_prev = nullptr;
+  n_lambdas_prev = 0;
+}
+
 void FixConstantPH::delete_lambdas()
 {
   if (lambdas) memory->destroy(lambdas);
@@ -441,10 +467,23 @@ void FixConstantPH::delete_lambdas()
   molids.reset();
 }
 
-/* ----------------------------------------------------------------------
-   This function allocates the storage for memories whose sizes are 
-   dependent on the n_lambdas
-   ----------------------------------------------------------------------  */
+
+void FixConstantPH::set_lambdas_prev()
+{
+  n_lambdas_prev = n_lambdas;
+  memory->grow(lambdas_prev,n_lambdas_prev,3,"constant_pH:lambdas_prev");
+  memory->grow(v_lambdas_prev, n_lambdas_prev, 3, "constant_pH:v_lambdas_prev");
+  memory->grow(a_lambdas_prev, n_lambdas_prev, 3, "constant_pH:a_lambdas_prev");
+  memory->grow(m_lambdas_prev, n_lambdas_prev, 3, "constant_pH:m_lambdas_prev");
+  memory->grow(H_lambdas_prev, n_lambdas_prev, "constant_pH:H_lambdas_prev");
+  molids_prev = std::make_unique<int []>(n_lambdas_prev);
+  std::copy(lambdas[0],lambdas[0]+3*n_lambdas_prev,lambdas_prev[0]);
+  std::copy(v_lambdas[0],v_lambdas[0]+3*n_lambdas_prev,v_lambdas_prev[0]);
+  std::copy(a_lambdas[0],a_lambdas[0]+3*n_lambdas_prev,a_lambdas_prev[0]);
+  std::copy(m_lambdas[0],m_lambdas[0]+3*n_lambdas_prev,m_lambdas_prev[0]);
+  std::copy(H_lambdas,H_lambdas+n_lambdas_prev,H_lambdas_prev);
+  std::copy(molids.get(),molids.get()+n_lambdas_prev,molids_prev.get());
+}
 
 void FixConstantPH::set_lambdas()
 {
@@ -469,8 +508,26 @@ void FixConstantPH::set_lambdas()
     fix_adaptive_protonation->get_protonable_molids(molids.get());
   }
 
+  int to = 0;
+  if (molids_prev) {
+    for (int i = 0; i < n_lambdas; i++) {
+      auto iter = std::find(molids_prev.get(),molids_prev.get()+n_lambdas_prev,molids[i]);
+      if (iter != molids_prev.get()+n_lambdas_prev) {
+        int from = std::distance(molids_prev.get(),iter);
+        for (int j = 0; j < 3; j++) {
+          lambdas[to][j] = lambdas_prev[from][j];
+          v_lambdas[to][j] = v_lambdas_prev[from][j];
+          a_lambdas[to][j] = a_lambdas_prev[from][j];
+          m_lambdas[to][j] = m_lambdas_prev[from][j];
+        }
+        H_lambdas[to] = H_lambdas_prev[from];
+        to++;
+      }
+    }
+  }
 
-  for (int i = 0; i < n_lambdas; i++) {
+
+  for (int i = to; i < n_lambdas; i++) {
     GFF_lambdas[i] = 0.0;
     H_lambdas[i] = 0.0;
     for (int j = 0; j < 3; j++) {
@@ -483,7 +540,7 @@ void FixConstantPH::set_lambdas()
 
   if (n_lambdas) {
     // Initializing lambdas based on the current charge of protonable molecules so there is no jump in the system total charge
-    initialize_lambda();
+    initialize_lambda(to);
     // This would not work in the initialize section as the m_lambda has not been set yet!
     initialize_v_lambda(this->T);
   }
@@ -498,12 +555,13 @@ void FixConstantPH::set_lambdas()
    so there is no jump in the system total charge
    ---------------------------------------------------------------------- */
 
-void FixConstantPH::initialize_lambda()
+void FixConstantPH::initialize_lambda(const int& to)
 {
-  int nlocal = atom->nlocal;
+  const int nlocal = atom->nlocal;
   double *q = atom->q;
   int *type = atom->type;
   int *molecule = atom->molecule;
+  const int length = n_lambdas - to;
 
   // These three are not safe for the pH*qs I should
   // use the mdspan with std::unique_ptr and 
@@ -516,45 +574,46 @@ void FixConstantPH::initialize_lambda()
                         .get(); 
 
 
-  std::unique_ptr<double []>     q_local = std::make_unique<double []>(n_lambdas);
-  std::unique_ptr<double []> q_local_pH1 = std::make_unique<double []>(n_lambdas);
-  std::unique_ptr<double []> q_local_pH2 = std::make_unique<double []>(n_lambdas);
-  std::unique_ptr<double []>     q_total = std::make_unique<double []>(n_lambdas);
-  std::unique_ptr<double []> q_total_pH1 = std::make_unique<double []>(n_lambdas);
-  std::unique_ptr<double []> q_total_pH2 = std::make_unique<double []>(n_lambdas);
+  std::unique_ptr<double []>     q_local = std::make_unique<double []>(length);
+  std::unique_ptr<double []> q_local_pH1 = std::make_unique<double []>(length);
+  std::unique_ptr<double []> q_local_pH2 = std::make_unique<double []>(length);
+  std::unique_ptr<double []>     q_total = std::make_unique<double []>(length);
+  std::unique_ptr<double []> q_total_pH1 = std::make_unique<double []>(length);
+  std::unique_ptr<double []> q_total_pH2 = std::make_unique<double []>(length);
 
-  std::fill_n(q_local.get(),n_lambdas,0.0);
-  std::fill_n(q_local_pH1.get(),n_lambdas,0.0);
-  std::fill_n(q_local_pH2.get(),n_lambdas,0.0);
+  std::fill_n(q_local.get(),length,0.0);
+  std::fill_n(q_local_pH1.get(),length,0.0);
+  std::fill_n(q_local_pH2.get(),length,0.0);
 
   for (int i = 0; i < nlocal; i++) {
-    int type_i = type[i];
+    const int type_i = type[i];
     if (!protonable[type_i]) continue;
-    for (int j = 0; j < n_lambdas; j++) {
-      int molid_j = molids[j];
-      if (molecule[i] == molid_j) {
-        q_local[j]     += q[i];
-        q_local_pH1[j] += pH1qs[type_i][0];
-        q_local_pH2[j] += pH2qs[type_i][0];
+    for (int j = to; j < n_lambdas; j++) {
+      const int indx = j - to;
+      if (molecule[i] == molids[j]) {
+        q_local[indx]     += q[i];
+        q_local_pH1[indx] += pH1qs[type_i][0];
+        q_local_pH2[indx] += pH2qs[type_i][0];
       }
     }
   }
 
-  MPI_Allreduce(q_local.get(),q_total.get(),n_lambdas,MPI_DOUBLE,MPI_SUM,world);
-  MPI_Allreduce(q_local_pH1.get(),q_total_pH1.get(),n_lambdas,MPI_DOUBLE,MPI_SUM,world);
-  MPI_Allreduce(q_local_pH2.get(),q_total_pH2.get(),n_lambdas,MPI_DOUBLE,MPI_SUM,world);
+  MPI_Allreduce(q_local.get(),q_total.get(),length,MPI_DOUBLE,MPI_SUM,world);
+  MPI_Allreduce(q_local_pH1.get(),q_total_pH1.get(),length,MPI_DOUBLE,MPI_SUM,world);
+  MPI_Allreduce(q_local_pH2.get(),q_total_pH2.get(),length,MPI_DOUBLE,MPI_SUM,world);
 
-  for (int j = 0; j < n_lambdas; j++) {
+  for (int j = 0; j < length; j++) {
     if (std::abs(q_total_pH1[j] - q_total_pH2[j]) < tol) {
-      lambdas[j][0] = 0.0;
+      lambdas[to+j][0] = 0.0;
       continue;
     }
     double lambda_j = (q_total[j]-q_total_pH1[j])/(q_total_pH2[j]-q_total_pH1[j]);
-    if (lambda_j < -0.1 || lambda_j > 1.1) {
-      error->warning(FLERR,"out of range value for the initialization of the lambda {}, The simulation might crash!",lambda_j);
-      lambdas[j][0] = MAX(0.0,MIN(1.0,lambda_j));
-    } else
-    lambdas[j][0] = lambda_j;
+    if (comm->me == 0 && (lambda_j < -0.1 || lambda_j > 1.1)) {
+      error->warning(FLERR,"out of range value for the initialization of the lambda_{}=={}, The simulation might crash!",j,lambda_j);
+      lambdas[to+j][0] = MAX(0.0,MIN(1.0,lambda_j));
+    } 
+    else
+      lambdas[to+j][0] = lambda_j;
   }
 }
 
@@ -1140,9 +1199,7 @@ template <int direction> void FixConstantPH::backup_restore_qfev()
 void FixConstantPH::modify_qs(double scale, int j)
 {
   int nlocal = atom->nlocal;
-  int *mask = atom->mask;
   int *type = atom->type;
-  int ntypes = atom->ntypes;
   double *q = atom->q;
 
   int *protonable = pH_structure_storage->protonable
@@ -1236,9 +1293,7 @@ void FixConstantPH::modify_qs(double scale, int j)
 void FixConstantPH::modify_qs(double **scales)
 {
   int nlocal = atom->nlocal;
-  int *mask = atom->mask;
   int *type = atom->type;
-  int ntypes = atom->ntypes;
   double *q = atom->q;
 
   int *protonable = pH_structure_storage->protonable
@@ -1612,8 +1667,6 @@ void FixConstantPH::initialize_v_lambda(const double _T_lambda)
 
   if (flags & BUFFER) v_lambda_buff *= scaling_factor;
 
-  this->calculate_T_lambda();
-  scaling_factor = std::sqrt(_T_lambda / T_lambdas[2]);
 
   double v_cm = 0.0;
   for (int i = 0; i < n_lambdas; i++) v_cm += v_lambdas[i][0];
@@ -1633,6 +1686,9 @@ void FixConstantPH::initialize_v_lambda(const double _T_lambda)
 
   MPI_Bcast(v_lambdas[0], n_lambdas * 3, MPI_DOUBLE, 0, world);
   if (flags & BUFFER) MPI_Bcast(&v_lambda_buff,1,MPI_DOUBLE,0,world);
+  
+  // Updating the T_lambdas
+  this->calculate_T_lambda();
 }
 
 /* --------------------------------------------------------------------- */
@@ -1775,7 +1831,7 @@ double FixConstantPH::compute_array(int i, int j)
       if (j < n_lambdas)
         return kj2kcal * dUs[j];
       else if ((j == n_lambdas) && (flags & BUFFER))
-        return dU_buff;
+        return kj2kcal * dU_buff;
       else
         return -1.0;
     case 4:
