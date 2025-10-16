@@ -74,7 +74,7 @@ static constexpr double max_lambda_buff_0 = 1.05;
 FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
     Fix{lmp, narg, arg}, random_number_seed{1152}, 
     lambdas{nullptr}, v_lambdas{nullptr}, a_lambdas{nullptr},
-    m_lambdas{nullptr}, H_lambdas{nullptr}, n_lambdas{1},
+    m_lambdas{nullptr}, H_lambdas{nullptr}, n_lambdas{1}, mass_lambda{20.0},
     lambdas_prev{nullptr}, v_lambdas_prev{nullptr}, a_lambdas_prev{nullptr},
     m_lambdas_prev{nullptr}, H_lambdas_prev{nullptr}, n_lambdas_prev{0},
     GFF{nullptr}, m_lambda_buff{20.0}, fix_adaptive_protonation_id{nullptr},
