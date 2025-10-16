@@ -624,6 +624,11 @@ void FixAdaptiveProtonation::modify_protonation_state()
   // I can check if there is any atomic 
   // exchange that make q_orig irrelevant.
   double frac = step*nstepInv;
+  double frac_new = std::min(frac,1.0);
+  if (frac_new < frac) {
+    error->warning(FLERR,"Warning caping the frac from {} to 1.0",frac);
+    frac = frac_new;
+  }
   double q_new;
 
   for (int i = 0; i < nlocal; i++) {
