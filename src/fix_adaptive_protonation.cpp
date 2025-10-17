@@ -144,6 +144,10 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
   if (!(flags & INIT_MID)) n_protonable = 0;
 
   nRampStep = 1000000;
+
+  atom->add_callback(Atom::GROW);
+  //atom->add_callback(Atom::COPY);
+  atom->add_callback(Atom::BORDER);
 }
 
 /* --------------------------------------------------------------------------------------- */
@@ -157,6 +161,10 @@ FixAdaptiveProtonation::~FixAdaptiveProtonation()
   deallocate_storage();
 
   vector_atom = nullptr;
+
+  atom->delete_callback(id,Atom::GROW);
+  //atom->delete_callback(id,Atom::COPY);
+  atom->delete_callback(id,Atom::BORDER);
 }
 
 /* --------------------------------------------------------------------------------------- */
@@ -221,8 +229,7 @@ void FixAdaptiveProtonation::init_list(int /*id*/, NeighList *ptr)
 
 void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
 {
-  if (update->ntimestep%nevery == 0)
-    protonation_deprotonation();
+  protonation_deprotonation();
 }
 
 /* --------------------------------------------------------------------------------------- 
@@ -271,53 +278,53 @@ void FixAdaptiveProtonation::copy_arrays(int i, int j , int /*deflag*/)
 
 void FixAdaptiveProtonation::protonation_deprotonation()
 {
-  /* 
-    * Building the neighbor list
-    * every nevery steps 
-    */
+
+  /*if (atom->nmax > nmax) {
+    nmax = atom->nmax;
+    if (vector_atom) delete[] vector_atom;
+    vector_atom = nullptr;
+    vector_atom = new double[nmax];
+    std::fill_n(vector_atom,nmax,0);
+  }*/
+  
+  // If I do not put this to zero, it will have a very large value making the if statement false.
+  int nmolecules_local = 0;
+  int nmolecules_total;
+  
+  for (int i = 0; i < atom->nlocal; i++) {
+    if (atom->molecule[i] > nmolecules_local) nmolecules_local = atom->molecule[i];
+  }
+  
+  MPI_Allreduce(&nmolecules_local, &nmolecules_total, 1, MPI_INT, MPI_MAX, world);
+  nmolecules_total++;
+  
+  if (nmolecules_total > nmolecules) {
+    nmolecules = nmolecules_total;
+    deallocate_storage();
+    allocate_storage();
+  }
+  
+  // Counting the number of water molecules surrounding the protonable molecules
+  if (update->ntimestep%nevery == 0) {
+    /* 
+     * Building the neighbor list
+     * every nevery steps 
+     */
     if (!list) error->all(FLERR, "Neighbor list not initialized for adaptive_protonation");
     neighbor->build_one(list);
+    rampStep = 1;
+    mark_protonation_deprotonation();
+    backup_init_qs();
+  }
   
-    if (atom->nmax > nmax) {
-      nmax = atom->nmax;
-      if (vector_atom) delete[] vector_atom;
-      vector_atom = nullptr;
-      vector_atom = new double[nmax];
-      std::fill_n(vector_atom,nmax,0);
-    }
-  
-    // If I do not put this to zero, it will have a very large value making the if statement false.
-    int nmolecules_local = 0;
-    int nmolecules_total;
-  
-    for (int i = 0; i < atom->nlocal; i++) {
-      if (atom->molecule[i] > nmolecules_local) nmolecules_local = atom->molecule[i];
-    }
-  
-    MPI_Allreduce(&nmolecules_local, &nmolecules_total, 1, MPI_INT, MPI_MAX, world);
-    nmolecules_total++;
-  
-    if (nmolecules_total > nmolecules) {
-      nmolecules = nmolecules_total;
-      deallocate_storage();
-      allocate_storage();
-    }
-  
-    // Counting the number of water molecules surrounding the protonable molecules
-    if (update->ntimestep%nevery == 0) {
-      rampStep = 1;
-      mark_protonation_deprotonation();
-      backup_init_qs();
-    }
-  
-    // This is required since the fix_constant_pH.cpp does not deal with those molecules in the solid
-    modify_protonation_state();
-    rampStep++;
+  // This is required since the fix_constant_pH.cpp does not deal with those molecules in the solid
+  modify_protonation_state();
+  rampStep++;
   
 
-    // Resetting the mark_prev parameter to help us keep the track of which molecule moves from solid to solvent and vice versa
-    if (update->ntimestep%nevery == 0)
-      set_mark_prev();
+  // Resetting the mark_prev parameter to help us keep the track of which molecule moves from solid to solvent and vice versa
+  if (update->ntimestep%nevery == 0)
+    set_mark_prev();
 }
 
 /* ----------------------------------------------------------------------------------------
@@ -407,6 +414,8 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
   for (int ii = 0; ii < inum; ii++) {
     int i = ilist[ii];
 
+
+
     // Check if this atom is protonable --> if not do not bother with it.
     if (protonable[type[i]] == 0) {
       continue;
@@ -421,6 +430,7 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
       j &= NEIGHMASK;
 
       if (type[j] != typeOW) continue;
+
 
       double dx = x[i][0]-x[j][0];
       double dy = x[i][1]-x[j][1];
@@ -512,6 +522,8 @@ void FixAdaptiveProtonation::set_molecule_id()
     if (!any_global) break;
     comm->exchange();
   }
+  comm->exchange();
+  comm->borders();
 }
 
 /* ----------------------------------------------------------------------------------------
@@ -664,7 +676,7 @@ void FixAdaptiveProtonation::modify_protonation_state()
           q_init = q[i];
           q_new = q_orig[i] + frac*(pH1qs[type[i]][0]-q_orig[i]);
           if (!std::isfinite(q_new)) error->one(FLERR,"The q[{}] is infinite!",i);
-          q[i] = q_new;
+          //q[i] = q_new;
           q_change_local += q[i] - q_init;
           break;
         } else if (mark_prev[molecule[i]] == SOLID || mark_prev[molecule[i]] == NEITHER)
