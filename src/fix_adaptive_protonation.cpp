@@ -142,6 +142,8 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
     *  Otherwise, it had been set by the read_molids_file()
     */
   if (!(flags & INIT_MID)) n_protonable = 0;
+
+  nRampStep = 10000;
 }
 
 /* --------------------------------------------------------------------------------------- */
@@ -301,7 +303,6 @@ void FixAdaptiveProtonation::protonation_deprotonation()
       allocate_storage();
     }
   
-    /*
     // Counting the number of water molecules surrounding the protonable molecules
     if (update->ntimestep%nevery == 0) {
       rampStep = 1;
@@ -317,12 +318,6 @@ void FixAdaptiveProtonation::protonation_deprotonation()
     // Resetting the mark_prev parameter to help us keep the track of which molecule moves from solid to solvent and vice versa
     if (update->ntimestep%nevery == 0)
       set_mark_prev();
-    */
-
-    mark_protonation_deprotonation();
-    backup_init_qs();
-    modify_protonation_state();
-    set_mark_prev();
 }
 
 /* ----------------------------------------------------------------------------------------
@@ -601,7 +596,7 @@ void FixAdaptiveProtonation::modify_protonation_state()
   double q_change_local = 0;
   double q_init;
   double step = static_cast<double>(rampStep);
-  double nstepInv = 1.0/static_cast<double>(nevery);
+  double nRampStepInv = 1.0/static_cast<double>(nRampStep);
 
   // I am not sure if this is necessary or not.
   double **pH1qs = pH_structure_storage->pH1qs;
@@ -631,7 +626,7 @@ void FixAdaptiveProtonation::modify_protonation_state()
   // I am not clamping it on purpose so that 
   // I can check if there is any atomic 
   // exchange that make q_orig irrelevant.
-  double frac = step*nstepInv;
+  double frac = step*nRampStepInv;
   double frac_new = std::min(frac,1.0);
   if (frac_new < frac) {
     error->warning(FLERR,"Warning caping the frac from {} to 1.0",frac);
@@ -670,7 +665,6 @@ void FixAdaptiveProtonation::modify_protonation_state()
           q_new = q_orig[i] + frac*(pH1qs[type[i]][0]-q_orig[i]);
           if (!std::isfinite(q_new)) error->one(FLERR,"The q[{}] is infinite!",i);
           q[i] = q_new;
-          q[i] = pH1qs[type[i]][0];
           q_change_local += q[i] - q_init;
           break;
         } else if (mark_prev[molecule[i]] == SOLID || mark_prev[molecule[i]] == NEITHER)
