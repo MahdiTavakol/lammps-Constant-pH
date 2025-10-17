@@ -670,7 +670,7 @@ void FixAdaptiveProtonation::modify_protonation_state()
           q_new = q_orig[i] + frac*(pH1qs[type[i]][0]-q_orig[i]);
           if (!std::isfinite(q_new)) error->one(FLERR,"The q[{}] is infinite!",i);
           q[i] = q_new;
-          q[i] = pH1qs[type[i]];
+          q[i] = pH1qs[type[i][0]];
           q_change_local += q[i] - q_init;
           break;
         } else if (mark_prev[molecule[i]] == SOLID || mark_prev[molecule[i]] == NEITHER)
