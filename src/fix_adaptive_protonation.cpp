@@ -219,7 +219,8 @@ void FixAdaptiveProtonation::init_list(int /*id*/, NeighList *ptr)
 
 void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
 {
-  protonation_deprotonation();
+  if (update->ntimestep%nevery == 0)
+    protonation_deprotonation();
 }
 
 /* --------------------------------------------------------------------------------------- 
@@ -300,6 +301,7 @@ void FixAdaptiveProtonation::protonation_deprotonation()
       allocate_storage();
     }
   
+    /*
     // Counting the number of water molecules surrounding the protonable molecules
     if (update->ntimestep%nevery == 0) {
       rampStep = 1;
@@ -315,6 +317,12 @@ void FixAdaptiveProtonation::protonation_deprotonation()
     // Resetting the mark_prev parameter to help us keep the track of which molecule moves from solid to solvent and vice versa
     if (update->ntimestep%nevery == 0)
       set_mark_prev();
+    */
+
+    mark_protonation_deprotonation();
+    backup_init_qs();
+    modify_protonation_state();
+    set_mark_prev();
 }
 
 /* ----------------------------------------------------------------------------------------
@@ -662,6 +670,7 @@ void FixAdaptiveProtonation::modify_protonation_state()
           q_new = q_orig[i] + frac*(pH1qs[type[i]][0]-q_orig[i]);
           if (!std::isfinite(q_new)) error->one(FLERR,"The q[{}] is infinite!",i);
           q[i] = q_new;
+          q[i] = pH1qs[type[i]];
           q_change_local += q[i] - q_init;
           break;
         } else if (mark_prev[molecule[i]] == SOLID || mark_prev[molecule[i]] == NEITHER)

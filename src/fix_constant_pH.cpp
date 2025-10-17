@@ -69,6 +69,7 @@ enum {
 
 static constexpr double tol = 1e-5;
 static constexpr double max_lambda_buff_0 = 1.05;
+
 /* ---------------------------------------------------------------------- */
 
 FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
@@ -1587,6 +1588,7 @@ void FixConstantPH::write_lambdas_header()
 
   for (auto &file : files) {
     if (fp_flags & file.flag && file.fp) {
+      
       *(file.fp) << "n_lambdas=" << n_lambdas << std::endl;
       for (int i = 0; i < n_lambdas - 1; i++) *(file.fp) << "lambda-" << molids[i] << ",";
       *(file.fp) << "lambda-" << molids[n_lambdas - 1];
