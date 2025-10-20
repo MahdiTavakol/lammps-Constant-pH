@@ -541,10 +541,10 @@ void FixAdaptiveProtonation::set_molecule_id()
     int any = changed ? 1 : 0, any_global = 0;
     MPI_Allreduce(&any, &any_global, 1, MPI_INT, MPI_MAX, world);
     if (!any_global) break;
-    //comm->exchange();
+    comm->exchange();
   }
-  //comm->exchange();
-  //comm->borders();
+  comm->exchange();
+  comm->borders();
 }
 
 /* ----------------------------------------------------------------------------------------
@@ -659,6 +659,8 @@ void FixAdaptiveProtonation::modify_protonation_state()
   // I am not clamping it on purpose so that 
   // I can check if there is any atomic 
   // exchange that make q_orig irrelevant.
+  if (comm->me == 0)
+    error->warning(FLERR,"step={},nRampStep={},nRampStepInv={}",step,nRampStep,nRampStepInv);
   double frac = step*nRampStepInv;
   double frac_new = std::min(frac,1.0);
   if (frac_new < frac) {
