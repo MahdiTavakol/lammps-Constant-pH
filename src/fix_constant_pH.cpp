@@ -1591,7 +1591,8 @@ void FixConstantPH::write_lambdas_header()
       
       *(file.fp) << "n_lambdas=" << n_lambdas << std::endl;
       for (int i = 0; i < n_lambdas - 1; i++) *(file.fp) << "lambda-" << molids[i] << ",";
-      *(file.fp) << "lambda-" << molids[n_lambdas - 1];
+      if (n_lambdas > 0)
+        *(file.fp) << "lambda-" << molids[n_lambdas - 1];
       if (file.flag == LAMBDA_S_FP) {
         *(file.fp) << std::endl;
         continue;
@@ -1616,8 +1617,10 @@ void FixConstantPH::write_lambdas()
   if (comm->me != 0) return;    // Only rank 0 writes
 
   if (fp_flags & H_LAMBDA_FP && H_lambda_fp) {
-    for (int i = 0; i < n_lambdas - 1; i++) H_lambda_fp << H_lambdas[i] << ",";
-    H_lambda_fp << H_lambdas[n_lambdas - 1];
+    for (int i = 0; i < n_lambdas - 1; i++)
+      H_lambda_fp << H_lambdas[i] << ",";
+    if (n_lambdas > 0)
+      H_lambda_fp << H_lambdas[n_lambdas - 1];
     if (flags & BUFFER) H_lambda_fp << "," << H_lambda_buff;
     H_lambda_fp << std::endl;
   }
@@ -1636,8 +1639,10 @@ void FixConstantPH::write_lambdas()
 
   for (auto &file : files) {
     if (fp_flags & file.flag && file.fp) {
-      for (int i = 0; i < n_lambdas - 1; i++) *(file.fp) << file.content[i][file.j] << ",";
-      *(file.fp) << file.content[n_lambdas - 1][file.j];
+      for (int i = 0; i < n_lambdas - 1; i++)
+        *(file.fp) << file.content[i][file.j] << ",";
+      if (n_lambdas > 0)
+        *(file.fp) << file.content[n_lambdas - 1][file.j];
       if (file.flag == LAMBDA_S_FP) {
         *(file.fp) << std::endl;
         continue;
