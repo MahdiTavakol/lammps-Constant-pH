@@ -231,6 +231,11 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
   size_peratom_cols = 0;
   peratom_freq = nevery;
   extarray = 0;
+
+
+  atom->add_callback(Atom::GROW);
+  //atom->add_callback(Atom::COPY);
+  atom->add_callback(Atom::BORDER);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -250,6 +255,10 @@ FixConstantPH::~FixConstantPH()
 
   // deallocate memories whose size is dependent on natoms
   deallocate_storage();
+
+  atom->delete_callback(id,Atom::GROW);
+  //atom->delete_callback(id,Atom::COPY);
+  atom->delete_callback(id,Atom::BORDER);
 
 }
 
@@ -1600,7 +1609,8 @@ void FixConstantPH::write_lambdas_header()
         *(file.fp) << std::endl;
         continue;
       } else if (flags & BUFFER)
-        *(file.fp) << ",lambda-buffer";
+        if (n_lambdas > 0) *(file.fp) << ",";
+        *(file.fp) << "lambda-buffer";
       *(file.fp) << std::endl;
     }
   }
@@ -1650,7 +1660,8 @@ void FixConstantPH::write_lambdas()
         *(file.fp) << std::endl;
         continue;
       } else if (flags & BUFFER)
-        *(file.fp) << "," << file.buff_value;
+        if (n_lambdas > 0) *(file.fp) << ",";
+        *(file.fp) << file.buff_value;
       *(file.fp) << std::endl;
     }
   }
@@ -1800,6 +1811,40 @@ double FixConstantPH::compute_epair()
   energy /= static_cast<double>(
       natoms);    // To convert to kcal/mol the total energy must be devided by the number of atoms
   return energy;
+}
+
+/* --------------------------------------------------------------------------------------- */
+
+void FixConstantPH::grow_arrays(int nmax_new)
+{
+  double *new_vector_atom = new double[nmax_new];
+  int keep = std::min(nmax,nmax_new);
+  if (keep > 0) std::copy(vector_atom,vector_atom+keep,new_vector_atom);
+  if (keep < nmax_new) std::fill(new_vector_atom+keep,new_vector_atom+nmax_new,0.0);
+  delete [] vector_atom;
+  vector_atom = new_vector_atom;
+  nmax = nmax_new;
+}
+
+/* --------------------------------------------------------------------------------------- */
+
+void FixConstantPH::copy_arrays(int i, int j , int /*deflag*/)
+{
+  vector_atom[j] = vector_atom[i];
+}
+
+/* --------------------------------------------------------------------------------------- */
+
+int FixConstantPH::pack_exchange(int i, double *buf) {
+  buf[0] = vector_atom[i];
+  return 1;
+}
+
+/* --------------------------------------------------------------------------------------- */
+
+int FixConstantPH::unpack_exchange(int nlocal, double *buf) {
+  vector_atom[nlocal] = buf[0];
+  return 1;
 }
 
 /* ----------------------------------------------------------------------

@@ -45,6 +45,11 @@ class FixConstantPH : public Fix {
   double compute_array(int, int) override;
   double memory_usage() override;
 
+  void grow_arrays(int) override;
+  void copy_arrays(int, int, int) override;
+  int pack_exchange(int i, double *buf) override;
+  int unpack_exchange(int nlocal, double *buf) override;
+
  protected:
   int flags;
 
