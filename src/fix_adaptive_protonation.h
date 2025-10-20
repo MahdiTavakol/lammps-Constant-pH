@@ -38,6 +38,7 @@ class FixAdaptiveProtonation : public Fix {
   void init() override;
   void setup(int) override;
   void initial_integrate(int) override;
+  void post_force(int) override;
   double compute_scalar() override;
   double compute_vector(int) override;
   double memory_usage() override;

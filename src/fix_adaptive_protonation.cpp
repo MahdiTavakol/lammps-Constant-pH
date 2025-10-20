@@ -173,6 +173,7 @@ int FixAdaptiveProtonation::setmask()
 {
   int mask = 0;
   mask |= INITIAL_INTEGRATE;
+  mask |= POST_FORCE;
   return mask;
 }
 
@@ -212,7 +213,9 @@ void FixAdaptiveProtonation::init()
 
 void FixAdaptiveProtonation::setup(int /*vflag*/) 
 {
-  protonation_deprotonation();
+  if (!list)
+    error->all(FLERR, "Neighbor list not initialized for adaptive_protonation");
+  neighbor->build_one(list);
 }
 
 
@@ -229,7 +232,28 @@ void FixAdaptiveProtonation::init_list(int /*id*/, NeighList *ptr)
 
 void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
 {
+  if (update->ntimestep == 0)
+    return;
+  if (atom->nmax > nmax) {
+    error->warning(FLERR,"Changing the nmax from {} to {}",nmax,atom->nmax); 
+    grow_arrays(atom->nmax);
+  }
   protonation_deprotonation();
+}
+
+/* --------------------------------------------------------------------------------------- */
+
+void FixAdaptiveProtonation::post_force(int /*vflag*/)
+{
+  /* 
+   * Building the neighbor list
+   * a step before every nevery steps 
+   */
+  if ((update->ntimestep+1)%nevery == 0) {
+    if (!list)
+      error->all(FLERR, "Neighbor list not initialized for adaptive_protonation");
+    neighbor->build_one(list);
+  }
 }
 
 /* --------------------------------------------------------------------------------------- 
@@ -243,12 +267,16 @@ int FixAdaptiveProtonation::pack_exchange(int i, double* buf)
   return 2;
 }
 
+/* --------------------------------------------------------------------------------------- */
+
 int FixAdaptiveProtonation::unpack_exchange(int nlocal, double* buf)
 {
   q_orig[nlocal] = buf[0];
   vector_atom[nlocal] = buf[1];
   return 2;
 }
+
+/* --------------------------------------------------------------------------------------- */
 
 void FixAdaptiveProtonation::grow_arrays(int nmax_new)
 {
@@ -265,6 +293,8 @@ void FixAdaptiveProtonation::grow_arrays(int nmax_new)
   vector_atom = new_vector_atom;
   nmax = nmax_new;
 }
+
+/* --------------------------------------------------------------------------------------- */
 
 void FixAdaptiveProtonation::copy_arrays(int i, int j , int /*deflag*/)
 {
@@ -306,12 +336,6 @@ void FixAdaptiveProtonation::protonation_deprotonation()
   
   // Counting the number of water molecules surrounding the protonable molecules
   if (update->ntimestep%nevery == 0) {
-    /* 
-     * Building the neighbor list
-     * every nevery steps 
-     */
-    if (!list) error->all(FLERR, "Neighbor list not initialized for adaptive_protonation");
-    neighbor->build_one(list);
     rampStep = 1;
     mark_protonation_deprotonation();
     backup_init_qs();
@@ -414,8 +438,6 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
   for (int ii = 0; ii < inum; ii++) {
     int i = ilist[ii];
 
-
-
     // Check if this atom is protonable --> if not do not bother with it.
     if (protonable[type[i]] == 0) {
       continue;
@@ -473,7 +495,6 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
       else mark[i] = SOLID;
     }
   }
-
 }
 
 /* ----------------------------------------------------------------------------------------
@@ -520,10 +541,10 @@ void FixAdaptiveProtonation::set_molecule_id()
     int any = changed ? 1 : 0, any_global = 0;
     MPI_Allreduce(&any, &any_global, 1, MPI_INT, MPI_MAX, world);
     if (!any_global) break;
-    comm->exchange();
+    //comm->exchange();
   }
-  comm->exchange();
-  comm->borders();
+  //comm->exchange();
+  //comm->borders();
 }
 
 /* ----------------------------------------------------------------------------------------
