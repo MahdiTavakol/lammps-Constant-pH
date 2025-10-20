@@ -37,6 +37,7 @@ enum { F_NONE, RESET_MID = 1 << 1, INIT_MID = 1 << 2 };
 static constexpr double frac_low  = 0.4;
 static constexpr double frac_high = 0.6;
 static constexpr int max_moleset_iter = 10;
+static constexpr double eps = 1e-2;
 
 /* --------------------------------------------------------------------------------------- */
 
@@ -148,6 +149,7 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
   atom->add_callback(Atom::GROW);
   //atom->add_callback(Atom::COPY);
   atom->add_callback(Atom::BORDER);
+
 }
 
 /* --------------------------------------------------------------------------------------- */
@@ -243,7 +245,36 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
     error->warning(FLERR,"Changing the nmax from {} to {}",nmax,atom->nmax); 
     grow_arrays(atom->nmax);
   }
-  protonation_deprotonation();
+
+
+  // If I do not put this to zero, it will have a very large value making the if statement false.
+  int nmolecules_local = 0;
+  int nmolecules_total;
+    
+  for (int i = 0; i < atom->nlocal; i++) {
+    if (atom->molecule[i] > nmolecules_local) nmolecules_local = atom->molecule[i];
+  }
+    
+  MPI_Allreduce(&nmolecules_local, &nmolecules_total, 1, MPI_INT, MPI_MAX, world);
+  nmolecules_total++;
+    
+  if (nmolecules_total > nmolecules) {
+    nmolecules = nmolecules_total;
+    deallocate_storage();
+    allocate_storage();
+  }
+    
+    
+  // This is required since the fix_constant_pH.cpp does not deal with those molecules in the solid
+  modify_protonation_state();
+  rampStep++;
+    
+  
+  // Resetting the mark_prev parameter to help us keep the track of which molecule moves from solid to solvent and vice versa
+  if (update->ntimestep%nevery == 0) {
+    set_mark_prev();
+    reset_mark_sum_running();
+  }
 }
 
 /* --------------------------------------------------------------------------------------- */
@@ -258,10 +289,20 @@ void FixAdaptiveProtonation::post_force(int /*vflag*/)
     if (!list)
       error->all(FLERR, "Neighbor list not initialized for adaptive_protonation");
     neighbor->build_one(list);
+  }
 
-    // Counting the number of water molecules surrounding the protonable molecules
-    rampStep = 1;
+  // Counting the number of water molecules surrounding the protonable molecules
+  int innernevery;
+  if (nSmoothingSteps)
+    innernevery = MAX(1,nevery / nSmoothingSteps);
+  else 
+    error->all(FLERR,"nSmoothingSteps in the fix_adaptive_protonation is zero");
+  if ((update->ntimestep+1)%innernevery == 0)
     mark_protonation_deprotonation();
+
+  if ((update->ntimestep+1)%nevery == 0) {
+    rampStep = 1;
+    accumulate_mark_sum_running();
     backup_init_qs();
   }
 }
@@ -312,48 +353,6 @@ void FixAdaptiveProtonation::copy_arrays(int i, int j , int /*deflag*/)
   vector_atom[j] = vector_atom[i];
 }
 
-/* ----------------------------------------------------------------------------------------
-    Checking the protonation deprotonation
-   ---------------------------------------------------------------------------------------- */
-
-void FixAdaptiveProtonation::protonation_deprotonation()
-{
-
-  /*if (atom->nmax > nmax) {
-    nmax = atom->nmax;
-    if (vector_atom) delete[] vector_atom;
-    vector_atom = nullptr;
-    vector_atom = new double[nmax];
-    std::fill_n(vector_atom,nmax,0);
-  }*/
-  
-  // If I do not put this to zero, it will have a very large value making the if statement false.
-  int nmolecules_local = 0;
-  int nmolecules_total;
-  
-  for (int i = 0; i < atom->nlocal; i++) {
-    if (atom->molecule[i] > nmolecules_local) nmolecules_local = atom->molecule[i];
-  }
-  
-  MPI_Allreduce(&nmolecules_local, &nmolecules_total, 1, MPI_INT, MPI_MAX, world);
-  nmolecules_total++;
-  
-  if (nmolecules_total > nmolecules) {
-    nmolecules = nmolecules_total;
-    deallocate_storage();
-    allocate_storage();
-  }
-  
-  
-  // This is required since the fix_constant_pH.cpp does not deal with those molecules in the solid
-  modify_protonation_state();
-  rampStep++;
-  
-
-  // Resetting the mark_prev parameter to help us keep the track of which molecule moves from solid to solvent and vice versa
-  if (update->ntimestep%nevery == 0)
-    set_mark_prev();
-}
 
 /* ----------------------------------------------------------------------------------------
    Writing molids into a file
@@ -383,6 +382,8 @@ void FixAdaptiveProtonation::deallocate_storage()
   mark.reset();
   mark_prev.reset();
   mark_local.reset();
+  mark_total.reset();
+  mark_sum_running.reset();
   protonable_size.reset();
   protonable_size_local.reset();
 }
@@ -399,12 +400,16 @@ void FixAdaptiveProtonation::allocate_storage()
   mark                  = make_unique<int[]>(nmolecules + 1);
   mark_prev             = make_unique<int[]>(nmolecules + 1);
   mark_local            = make_unique<int[]>(nmolecules + 1);
+  mark_total            = make_unique<int[]>(nmolecules + 1);
+  mark_sum_running      = make_unique<double[]>(nmolecules + 1);
   protonable_size       = make_unique<int[]>(nmolecules + 1);
   protonable_size_local = make_unique<int[]>(nmolecules + 1);
   fill_n(protonable_molids.get(), nmolecules, -1);
   fill_n(mark.get(), nmolecules + 1, 0);
   fill_n(mark_prev.get(), nmolecules + 1,NEITHER);
   fill_n(mark_local.get(), nmolecules + 1, 0);
+  fill_n(mark_total.get(), nmolecules + 1, 0);
+  fill_n(mark_sum_running.get(),nmolecules + 1 , 0.0);
   fill_n(protonable_size.get(), nmolecules + 1, 0);
   fill_n(protonable_size_local.get(), nmolecules + 1, 0);
   /* I put it on purpose so in the first step every molecule changes unless 
@@ -428,6 +433,7 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
 
   // resetting the mark_local and molecule_size_local before going through atoms
   std::fill_n(mark_local.get(),nmolecules+1,0);
+  //std::fill_n(mark_total.get(),nmolecules+1,0);
   std::fill_n(protonable_size_local.get(),nmolecules+1,0);
   std::fill_n(vector_atom,nmax,0.0);
 
@@ -462,8 +468,8 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
       double dy = x[i][1]-x[j][1];
       double dz = x[i][2]-x[j][2];
       domain->minimum_image(dx,dy,dz);
-      double rsq = std::sqrt(dx*dx+dy*dy+dz*dz);
-      if (rsq < rprobe)
+      double r = dx*dx+dy*dy+dz*dz;
+      if (r < rprobe*rprobe)
         vector_atom[i] += 1.0;    // Just considering the Oxygens. It is possible that both O and H from the same water molecule are close to this atom.
     }
 
@@ -475,7 +481,7 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
   }
 
   // Reducing the values from various cpus
-  MPI_Allreduce(mark_local.get(), mark.get(), nmolecules + 1, MPI_INT, MPI_SUM, world);
+  MPI_Allreduce(mark_local.get(), mark_total.get(), nmolecules + 1, MPI_INT, MPI_SUM, world);
   MPI_Allreduce(protonable_size_local.get(), protonable_size.get(), nmolecules + 1, MPI_INT, MPI_SUM,
                 world);
 
@@ -483,22 +489,35 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
 
   for (int i = 1; i < nmolecules + 1; i++) {
     if (!protonable_size[i]) {
-      mark[i] = NEITHER;
       continue;
     }
-    double test_condition = static_cast<double>(mark[i]) / static_cast<double>(protonable_size[i]);
-    if (test_condition >= 0 && test_condition <= frac_low)
-      mark[i] = SOLID;
-    else if (test_condition >= frac_high && test_condition <= 1)
-      mark[i] = SOLVENT;
-    else if (test_condition > 1 + eps || test_condition < -1 - eps)
-      error->one(FLERR, "Error in fix adaptive_protonation: You should never have reached here!");
-    else {
-      int prev = mark_prev[i];
-      if (prev == SOLID || prev == SOLVENT) mark[i] = prev;
-      else mark[i] = SOLID;
-    }
+    mark_sum_running[i] += static_cast<double>(mark_total[i]) / static_cast<double>(protonable_size[i]);
   }
+}
+
+/* ----------------------------------------------------------------------------------------
+    Smoothing the mark
+   ---------------------------------------------------------------------------------------- */
+
+void FixAdaptiveProtonation::accumulate_mark_sum_running()
+{
+  for (int m = 1; m <= nmolecules; ++m) {
+    if (!protonable_size[m]) {           // no protonable atoms in this mol
+      mark[m] = NEITHER;
+      continue;
+    }
+    const double frac = mark_sum_running[m] / static_cast<double>(nSmoothingSteps);
+    if (frac <= frac_low + eps)          mark[m] = SOLID;
+    else if (frac >= frac_high - eps)    mark[m] = SOLVENT;
+    else                                 mark[m] = mark_prev[m]; // hysteresis
+  }
+}
+
+/* ---------------------------------------------------------------------------------------- */
+
+void FixAdaptiveProtonation::reset_mark_sum_running()
+{
+  std::fill_n(mark_sum_running.get(),nmolecules+1,0.0);
 }
 
 /* ----------------------------------------------------------------------------------------
@@ -545,10 +564,10 @@ void FixAdaptiveProtonation::set_molecule_id()
     int any = changed ? 1 : 0, any_global = 0;
     MPI_Allreduce(&any, &any_global, 1, MPI_INT, MPI_MAX, world);
     if (!any_global) break;
-    //comm->exchange();
+    comm->exchange();
   }
-  //comm->exchange();
-  //comm->borders();
+  comm->exchange();
+  comm->borders();
 }
 
 /* ----------------------------------------------------------------------------------------

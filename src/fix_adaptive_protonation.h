@@ -92,6 +92,8 @@ class FixAdaptiveProtonation : public Fix {
 
   std::unique_ptr<int[]> mark;
   std::unique_ptr<int[]> mark_local;
+  std::unique_ptr<int[]> mark_total;
+  std::unique_ptr<int[]> mark_sum_running;
   std::unique_ptr<int[]> mark_prev;    // For the previous step
   std::unique_ptr<int[]> mark_per_mol;   
   // If one atom have mark == 1 all the atoms of that molecule should have mark == 1
@@ -104,7 +106,10 @@ class FixAdaptiveProtonation : public Fix {
   std::unique_ptr<double []> q_orig;
   int rampStep;
   int nRampStep;
-
+  
+  // smoothing the mark
+  int nSmoothingSteps = 10;
+  
   // Tracking the changes in the q_total
   double q_change;
 
@@ -125,8 +130,6 @@ class FixAdaptiveProtonation : public Fix {
   void allocate_storage();
   // Reseting all the molids
   void set_molecule_id();
-  // protonation_deprotonation
-  void protonation_deprotonation();
   // backing up the initial qs
   void backup_init_qs();
   // Mark phosphate atoms for protonation/deprotonation
