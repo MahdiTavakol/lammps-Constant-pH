@@ -396,6 +396,7 @@ void FixConstantPH::initial_integrate(int /*vflag*/)
          * I do not want to reset their lambdas and v_lambdas;
          */
         set_lambdas_prev();
+        
         delete_lambdas();
         /* 
          *  we reread the n_lambdas after backing up the lambdas
