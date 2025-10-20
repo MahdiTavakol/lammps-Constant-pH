@@ -388,10 +388,6 @@ void FixConstantPH::initial_integrate(int /*vflag*/)
           error->all(FLERR, "Wrong fix type in the adaptive keyword for the constant pH");
         // Updating the endstep
         update->endstep = endstep_backup;
-        /* Since we might have deleted the fix_adaptive_protonation in the command 
-         *  we reread the molids file 
-         */
-        fix_adaptive_protonation->get_n_protonable(this->n_lambdas);
 
         /*
          * Backing up lambdas, v_lambdas, a_lambdas,
@@ -401,6 +397,10 @@ void FixConstantPH::initial_integrate(int /*vflag*/)
          */
         set_lambdas_prev();
         delete_lambdas();
+        /* 
+         *  we reread the n_lambdas after backing up the lambdas
+         */
+        fix_adaptive_protonation->get_n_protonable(this->n_lambdas);
         set_lambdas();
 
         modify->clearstep_compute();
@@ -616,6 +616,8 @@ void FixConstantPH::initialize_lambda(const int& to)
     else
       lambdas[to+j][0] = lambda_j;
   }
+
+  error->warning(FLERR,"here");
 }
 
 /* ---------------------------------------------------------------------- */
