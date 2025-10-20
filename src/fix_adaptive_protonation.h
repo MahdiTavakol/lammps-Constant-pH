@@ -93,7 +93,7 @@ class FixAdaptiveProtonation : public Fix {
   std::unique_ptr<int[]> mark;
   std::unique_ptr<int[]> mark_local;
   std::unique_ptr<int[]> mark_total;
-  std::unique_ptr<int[]> mark_sum_running;
+  std::unique_ptr<double[]> mark_sum_running;
   std::unique_ptr<int[]> mark_prev;    // For the previous step
   std::unique_ptr<int[]> mark_per_mol;   
   // If one atom have mark == 1 all the atoms of that molecule should have mark == 1
@@ -109,7 +109,9 @@ class FixAdaptiveProtonation : public Fix {
   
   // smoothing the mark
   int nSmoothingSteps = 10;
-  
+  void accumulate_mark_sum_running();
+  void reset_mark_sum_running();
+
   // Tracking the changes in the q_total
   double q_change;
 
