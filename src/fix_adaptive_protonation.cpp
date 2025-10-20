@@ -143,7 +143,7 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
     */
   if (!(flags & INIT_MID)) n_protonable = 0;
 
-  nRampStep = 1000000;
+  nRampStep = 1000;
 
   atom->add_callback(Atom::GROW);
   //atom->add_callback(Atom::COPY);
