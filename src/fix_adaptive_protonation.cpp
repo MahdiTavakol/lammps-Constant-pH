@@ -216,6 +216,11 @@ void FixAdaptiveProtonation::setup(int /*vflag*/)
   if (!list)
     error->all(FLERR, "Neighbor list not initialized for adaptive_protonation");
   neighbor->build_one(list);
+
+  // Counting the number of water molecules surrounding the protonable molecules
+  rampStep = 1;
+  mark_protonation_deprotonation();
+  backup_init_qs();
 }
 
 
@@ -253,6 +258,11 @@ void FixAdaptiveProtonation::post_force(int /*vflag*/)
     if (!list)
       error->all(FLERR, "Neighbor list not initialized for adaptive_protonation");
     neighbor->build_one(list);
+
+    // Counting the number of water molecules surrounding the protonable molecules
+    rampStep = 1;
+    mark_protonation_deprotonation();
+    backup_init_qs();
   }
 }
 
@@ -334,12 +344,6 @@ void FixAdaptiveProtonation::protonation_deprotonation()
     allocate_storage();
   }
   
-  // Counting the number of water molecules surrounding the protonable molecules
-  if (update->ntimestep%nevery == 0) {
-    rampStep = 1;
-    mark_protonation_deprotonation();
-    backup_init_qs();
-  }
   
   // This is required since the fix_constant_pH.cpp does not deal with those molecules in the solid
   modify_protonation_state();
