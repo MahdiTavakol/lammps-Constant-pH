@@ -666,7 +666,7 @@ void FixConstantPH::update_a_lambda()
     this->a_lambdas[i][2] = f_lambda_2 / m_lambdas[i][2];
 
     // I am not sure about the sign of the f*kT*log(10)*(pK-pH)
-    this->H_lambdas[i] = lambdas[i]*HAs[i] + (1.0-lambdas[i])*HBs[i] -fs[i] * kT * log(10) * (pK - pH) + kj2kcal * Us[i] +
+    this->H_lambdas[i] = lambdas[i][0]*HAs[i] + (1.0-lambdas[i][0])*HBs[i] -fs[i] * kT * log(10) * (pK - pH) + kj2kcal * Us[i] +
         (m_lambdas[i][0] / 2.0) * (v_lambdas[i][0] * v_lambdas[i][0]) * mvv2e;    
       // This might not be needed. May be I need to tally this into energies.
     // I might need to use the leap-frog integrator and so this function might need to be in other functions than postforce()
@@ -1559,9 +1559,9 @@ void FixConstantPH::calculate_Hs()
       {
         int dist = distArray[i];
         if (molecule[i] == molids[j])
-          q[i] = pH2qs[type[i]] - pH1qs[type[i]];
+          q[i] = pH2qs[type[i]][0] - pH1qs[type[i]][0];
         else if (dist != n_lambdas)
-          q[i] = lambdas[dist] * pH2qs[type[i]] + (1 - lambdas[dist]) * pH1qs[type[i]];
+          q[i] = lambdas[dist][0] * pH2qs[type[i]][0] + (1 - lambdas[dist][0]) * pH1qs[type[i]][0];
       }
       // forward comm so that ghost atoms are consistent
       comm->forward_comm();
@@ -1591,13 +1591,13 @@ void FixConstantPH::calculate_Hs()
       // calculating the energies
       update_lmp();
       // getting the electrostatic energy + kspace energy
-      HAs[j] = compute_epair()
+      HAs[j] = compute_epair();
       // deprotonated
       double VB = 0.0;
       // deprotonated
-      lambda_k = 0.0;
+      lambda_j = 0.0;
       // modifying the atom charges
-      modify_qs(lambda_k,k);
+      modify_qs(lambda_j,j);
       // forward comm so that ghost atoms are consistent
       comm->forward_comm();
       // calculating the energies
@@ -1828,12 +1828,11 @@ double FixConstantPH::compute_epair()
 
   int natoms = atom->natoms;
 
-  double energy_local = 0.0;
   double energy = 0.0;
-  if (force->pair) energy_local += force->pair->eng_coul;
+  if (force->pair) energy += force->pair->eng_coul;
   // Adding the kspace component
   if (force->kspace)
-    force_lambda += force->kspace->energy();
+    energy += force->kspace->energy();
 
   /* As the bond, angle, dihedral and improper energies 
       do not change with the espilon, we do not need to 
