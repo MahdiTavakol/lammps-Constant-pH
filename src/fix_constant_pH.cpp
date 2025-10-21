@@ -56,6 +56,7 @@ enum {
   CONSTRAIN = 1 << 3,
   COMMANDS = 1 << 4,
   INTERMEDIATE = 1 << 5,
+  INTERPOLATION = 1 << 6
 };
 
 enum {
@@ -211,6 +212,9 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
       mass_lambda = utils::numeric(FLERR,arg[iarg+1],false,lmp);
       m_lambda_buff = utils::numeric(FLERR,arg[iarg+2],false,lmp);
       iarg += 3;
+    } else if (strcmp(arg[iarg],"interpolation") == 0) {
+      flags |= INTERPOLATION;
+      iarg += 1;
     } else {
       error->all(FLERR, "Unknown fix constant_pH keyword: {}", arg[iarg]);
     }
@@ -423,6 +427,7 @@ void FixConstantPH::initial_integrate(int /*vflag*/)
 
   calculate_dfs();
   calculate_dUs();
+  calculate_Hs();
   update_a_lambda();
 }
 
@@ -434,6 +439,7 @@ void FixConstantPH::post_force(int /*vflag*/)
 {
   calculate_dfs();
   calculate_dUs();
+  calculate_Hs();
   update_a_lambda();
   if (!(update->ntimestep % write_lambda_nevery)) write_lambdas();
 }
@@ -585,12 +591,12 @@ void FixConstantPH::initialize_lambda(const int& to)
                         .get(); 
 
 
-  std::unique_ptr<double []>     q_local = std::make_unique<double []>(length);
-  std::unique_ptr<double []> q_local_pH1 = std::make_unique<double []>(length);
-  std::unique_ptr<double []> q_local_pH2 = std::make_unique<double []>(length);
-  std::unique_ptr<double []>     q_total = std::make_unique<double []>(length);
-  std::unique_ptr<double []> q_total_pH1 = std::make_unique<double []>(length);
-  std::unique_ptr<double []> q_total_pH2 = std::make_unique<double []>(length);
+  auto q_local     = std::make_unique<double []>(length);
+  auto q_local_pH1 = std::make_unique<double []>(length);
+  auto q_local_pH2 = std::make_unique<double []>(length);
+  auto q_total     = std::make_unique<double []>(length);
+  auto q_total_pH1 = std::make_unique<double []>(length);
+  auto q_total_pH2 = std::make_unique<double []>(length);
 
   std::fill_n(q_local.get(),length,0.0);
   std::fill_n(q_local_pH1.get(),length,0.0);
@@ -648,7 +654,7 @@ void FixConstantPH::update_a_lambda()
   //f = 1.0;
 
   for (int i = 0; i < n_lambdas; i++) {
-    double f_lambda_0 = -(-dfs[i] * kT * log(10) * (pK - pH) + kj2kcal * dUs[i] - GFF_lambdas[i]);    
+    double f_lambda_0 = -(HAs[i] - HBs[i] -dfs[i] * kT * log(10) * (pK - pH) + kj2kcal * dUs[i] - GFF_lambdas[i]);    
     // The df sign should be positive if the lambda = 0 is for the protonated state
     double f_lambda_1 = 2 * M_PI * nStructures1Barrier * pHnStructures1 *
         sin(2 * M_PI * pHnStructures1 * lambdas[i][1]);
@@ -660,7 +666,7 @@ void FixConstantPH::update_a_lambda()
     this->a_lambdas[i][2] = f_lambda_2 / m_lambdas[i][2];
 
     // I am not sure about the sign of the f*kT*log(10)*(pK-pH)
-    this->H_lambdas[i] = -fs[i] * kT * log(10) * (pK - pH) + kj2kcal * Us[i] +
+    this->H_lambdas[i] = lambdas[i]*HAs[i] + (1.0-lambdas[i])*HBs[i] -fs[i] * kT * log(10) * (pK - pH) + kj2kcal * Us[i] +
         (m_lambdas[i][0] / 2.0) * (v_lambdas[i][0] * v_lambdas[i][0]) * mvv2e;    
       // This might not be needed. May be I need to tally this into energies.
     // I might need to use the leap-frog integrator and so this function might need to be in other functions than postforce()
@@ -685,33 +691,6 @@ void FixConstantPH::calculate_H_once()
   calculate_dfs();
   calculate_dUs();
   update_a_lambda();
-}
-
-/* ----------------------------------------------------------------------- */
-
-void FixConstantPH::compute_Hs()
-{
-  if (nmax < atom->nmax) {
-    nmax = atom->nmax;
-    deallocate_storage();
-    allocate_storage();
-  }
-
-  backup_restore_qfev<1>();
-  // computing the HA and HB for each lambda
-  for (int j = 0; j < n_lambdas; j++) {
-    std::fill(lambdas_j.get(), lambdas_j.get() + n_lambdas, 0.0);
-    double lambda_j = 0.0;
-    modify_qs(lambda_j, j);
-    update_lmp();
-    HAs[j] = compute_epair();
-    backup_restore_qfev<-1>();
-    lambda_j = 1.0;
-    modify_qs(lambda_j, j);
-    update_lmp();
-    HBs[j] = compute_epair();
-    backup_restore_qfev<-1>();
-  }
 }
 
 /* ----------------------------------------------------------------------
@@ -1161,7 +1140,7 @@ template <int direction> void FixConstantPH::backup_restore_qfev()
 {
   int i;
 
-  int natom = atom->nlocal;
+  int natom = atom->nlocal + atom->nghost;
   if (force->newton || (force->kspace && force->kspace->tip4pflag)) natom += atom->nghost;
 
   double **f = atom->f;
@@ -1536,47 +1515,98 @@ void FixConstantPH::init_GFF()
     error->one(FLERR, "The GFF correction file in the fix constant_pH is in a wrong format!");
 }
 
+
 /* ----------------------------------------------------------------------
-   The linear charge interpolation method in Aho et al JCTC 2022
+   Environment coupling 
    --------------------------------------------------------------------- */
 
-void FixConstantPH::compute_f_lambda_charge_interpolation()
+void FixConstantPH::calculate_Hs()
 {
-  /* Two different approaches can be used
-      either I can go with copying the compute_group_group
-      code with factor_lj = 0 or I can use the eng->coul
-      I prefer the second one as it is tidier and I guess 
-      it should be faster
-   */
-
-  int natoms = atom->natoms;
-  
-  std::unique_ptr<double []> energy_local = std::make_unique<double []>(n_lambdas);
-  std::unique_ptr<double []> energy = std::make_unique<double []>(n_lambdas);
-  std::unique_ptr<double []> n_lambda_atoms = std::make_unique<double []>(n_lambdas);
-
-  for (int i = 0; i < n_lambdas; i++) {
-    for (int j = 0; j < n_lambda_atoms[i]; j++) {
-      //double delta_q = q_prot[j] - q_deprot[j];
-      // I need to figure out how to identify those atoms
-    }
-    for (int k = 0; k < n_lambdas; k++) {
-      if (k == i) continue;
-      for (int l = 0; l < n_lambda_atoms[k]; l++) {
-        //double q = (1-lambdas[k])*q_prot[l] + lambdas[k] * q_deprot[l];
-        // Double check if the q_prot and q_deprot are in the right place
-        // how should I identify those atoms
-      }
-    }
-    energy_local[i] = 0.0;
-    if (force->pair) energy_local[i] += force->pair->eng_coul;
-    // You need to add the kspace contribution too
+  int nlocal = atom->nlocal;
+  int* molecule = atom->molecule;
+  int* type = atom->type;
+  double* q = atom->q;
+  bigint natoms = atom->natoms;
+   
+  if (!q) error->all(FLERR, "Atom style has no charges");
+   
+   
+  auto distArray = std::make_unique<int[]>(nlocal);
+  for (int i = 0; i < nlocal; i++)
+  {
+    int mol = molecule[i];
+    auto itr = std::find(molids.get(), molids.get() + n_lambdas, mol);
+    int dist = static_cast<int>(std::distance(molids.get(), itr));
+    distArray[i] = dist;
   }
+   
 
-  MPI_Allreduce(energy_local.get(), energy.get(), n_lambdas, MPI_DOUBLE, MPI_SUM, world);
-  for (int i = 0; i < n_lambdas; i++) {
-    double force_i = energy[i] / static_cast<double>(natoms);    // convert to kcal/mol
-    a_lambdas[i][0] = 4.184 * 0.0001 * force_i / m_lambdas[i][0];
+   
+  if (flags & INTERPOLATION) {
+    /*The linear charge interpolation method in Aho et al JCTC 2022*/
+    /*
+     * According to the equation 17 in the https://pubs.acs.org/doi/full/10.1021/acs.jctc.2c00516,
+     * we loop through lambdas.  For each lambda we put the charge as delta q and for
+     * the rest we put the charge as lambda*qProt + (1-lambda)*qDeprot
+     * My lambda = 1 - their lambda;
+    */
+    for (int j = 0; j < n_lambdas; j++)
+    {
+      // backing up qs
+      backup_restore_qfev<1>();
+      double H_lambda = 0.0;
+      for (int i = 0; i < nlocal; i++)
+      {
+        int dist = distArray[i];
+        if (molecule[i] == molids[j])
+          q[i] = pH2qs[type[i]] - pH1qs[type[i]];
+        else if (dist != n_lambdas)
+          q[i] = lambdas[dist] * pH2qs[type[i]] + (1 - lambdas[dist]) * pH1qs[type[i]];
+      }
+      // forward comm so that ghost atoms are consistent
+      comm->forward_comm();
+      // calculating the energies
+      update_lmp();
+      // getting the electrostatic energy + kspace energy
+      H_lambda = compute_epair();
+      // restore qs
+      backup_restore_qfev<-1>();
+      // saving
+      HAs[j] = H_lambda;
+      HBs[j] = 0.0;
+    }
+  }
+  else if (!(flags & INTERPOLATION)) {
+    for (int j = 0; j < n_lambdas; j++) {
+      // backing up qs
+      backup_restore_qfev<1>();
+      // protonated
+      double VA = 0.0;
+      // protonated
+      double lambda_j = 1.0;
+      // modifying the atom charges
+      modify_qs(lambda_j,j);
+      // forward comm so that ghost atoms are consistent
+      comm->forward_comm();
+      // calculating the energies
+      update_lmp();
+      // getting the electrostatic energy + kspace energy
+      HAs[j] = compute_epair()
+      // deprotonated
+      double VB = 0.0;
+      // deprotonated
+      lambda_k = 0.0;
+      // modifying the atom charges
+      modify_qs(lambda_k,k);
+      // forward comm so that ghost atoms are consistent
+      comm->forward_comm();
+      // calculating the energies
+      update_lmp();
+      // getting the electrostatic energy + kspace energy
+      HBs[j] = compute_epair();
+      // restore qs
+      backup_restore_qfev<-1>();
+    }
   }
 }
 
@@ -1800,16 +1830,18 @@ double FixConstantPH::compute_epair()
 
   double energy_local = 0.0;
   double energy = 0.0;
-  if (force->pair) energy_local += (force->pair->eng_vdwl + force->pair->eng_coul);
+  if (force->pair) energy_local += force->pair->eng_coul;
+  // Adding the kspace component
+  if (force->kspace)
+    force_lambda += force->kspace->energy();
 
   /* As the bond, angle, dihedral and improper energies 
       do not change with the espilon, we do not need to 
       include them in the energy. We are interested in 
       their difference afterall */
 
-  MPI_Allreduce(&energy_local, &energy, 1, MPI_DOUBLE, MPI_SUM, world);
-  energy /= static_cast<double>(
-      natoms);    // To convert to kcal/mol the total energy must be devided by the number of atoms
+  // To convert to kcal/mol the total energy must be devided by the number of atoms
+  energy /= static_cast<double>(natoms);    
   return energy;
 }
 

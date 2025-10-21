@@ -199,7 +199,7 @@ class FixConstantPH : public Fix {
   // Function to set the charges based on the lambdas and lambda_buff values
   void reset_qs();
 
-  void compute_Hs();
+  void calculate_Hs();
   void check_num_OWs_HWs();
   void read_pH_structure_files();
   void read_commands_file();
@@ -228,7 +228,6 @@ class FixConstantPH : public Fix {
   void modify_qs(double **scales);
   void modify_q_buff(const double scale);
   void update_lmp();
-  void compute_f_lambda_charge_interpolation();
   double compute_epair();
   void update_a_lambda();
 };
