@@ -34,8 +34,8 @@ using namespace MathConst;
 enum { NEITHER = -1, SOLID = 0, SOLVENT = 1 };
 enum { F_NONE, RESET_MID = 1 << 1, INIT_MID = 1 << 2 };
 
-static constexpr double frac_low  = 0.4;
-static constexpr double frac_high = 0.6;
+static constexpr double frac_low  = 0.3;
+static constexpr double frac_high = 0.7;
 static constexpr int max_moleset_iter = 10;
 static constexpr double eps = 1e-2;
 
@@ -144,7 +144,7 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
     */
   if (!(flags & INIT_MID)) n_protonable = 0;
 
-  nRampStep = 1000;
+  nRampStep = 3000;
 
   atom->add_callback(Atom::GROW);
   //atom->add_callback(Atom::COPY);
@@ -484,8 +484,6 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
   MPI_Allreduce(mark_local.get(), mark_total.get(), nmolecules + 1, MPI_INT, MPI_SUM, world);
   MPI_Allreduce(protonable_size_local.get(), protonable_size.get(), nmolecules + 1, MPI_INT, MPI_SUM,
                 world);
-
-  constexpr double eps = 0.01;
 
   for (int i = 1; i < nmolecules + 1; i++) {
     if (!protonable_size[i]) {
