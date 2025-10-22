@@ -1530,8 +1530,8 @@ void FixConstantPH::calculate_Hs()
    
   if (!q) error->all(FLERR, "Atom style has no charges");
 
-  double **pH1qs = pH_structure_storage->pH1qs; // deprotonated if that’s your naming
-  double **pH2qs = pH_structure_storage->pH2qs; // protonated   if that’s your naming
+  double **pH1qs = pH_structure_storage->pH1qs; 
+  double **pH2qs = pH_structure_storage->pH2qs; 
   int *protonable = pH_structure_storage->protonable.get();
    
    
