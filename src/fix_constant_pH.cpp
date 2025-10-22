@@ -445,7 +445,7 @@ void FixConstantPH::initial_integrate(int /*vflag*/)
 
     // priting the info 
     if (comm->me == 0) {
-      auto mesg = fmt::format("HA and HB were updated {:<4.2}% of simulation time from fix_constant_pH\n",ratio);
+      auto mesg = fmt::format("HA and HB were updated {:.2f}% of simulation time from fix_constant_pH\n",ratio);
       utils::logmesg(lmp,mesg);
     }
     HCalcNSteps = 0;
