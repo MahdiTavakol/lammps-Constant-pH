@@ -501,12 +501,15 @@ void FixConstantPH::set_lambdas_prev()
   memory->grow(m_lambdas_prev, n_lambdas_prev, 3, "constant_pH:m_lambdas_prev");
   memory->grow(H_lambdas_prev, n_lambdas_prev, "constant_pH:H_lambdas_prev");
   molids_prev = std::make_unique<int []>(n_lambdas_prev);
-  std::copy(lambdas[0],lambdas[0]+3*n_lambdas_prev,lambdas_prev[0]);
-  std::copy(v_lambdas[0],v_lambdas[0]+3*n_lambdas_prev,v_lambdas_prev[0]);
-  std::copy(a_lambdas[0],a_lambdas[0]+3*n_lambdas_prev,a_lambdas_prev[0]);
-  std::copy(m_lambdas[0],m_lambdas[0]+3*n_lambdas_prev,m_lambdas_prev[0]);
-  std::copy(H_lambdas,H_lambdas+n_lambdas_prev,H_lambdas_prev);
-  std::copy(molids.get(),molids.get()+n_lambdas_prev,molids_prev.get());
+  // When n_lambdas_prev is zero the std::copy tries to access the non-avail memory
+  if (n_lambdas_prev) {
+    std::copy(lambdas[0],lambdas[0]+3*n_lambdas_prev,lambdas_prev[0]);
+    std::copy(v_lambdas[0],v_lambdas[0]+3*n_lambdas_prev,v_lambdas_prev[0]);
+    std::copy(a_lambdas[0],a_lambdas[0]+3*n_lambdas_prev,a_lambdas_prev[0]);
+    std::copy(m_lambdas[0],m_lambdas[0]+3*n_lambdas_prev,m_lambdas_prev[0]);
+    std::copy(H_lambdas,H_lambdas+n_lambdas_prev,H_lambdas_prev);
+    std::copy(molids.get(),molids.get()+n_lambdas_prev,molids_prev.get());
+  }
 }
 
 void FixConstantPH::set_lambdas()
