@@ -1624,6 +1624,12 @@ void FixConstantPH::calculate_Hs()
       backup_restore_qfev<-1>();
     }
   }
+
+  // priting the info 
+  if (comm->me == 0) {
+    auto mesg = fmt::format("HA and HB calculation on step {} from fix_constant_pH\n",update->ntimestep);
+    utils::logmesg(lmp,mesg);
+  }
 }
 
 /* --------------------------------------------------------------------- 
