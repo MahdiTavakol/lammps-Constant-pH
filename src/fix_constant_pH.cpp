@@ -441,11 +441,11 @@ void FixConstantPH::initial_integrate(int /*vflag*/)
 
   // priting the precent of steps where the HA and HB values have ben calculated
   if (update->ntimestep && (update->ntimestep % 1000 == 0)) {
-    double ratio = static_cast<double>(HCalcNSteps)/1000.0;
+    double ratio = 100.0*static_cast<double>(HCalcNSteps)/1000.0;
 
     // priting the info 
     if (comm->me == 0) {
-      auto mesg = fmt::format("HA and HB were updated {}% of simulation time from fix_constant_pH\n",ratio);
+      auto mesg = fmt::format("HA and HB were updated {:<4.2}% of simulation time from fix_constant_pH\n",ratio);
       utils::logmesg(lmp,mesg);
     }
     HCalcNSteps = 0;
