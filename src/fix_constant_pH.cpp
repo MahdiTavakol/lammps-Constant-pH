@@ -1531,6 +1531,8 @@ void FixConstantPH::init_GFF()
 
 void FixConstantPH::calculate_Hs()
 {
+  if (neighbor->ago && update->ntimestep)
+    return ;
   int nlocal = atom->nlocal;
   int* molecule = atom->molecule;
   int* type = atom->type;
