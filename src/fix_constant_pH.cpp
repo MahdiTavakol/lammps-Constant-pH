@@ -309,6 +309,14 @@ void FixConstantPH::init()
   // Reading the pH structure files
   pH_structure_storage = std::make_unique<constant_pH_structures>(lmp, fileName1, fileName2);
   pH_structure_storage->read_pH_structure_files();
+
+  /*
+   * Allocating the storage so that the copy_arrays called
+   * in the Verlet::Setup would not lead to out of range.
+   * This setup method is called before the fix_constant_pH::setup
+   */
+  nmax = atom->nmax;
+  allocate_storage();
 }
 
 /* ---------------------------------------------------------------------- */
@@ -332,8 +340,7 @@ void FixConstantPH::setup(int /*vflag*/)
 
   if (print_Udwp_flag) print_Udwp();
 
-  nmax = atom->nmax;
-  allocate_storage();
+
 
   // I have put this part here on purpose so if the fix_adaptive_protonation reads the initial molids, it is set here
   if (flags & ADAPTIVE) { 
