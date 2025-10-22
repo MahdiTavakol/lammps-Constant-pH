@@ -158,7 +158,10 @@ class FixConstantPH : public Fix {
 
   class Fix *fixgpu;
 
+  // maximum local atoms
   int nmax;
+  // maximum local + ghost atoms
+  int natoms;
 
   // These pointers are allocated and deallocated through allocate_storage() and deallocate_storage() functions
   // _org is for value of parameters before the update_lmp() with modified parameters act on them

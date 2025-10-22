@@ -315,7 +315,6 @@ void FixConstantPH::init()
    * in the Verlet::Setup would not lead to out of range.
    * This setup method is called before the fix_constant_pH::setup
    */
-  nmax = atom->nmax;
   allocate_storage();
 }
 
@@ -1076,7 +1075,7 @@ void FixConstantPH::allocate_storage()
      nmax contains the maximum number of nlocal 
      and nghost atoms.
   */
-  int nmax = atom->nmax;
+  nmax = atom->nmax;
   memory->create(q_orig, nmax, "constant_pH:q_orig");
   memory->create(f_orig, nmax, 3, "constant_pH:f_orig");
   memory->create(peatom_orig, nmax, "constant_pH:peatom_orig");
@@ -1150,7 +1149,7 @@ template <int direction> void FixConstantPH::backup_restore_qfev()
 {
   int i;
 
-  int natom = atom->nlocal + atom->nghost;
+  int natom = atom->nlocal;
   if (force->newton || (force->kspace && force->kspace->tip4pflag)) natom += atom->nghost;
 
   double **f = atom->f;
