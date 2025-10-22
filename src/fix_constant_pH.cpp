@@ -316,6 +316,9 @@ void FixConstantPH::init()
    * This setup method is called before the fix_constant_pH::setup
    */
   allocate_storage();
+
+  // setting the HCalcNSteps to zero
+  HCalcNSteps = 0;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -435,6 +438,18 @@ void FixConstantPH::initial_integrate(int /*vflag*/)
   calculate_dUs();
   calculate_Hs();
   update_a_lambda();
+
+  // priting the precent of steps where the HA and HB values have ben calculated
+  if (update->ntimestep && (update->ntimestep % 1000 == 0)) {
+    double ratio = static_cast<double>(HCalcNSteps)/1000.0;
+
+    // priting the info 
+    if (comm->me == 0) {
+      auto mesg = fmt::format("HA and HB were updated {}% of simulation time from fix_constant_pH\n",ratio);
+      utils::logmesg(lmp,mesg);
+    }
+    HCalcNSteps = 0;
+  }
 }
 
 /* ----------------------------------------------------------------------
@@ -1625,11 +1640,7 @@ void FixConstantPH::calculate_Hs()
     }
   }
 
-  // priting the info 
-  if (comm->me == 0) {
-    auto mesg = fmt::format("HA and HB calculation on step {} from fix_constant_pH\n",update->ntimestep);
-    utils::logmesg(lmp,mesg);
-  }
+  HCalcNSteps++;
 }
 
 /* --------------------------------------------------------------------- 

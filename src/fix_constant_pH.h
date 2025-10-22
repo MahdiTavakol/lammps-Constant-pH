@@ -150,6 +150,7 @@ class FixConstantPH : public Fix {
 
   // Function required to be called by the compute_GFF
   void calculate_H_once();
+  int HCalcNSteps; // Number of steps when HA was calculated
 
   // The q_total used to calculate the HW charges
   double q_total;
