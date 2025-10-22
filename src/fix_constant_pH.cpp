@@ -1837,7 +1837,7 @@ double FixConstantPH::compute_epair()
   if (force->pair) energy += force->pair->eng_coul;
   // Adding the kspace component
   if (force->kspace)
-    energy += force->kspace->energy();
+    energy += force->kspace->energy;
 
   /* As the bond, angle, dihedral and improper energies 
       do not change with the espilon, we do not need to 
