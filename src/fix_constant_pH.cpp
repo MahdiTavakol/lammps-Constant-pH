@@ -460,7 +460,7 @@ void FixConstantPH::post_force(int /*vflag*/)
 {
   calculate_dfs();
   calculate_dUs();
-  calculate_Hs();
+  //calculate_Hs();
   update_a_lambda();
   if (!(update->ntimestep % write_lambda_nevery)) write_lambdas();
 }
