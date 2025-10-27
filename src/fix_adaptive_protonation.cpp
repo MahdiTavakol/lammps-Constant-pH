@@ -325,7 +325,7 @@ void FixAdaptiveProtonation::post_force(int /*vflag*/)
   // th neighBuildRatioPrev is updated every nevery steps
   if (comm->me == 0 && 
       (update->ntimestep+1)%nevery == 0 && 
-      uneighBuildRatioPrev > neighBuildRatioCutoff)
+       neighBuildRatioPrev > neighBuildRatioCutoff)
         error->warning(FLERR,"Neighbor build ratio is higher than the cutoff skiping this step in the fix adaptive protonation: {}, {}",
                           neighBuildRatioPrev,neighBuildRatioCutoff);
 
