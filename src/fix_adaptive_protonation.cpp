@@ -84,6 +84,9 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
     } else if (strcmp(arg[iarg],"nRampStep") == 0) {
       nRampStep = utils::numeric(FLERR,arg[iarg+1],false,lmp);
       iarg += 2;
+    } else if (strcmp(arg[iarg], "neigh_build_cutoff") == 0) {
+      neighBuildRatioCutoff = utils::numeric(FLERR, arg[iarg+1], false, lmp);
+      iarg += 2;
     } else
       error->all(FLERR, "Unknown keyword");
   }
@@ -272,12 +275,16 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
   modify_protonation_state();
   rampStep++;
     
+
   
   // Resetting the mark_prev parameter to help us keep the track of which molecule moves from solid to solvent and vice versa
-  if (update->ntimestep%nevery == 0) {
+  // If neighBuildRatio is higher than 50% neigher the mark is updated nor
+  // the mark_prev nor is set and also the reset_mark_sum_running is not called
+  // --->>> status quo
+  if (update->ntimestep%nevery == 0 && neighBuildRatioPrev <= neighBuildRatioCutoff) {
     set_mark_prev();
     reset_mark_sum_running();
-  }
+  } 
 }
 
 /* --------------------------------------------------------------------------------------- */
@@ -292,7 +299,15 @@ void FixAdaptiveProtonation::post_force(int /*vflag*/)
     if (!list)
       error->all(FLERR, "Neighbor list not initialized for adaptive_protonation");
     neighbor->build_one(list);
+
+    neighBuildRatioPrev = 100.0*static_cast<double>(nNeighBuildSteps) / static_cast<double>(nevery);
+    nNeighBuildSteps = 0;
   }
+
+  // incrementing the nNeighBuildSteps
+  if (neighbor->ago == 0)
+    nNeighBuildSteps++;
+
 
   // Counting the number of water molecules surrounding the protonable molecules
   int innernevery;
@@ -300,8 +315,19 @@ void FixAdaptiveProtonation::post_force(int /*vflag*/)
     innernevery = MAX(1,nevery / nSmoothingSteps);
   else 
     error->all(FLERR,"nSmoothingSteps in the fix_adaptive_protonation is zero");
-  if ((update->ntimestep+1)%innernevery == 0)
+
+  // If neighBuildRatio is higher than 50% neigher the mark is updated nor
+  // the mark_prev nor is set and also the reset_mark_sum_running is not called
+  // --->>> status quo
+  if ((update->ntimestep+1)%innernevery == 0 && neighBuildRatioPrev <= neighBuildRatioCutoff) 
     mark_protonation_deprotonation();
+  
+  // th neighBuildRatioPrev is updated every nevery steps
+  if (comm->me == 0 && 
+      (update->ntimestep+1)%nevery == 0 && 
+      uneighBuildRatioPrev > neighBuildRatioCutoff)
+        error->warning(FLERR,"Neighbor build ratio is higher than the cutoff skiping this step in the fix adaptive protonation: {}, {}",
+                          neighBuildRatioPrev,neighBuildRatioCutoff);
 
   if ((update->ntimestep+1)%nevery == 0) {
     rampStep = 1;

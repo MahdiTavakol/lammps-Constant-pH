@@ -140,6 +140,17 @@ class FixAdaptiveProtonation : public Fix {
   void modify_protonation_state();
   // Setting the mark for the previous state
   void set_mark_prev();
+
+
+private:
+  // A parameter to check the frequency of neighbor rebuilds
+  // Since we have an innerfrequency lower than the nevery freq
+  // the neighBuildRatio is not avaiable in the inner_nevery 
+  // so we use the previous value.
+  double neighBuildRatioPrev = 0.0;
+  int nNeighBuildSteps = 0;
+  double neighBuildRatioCutoff = 50.0;
+
 };
 
 }    // namespace LAMMPS_NS
