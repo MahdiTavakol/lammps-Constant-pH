@@ -81,6 +81,9 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
     } else if (strcmp(arg[iarg],"cutoff") == 0) {
       rprobe = utils::numeric(FLERR, arg[iarg+1], false, lmp);
       iarg += 2;
+    } else if (strcmp(arg[iarg],"nRampStep") == 0) {
+      nRampStep = utils::numeric(FLERR,arg[iarg+1],false,lmp);
+      iarg += 2;
     } else
       error->all(FLERR, "Unknown keyword");
   }
