@@ -176,10 +176,10 @@ class FixConstantPH : public Fix {
   double *keatom_orig, **kvatom_orig;
 
   // Functions for accessing or reseting the lambda dynamics parameters
-  void return_params(constant_pH_state& pH_state);
-  reset_params(const constant_pH_state& pH_state_, const int mode = 1);
-  reset_params(constant_pH_state&& pH_state_, const int mode = 1);
-  
+  void return_params(std::unique_ptr<constant_pH_state>& pH_state);
+  reset_params(const std::unique_ptr<constant_pH_state>& pH_state_, const int mode = 1);
+  reset_params(std::unique_ptr<constant_pH_state>&& pH_state_, const int mode = 1);
+
   void return_nparams(int &_n_params) const;
   void return_params(double **const _x_lambdas, double **const _v_lambdas,
                      double **const _a_lambdas, double **const _m_lambdas) const;

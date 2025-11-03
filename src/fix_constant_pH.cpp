@@ -670,9 +670,9 @@ void FixConstantPH::return_nparams(int &_n_params) const
    The memories for these should be allocated before hands
    ---------------------------------------------------------------------- */
 
-void FixConstantPH::return_params(constant_pH_state& pH_state_) const
+void FixConstantPH::return_params(std::unique_ptr<constant_pH_state>& pH_state_) const
 {
-  pH_state_ = pH_state;
+  pH_state_ = std::make_unique<constant_pH_state>(*pH_state);
 } 
 
 void FixConstantPH::return_params(double **const _x_lambdas, double **const _v_lambdas,
@@ -738,16 +738,16 @@ void FixConstantPH::return_T_lambda(double &_T_lambda, int component)
     fix styles
     --------------------------------------------------------------------- */
 
-void FixConstantPH::reset_params(const constant_pH_state& pH_state_, const int mode)
+void FixConstantPH::reset_params(const std::unique_ptr<constant_pH_state>& pH_state_, const int mode)
 {
-  pH_state = pH_state_;
+  pH_state = std::make_unique<constant_pH_state>(*pH_state_);
   if (mode == 1)
     pH_state->broadcast();
 }
 
-void FixConstantPH::reset_params(constant_pH_state&& pH_state_, const int mode)
+void FixConstantPH::reset_params(std::unique_ptr<constant_pH_state>&& pH_state_, const int mode)
 {
-  pH_state = pH_state_;
+  pH_state = std::move(pH_state_);
   if (mode == 1)
     pH_state->broadcast();
 }

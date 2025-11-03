@@ -436,10 +436,14 @@ void FixNHConstantPH::constrain_lambdas()
       // Just doing this on the root and then broadcasting the results
       sigma_lambda = 0.0;
       sigma_mass_inverse = 0.0;
+
+      fix_constant_pH->return_params(pH_state);
+      auto& N_buff = pH_state->N_buff;
+      double** x_lambdas = pH_state->lambdas;
+      double** m_lambdas = pH_state->m_lambdas;
+      auto& x_lambda_buff = pH_state->lambda_buff;
+      auto& m_lambda_buff = pH_state->m_lambda_buff; 
       
-      fix_constant_pH->return_nparams(n_lambdas);
-      fix_constant_pH->return_params(x_lambdas,v_lambdas,a_lambdas,m_lambdas);
-      fix_constant_pH->return_buff_params(x_lambda_buff,v_lambda_buff,a_lambda_buff,m_lambda_buff,N_buff);
       
       /* Checking if the charge content of the N_buff is large enough for n_lambdas
        * Since there is a possibility that the n_lambdas change during the simulation by 
@@ -482,13 +486,11 @@ void FixNHConstantPH::constrain_lambdas()
       x_lambda_buff += buff_charge_change * omega / m_lambda_buff;
      
 
-      fix_constant_pH->reset_params(x_lambdas,v_lambdas,a_lambdas,m_lambdas,0);
-      fix_constant_pH->reset_buff_params(x_lambda_buff,v_lambda_buff,a_lambda_buff, m_lambda_buff,0);
+      fix_constant_pH->reset_params(pH_state,0);
       fix_constant_pH->reset_qs();
    }
    
-   fix_constant_pH->reset_params(x_lambdas,v_lambdas,a_lambdas,m_lambdas);
-   fix_constant_pH->reset_buff_params(x_lambda_buff,v_lambda_buff,a_lambda_buff, m_lambda_buff);
+   fix_constant_pH->reset_params(pH_state);
    fix_constant_pH->reset_qs();
 }
 
