@@ -159,10 +159,17 @@ constant_pH_state::constant_pH_state(const constant_pH_state& rhs):
 constant_pH_state& constant_pH_state::operator=(const constant_pH_state& rhs)
 {
   if (this != &rhs) {
-    deallocate_lambdas();
-    n_lambdas = rhs.n_lambdas;
-    mass_lambda = rhs.mass_lambda;
-    allocate_lambdas();
+    if (n_lambdas != rhs.n_lambdas) {
+      mass_lambda = rhs.mass_lambda;
+      deallocate_lambdas();
+      n_lambdas = rhs.n_lambdas;
+      allocate_lambdas();
+    } else if (mass_lambdas != rhs.mass_lambdas) {
+      mass_lambda = rhs.mass_lambda;
+      std::fill_n(&m_lambdas[0][0],3*n_lambdas,mass_lambda);
+      m_lambda_buff = mass_lambda;
+    }
+    
 
     if (n_lambdas) {
       std::copy_n(&rhs.lambdas[0][0],3*n_lambdas,&lambdas[0][0]);

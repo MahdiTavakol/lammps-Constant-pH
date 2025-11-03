@@ -129,7 +129,6 @@ FixNHConstantPH::FixNHConstantPH(LAMMPS *lmp, int narg, char **arg) :
 FixNHConstantPH::~FixNHConstantPH()
 {
   if (fix_constant_pH_id) delete [] fix_constant_pH_id;
-  deallocate_lambda_storage();
 }
 
 /* ---------------------------------------------------------------------- */
@@ -142,41 +141,10 @@ void FixNHConstantPH::init()
   if (!fix_constant_pH)
    error->all(FLERR,"fix {} is not a FixConstantPH", fix_constant_pH_id); 
 
-  fix_constant_pH->return_nparams(n_lambdas);
-  allocate_lambda_storage();
+  fix_constant_pH->return_params(pH_state);
   zeta_nose_hoover = 0.0;
   ranMars = std::make_unique<RanMars>(lmp,ranMarsSeed);
 }
-
-/* ----------------------------------------------------------------------
-    allocating the storage of the lambda parameters
-   ---------------------------------------------------------------------- */
-   
-void FixNHConstantPH::allocate_lambda_storage()
-{
-  memory->create(x_lambdas,n_lambdas,3,"nh_constant_pH:x_lambdas");
-  memory->create(v_lambdas,n_lambdas,3,"nh_constant_pH:v_lambdas");
-  memory->create(a_lambdas,n_lambdas,3,"nh_constant_pH:a_lambdas");
-  memory->create(m_lambdas,n_lambdas,3,"nh_constant_pH:m_lambdas");
-}
-
-/* ----------------------------------------------------------------------
-    deallocating the storage of the lambda parameters
-   ---------------------------------------------------------------------- */
-   
-void FixNHConstantPH::deallocate_lambda_storage()
-{
-  if (x_lambdas) memory->destroy(x_lambdas);
-  if (v_lambdas) memory->destroy(v_lambdas);
-  if (a_lambdas) memory->destroy(a_lambdas);
-  if (m_lambdas) memory->destroy(m_lambdas);
-  
-  x_lambdas = nullptr;
-  v_lambdas = nullptr;
-  a_lambdas = nullptr;
-  m_lambdas = nullptr; 
-}
-
 
 /* ----------------------------------------------------------------------
    updating the lambda parameters from the fix constant_pH
@@ -184,20 +152,7 @@ void FixNHConstantPH::deallocate_lambda_storage()
    
 void FixNHConstantPH::update_lambda_params()
 {
-  int n_lambdas_current;
-  fix_constant_pH->return_nparams(n_lambdas_current);
-  // We need to check if the number of lambdas has changed
-  // If the protonation states have change while the n_lambdas
-  // remained fixed it does not matter here since the fix_constant_pH
-  // takes care of this situation.
-  // Here we are just checking if there is enough space in the storage
-  // to keep all the lambdas!
-  if (n_lambdas != n_lambdas_current) {
-    n_lambdas = n_lambdas_current;
-    deallocate_lambda_storage();
-    allocate_lambda_storage();
-  }
-  fix_constant_pH->return_params(x_lambdas,v_lambdas,a_lambdas,m_lambdas);
+  fix_constant_pH->return_params(pH_state);
 }
 
 /* ----------------------------------------------------------------------
@@ -209,19 +164,20 @@ void FixNHConstantPH::nve_v()
   FixNH::nve_v();
   
   // Getting the lambda_parameters from the fix_constant_pH.
-  update_lambda_params();
+  fix_constant_pH->return_params(pH_state);
+  double** v_lambdas = pH_state->v_lambdas;
   for (int i = 0; i < n_lambdas; i++) 
    for (int j = 0; j < 3; j++)
     v_lambdas[i][j] += dtf * a_lambdas[i][j];
-  
- // Returning the modified parameters to the fix_constant_pH.
- fix_constant_pH->reset_params(x_lambdas,v_lambdas,a_lambdas,m_lambdas);
+
 
  if (lambda_integration_flags & BUFFER) {
-  fix_constant_pH->return_buff_params(x_lambda_buff,v_lambda_buff,a_lambda_buff,m_lambda_buff,N_buff);
+  double& v_lambda_buff = pH_state->v_lambda_buff;
   v_lambda_buff += dtf * a_lambda_buff;
-  fix_constant_pH->reset_buff_params(x_lambda_buff,v_lambda_buff,a_lambda_buff, m_lambda_buff);
  }
+
+ // Returning the modified parameters to the fix_constant_pH.
+ fix_constant_pH->reset_params(pH_state);
 }
 
 /* ----------------------------------------------------------------------
@@ -233,21 +189,23 @@ void FixNHConstantPH::nve_x()
   FixNH::nve_x();
 
   // Getting the lambda_parameters from the fix_constant_pH.
-  update_lambda_params();
+  fix_constant_pH->return_params(pH_state);
+  double** x_lambdas = pH_state->lambdas;
   for (int i = 0; i < n_lambdas; i++)
    for (int j = 0; j < 3; j++)
     x_lambdas[i][j] += dtv * v_lambdas[i][j];
   
      
-  // Resets the parameters for x_lambdas to be used in the constrain
-  fix_constant_pH->reset_params(x_lambdas,v_lambdas,a_lambdas,m_lambdas);
+  // Returning the modified parameters to the fix_constant_pH.
+  fix_constant_pH->reset_params(pH_state);
 
-  // This function sets the charges (qs) in the system based on the current value of x_lambdas and x_lambda_buffs
-  fix_constant_pH->reset_qs();     
-     
+    // This function sets the charges (qs) in the system based on the current value of x_lambdas and x_lambda_buffs
+    fix_constant_pH->reset_qs();    
+
   if (lambda_integration_flags & BUFFER) {
-     fix_constant_pH->return_buff_params(x_lambda_buff,v_lambda_buff,a_lambda_buff,m_lambda_buff,N_buff);
-     x_lambda_buff += dtv * v_lambda_buff;
+   auto& x_lambda_buff = pH_state->lambda_buff;
+   auto& v_lambda_buff = pH_state->v_lambda_buff;
+   x_lambda_buff += dtv * v_lambda_buff;
      if (lambda_integration_flags & CONSTRAIN) constrain_lambdas<2>();
   }
 }
@@ -267,12 +225,13 @@ void FixNHConstantPH::nh_v_temp()
   // unit conversion
   double mvv2e = force->mvv2e;
 
-  // Lets extract the parameters from the fix_constant_pH again
-  update_lambda_params();
-  
-  // and the buffer if present
-  if (lambda_integration_flags & BUFFER)
-     fix_constant_pH->return_buff_params(x_lambda_buff,v_lambda_buff,a_lambda_buff,m_lambda_buff,N_buff);
+  // Getting the lambda_parameters from the fix_constant_pH.
+  fix_constant_pH->return_params(pH_state);
+  auto& n_lambdas = pH_state->n_lambdas;
+  double** x_lambdas = pH_state->x_lambdas;
+  double** v_lambdas = pH_state->v_lambdas;
+  auto& x_lambda_buff = pH_state->x_lambda_buff;
+  auto& v_lambda_buff = pH_state->v_lambda_buff;
      
   // The number of degrees of freedom
   double Nf_lambdas = static_cast<double>(3*n_lambdas);
@@ -439,8 +398,7 @@ void FixNHConstantPH::nh_v_temp()
   if (lambda_integration_flags & BUFFER)
      v_lambda_buff -= v_cm; 
   
-  fix_constant_pH->reset_params(x_lambdas,v_lambdas,a_lambdas,m_lambdas);
-  if (lambda_integration_flags & BUFFER) fix_constant_pH->reset_buff_params(x_lambda_buff,v_lambda_buff,a_lambda_buff, m_lambda_buff);
+  fix_constant_pH->reset_params(pH_state);
 }
 
 /* ---------------------------------------------------------------------

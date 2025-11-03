@@ -738,7 +738,7 @@ void FixConstantPH::return_T_lambda(double &_T_lambda, int component)
     fix styles
     --------------------------------------------------------------------- */
 
-void FixConstantPH::reset_params(const constant_pH_state pH_state_, const int mode)
+void FixConstantPH::reset_params(const constant_pH_state& pH_state_, const int mode)
 {
   pH_state = pH_state_;
   if (mode == 1)

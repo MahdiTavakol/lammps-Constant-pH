@@ -56,15 +56,11 @@ class FixNHConstantPH : public FixNH {
   FixConstantPH *fix_constant_pH;
   char *fix_constant_pH_id;
 
-  // lambdas variables --> It should have its own class
-  double **x_lambdas, **v_lambdas, **a_lambdas, **m_lambdas;
+  // pH_state
+  std::unique_ptr<constant_pH_state> pH_state;
   double T_lambda;
-  int n_lambdas;
   int lambda_every;
 
-  // Buffer parameters
-  double x_lambda_buff, v_lambda_buff, a_lambda_buff, m_lambda_buff;
-  int N_buff;
 
   // Integration flags for lambda, should I constrain total charge and also is there any buffer
   int lambda_integration_flags;

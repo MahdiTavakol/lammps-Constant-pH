@@ -117,8 +117,6 @@ class FixConstantPH : public Fix {
   std::ofstream Udwp_fp;
   void print_Udwp();
 
-  // Parameters for the buffer
-  double lambda_buff, v_lambda_buff, a_lambda_buff, m_lambda_buff, H_lambda_buff;
   // lambda_buff at step0
   double lambda_buff_0 = 1.0;
   // number of buffer points
@@ -179,6 +177,9 @@ class FixConstantPH : public Fix {
 
   // Functions for accessing or reseting the lambda dynamics parameters
   void return_params(constant_pH_state& pH_state);
+  reset_params(const constant_pH_state& pH_state_, const int mode = 1);
+  reset_params(constant_pH_state&& pH_state_, const int mode = 1);
+  
   void return_nparams(int &_n_params) const;
   void return_params(double **const _x_lambdas, double **const _v_lambdas,
                      double **const _a_lambdas, double **const _m_lambdas) const;
