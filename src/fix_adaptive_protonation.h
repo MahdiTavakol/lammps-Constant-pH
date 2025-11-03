@@ -53,6 +53,8 @@ class FixAdaptiveProtonation : public Fix {
   void read_molids_file();
   // Getting the number of protonable molids;
   void get_n_protonable(int &n_lambdas) const { n_lambdas = this->n_protonable; }
+  // Getting the protonable molids
+  void get_protonable_molids(std::unique_ptr<int []>& molids);
   // Getting the protonable molids (The molids array must be allocated otherwise an error is produced)
   void get_protonable_molids(int *molids) const;
   // Changes in the environment which is needed in the fix_constant_pH to check if it needs to get the protonable_molids or not.

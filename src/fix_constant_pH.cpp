@@ -345,7 +345,7 @@ void FixConstantPH::setup(int /*vflag*/)
     fix_adaptive_protonation->get_n_protonable(n_lambdas_input);
     molids = std::make_unique<int[]>(n_lambdas_input);
     // get_protonable_molids should be modified to be compatible with std::unique_ptr
-    fix_adaptive_protonation->get_protonable_molids(molids_input.get());
+    fix_adaptive_protonation->get_protonable_molids(molids_input);
   }
 
   // dynamic states for lambdas
@@ -406,14 +406,15 @@ void FixConstantPH::initial_integrate(int /*vflag*/)
             input->one(commands[i]);
             modify->addstep_compute(update->ntimestep);    // I am not sure about this part yet!
           }
+
+          // Since there is a possibly to having the fix_adaptive_protonation deleted in 
+          // the commands we need to retrieve it again.
+          fix_adaptive_protonation = dynamic_cast<FixAdaptiveProtonation *>(modify->get_fix_by_id(fix_adaptive_protonation_id));
+          if (!fix_adaptive_protonation)
+            error->all(FLERR, "Wrong fix type in the adaptive keyword for the constant pH");
         }
         // <------ add those commands
 
-        // Since there is a possibly to having the fix_adaptive_protonation deleted in 
-        // the commands we need to retrieve it again.
-        fix_adaptive_protonation = dynamic_cast<FixAdaptiveProtonation *>(modify->get_fix_by_id(fix_adaptive_protonation_id));
-        if (!fix_adaptive_protonation)
-          error->all(FLERR, "Wrong fix type in the adaptive keyword for the constant pH");
         // Updating the endstep
         update->endstep = endstep_backup;
 
@@ -431,7 +432,7 @@ void FixConstantPH::initial_integrate(int /*vflag*/)
         fix_adaptive_protonation->get_n_protonable(n_lambdas_input);
         molids_input = std::make_unique<int[]>(n_lambdas_input);
         // get_protonable_molids should be modified to be compatible with std::unique_ptr
-        fix_adaptive_protonation->get_protonable_molids(molids_input.get());
+        fix_adaptive_protonation->get_protonable_molids(molids_input);
         // creating it based on the values of the pH_state_prev
         // For the molids in both the pH_state and pH_state_prev their lambda values are keep.
         pH_state = std::make_unique<constant_pH_state>(lmp,molids_input,
