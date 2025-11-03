@@ -107,3 +107,164 @@ void constant_pH_structures::read_pH_structure_files()
   parse_file(pHStructureFile1, pHnStructures1, pH1qs, pHnTypes1, "constant_pH:pH1qs");
   parse_file(pHStructureFile2, pHnStructures2, pH2qs, pHnTypes2, "constant_pH:pH2qs");
 }
+
+constant_pH_state::constant_pH_state(LAMMPS *lmp, const double& mass_lambda_, const int& N_buff_):
+  Pointers{lmp},
+  lambdas{nullptr}, v_lambdas{nullptr}, a_lambdas{nullptr}, m_lambdas{nullptr},
+  n_lambdas{0}, mass_lambda{mass_lambda_},
+  lambda_buff{0.0}, v_lambda_buff{0.0}, a_lambda_buff{0.0}, m_lambda_buff{mass_lambda},
+  N_buff{N_buff_} {}
+
+constant_pH_state::constant_pH_state(LAMMPS *lmp, std::unique_ptr<int []>& molids_, const int& n_lambdas_, const double& mass_lambda_, const int& N_buff_):
+  Pointers{lmp},
+  lambdas{nullptr}, v_lambdas{nullptr}, a_lambdas{nullptr}, m_lambdas{nullptr},
+  molids{std::move(molids_)},
+  n_lambdas{n_lambdas_}, mass_lambda{mass_lambda_},
+  N_buff{N_buff_}
+{
+  allocate_lambdas();
+}
+
+constant_pH_state::~constant_pH_state()
+{
+  deallocate_lambdas();
+}
+
+constant_pH_state::constant_pH_state(const constant_pH_state& rhs):
+  Pointers{rhs.lmp},
+  lambdas{nullptr}, v_lambdas{nullptr}, a_lambdas{nullptr}, m_lambdas{nullptr},
+  n_lambdas{rhs.n_lambdas}, mass_lambda{rhs.mass_lambda},
+  lambda_buff{rhs.lambda_buff}, v_lambda_buff{rhs.v_lambda_buff},
+  a_lambda_buff{rhs.a_lambda_buff}, m_lambda_buff{rhs.m_lambda_buff},
+  N_buff{rhs.N_buff}
+{
+  allocate_lambdas();
+  if (n_lambdas) {
+    std::copy_n(&rhs.lambdas[0][0],3*n_lambdas,&lambdas[0][0]);
+    std::copy_n(&rhs.v_lambdas[0][0],3*n_lambdas,&v_lambdas[0][0]);
+    std::copy_n(&rhs.a_lambdas[0][0],3*n_lambdas,&a_lambdas[0][0]);
+    std::copy_n(&rhs.m_lambdas[0][0],3*n_lambdas,&m_lambdas[0][0]);
+    std::copy_n(rhs.molids.get(),n_lambdas,molids.get());
+  }
+}
+
+constant_pH_state& constant_pH_state::operator=(const constant_pH_state& rhs)
+{
+  if (this != &rhs) {
+    deallocate_lambdas();
+    n_lambdas = rhs.n_lambdas;
+    mass_lambda = rhs.mass_lambda;
+    allocate_lambdas();
+
+    if (n_lambdas) {
+      std::copy_n(&rhs.lambdas[0][0],3*n_lambdas,&lambdas[0][0]);
+      std::copy_n(&rhs.v_lambdas[0][0],3*n_lambdas,&v_lambdas[0][0]);
+      std::copy_n(&rhs.a_lambdas[0][0],3*n_lambdas,&a_lambdas[0][0]);
+      std::copy_n(&rhs.m_lambdas[0][0],3*n_lambdas,&m_lambdas[0][0]);
+      std::copy_n(rhs.molids.get(),n_lambdas, molids.get());
+    }
+    lambda_buff = rhs.lambda_buff;
+    v_lambda_buff = rhs.v_lambda_buff;
+    a_lambda_buff = rhs.a_lambda_buff;
+    m_lambda_buff = rhs.m_lambda_buff;
+    N_buff = rhs.N_buff;
+  }
+
+  return *this;
+}
+
+constant_pH_state::constant_pH_state(constant_pH_state&& rhs):
+ Pointers{rhs.lmp},
+ lambdas{rhs.lambdas}, v_lambdas{rhs.v_lambdas},
+ a_lambdas{rhs.a_lambdas}, m_lambdas{rhs.m_lambdas},
+ molids{std::move(rhs.molids)},
+ n_lambdas{rhs.n_lambdas}, mass_lambda{rhs.mass_lambda},
+ lambda_buff{rhs.lambda_buff}, v_lambda_buff{rhs.v_lambda_buff},
+ a_lambda_buff{rhs.a_lambda_buff}, m_lambda_buff{rhs.m_lambda_buff},
+ N_buff{rhs.N_buff}
+{
+  rhs.lambdas  = nullptr;
+  rhs.v_lambdas = nullptr;
+  rhs.a_lambdas = nullptr;
+  rhs.m_lambdas = nullptr;
+  rhs.n_lambdas = 0;
+  rhs.mass_lambda = 0.0;
+  rhs.lambda_buff = 0.0;
+  rhs.v_lambda_buff = 0.0;
+  rhs.a_lambda_buff = 0.0;
+  rhs.m_lambda_buff = 0;
+  rhs.N_buff = 0;
+}
+
+constant_pH_state& constant_pH_state::operator=(constant_pH_state&& rhs)
+{
+  if (this != &rhs) {
+    deallocate_lambdas();
+    // we have just one movable item here
+    molids = std::move(rhs.molids);
+    // manual moving 
+    lambdas = rhs.lambdas;
+    v_lambdas = rhs.v_lambdas;
+    a_lambdas = rhs.a_lambdas;
+    m_lambdas = rhs.m_lambdas;
+    n_lambdas = rhs.n_lambdas;
+
+    mass_lambda = rhs.mass_lambda;
+    lambda_buff = rhs.lambda_buff;
+    v_lambda_buff = rhs.v_lambda_buff;
+    a_lambda_buff = rhs.a_lambda_buff;
+    m_lambda_buff = rhs.m_lambda_buff;
+    N_buff = rhs.N_buff;
+
+    rhs.lambdas  = nullptr;
+    rhs.v_lambdas = nullptr;
+    rhs.a_lambdas = nullptr;
+    rhs.m_lambdas = nullptr;
+    rhs.n_lambdas = 0;
+
+    rhs.mass_lambda = 0.0;
+    rhs.lambda_buff = 0.0;
+    rhs.v_lambda_buff = 0.0;
+    rhs.a_lambda_buff = 0.0;
+    rhs.m_lambda_buff = 0;
+    rhs.n_lambdas = 0;
+    rhs.N_buff = 0;
+  }
+  return *this;
+}
+
+
+void constant_pH_state::reset_lambdas(const int& n_lambdas_)
+{
+  deallocate_lambdas();
+  n_lambdas = n_lambdas_;
+  allocate_lambdas();
+}
+
+void constant_pH_state::allocate_lambdas()
+{
+  memory->create(lambdas, n_lambdas, 3, "constant_pH:lambdas");
+  memory->create(v_lambdas, n_lambdas, 3, "constant_pH:v_lambdas");
+  memory->create(a_lambdas, n_lambdas, 3, "constant_pH:a_lambdas");
+  memory->create(m_lambdas, n_lambdas, 3, "constant_pH:m_lambdas");
+
+  molids = std::make_unique<int []>(n_lambdas);
+
+  std::fill_n(&m_lambdas[0][0],3*n_lambdas,mass_lambda);
+  m_lambda_buff = mass_lambda;
+}
+
+void constant_pH_state::deallocate_lambdas()
+{
+  if (lambdas) memory->destroy(lambdas);
+  if (v_lambdas) memory->destroy(v_lambdas);
+  if (a_lambdas) memory->destroy(a_lambdas);
+  if (m_lambdas) memory->destroy(m_lambdas);
+
+  molids.reset();
+
+  lambdas = nullptr;
+  v_lambdas = nullptr;
+  a_lambdas = nullptr;
+  m_lambdas = nullptr;
+}

@@ -1,5 +1,5 @@
-#ifndef LMP_CONSTANT_PH_STRUCTURES_H
-#define LMP_CONSTANT_PH_STRUCTURES_H
+#ifndef LMP_CONSTANT_PH_DATA_H
+#define LMP_CONSTANT_PH_DATA_H
 
 #include <fstream>
 #include <string>
@@ -34,6 +34,38 @@ class constant_pH_structures : protected Pointers {
   std::unique_ptr<int[]> protonable;
   int pHnStructures1, pHnStructures2;
   int pHnTypes1, pHnTypes2;
+};
+
+class constant_pH_state : protected Pointers {
+ public:
+  constant_pH_state(LAMMPS *lmp, const double& mass_lambda_, const int& N_buff_);
+  constant_pH_state(LAMMPS *lmp, std::unique_ptr<int []>& molids_, const int& n_lambdas_, const double& mass_lambda_, const int& N_buff_);
+
+  ~constant_pH_state();
+  constant_pH_state(const constant_pH_state& rhs);
+  constant_pH_state& operator=(const constant_pH_state& rhs);
+  constant_pH_state(constant_pH_state&& rhs) noexcept;
+  constant_pH_state& operator=(constant_pH_state&& rhs) noexcept;
+
+
+  void reset_lambdas(const int& n_lambdas_);
+
+ private:
+  
+   // Lambda arrays
+   double **lambdas, **v_lambdas, **a_lambdas, **m_lambdas;
+   std::unique_ptr<int[]> molids;
+   int n_lambdas;
+   double mass_lambda;
+
+     // Parameters for the buffer
+  double lambda_buff, v_lambda_buff, a_lambda_buff, m_lambda_buff;
+  // number of buffer points
+  int N_buff;
+
+  void allocate_lambdas();
+  void deallocate_lambdas();
+
 };
 }    // namespace LAMMPS_NS
 
