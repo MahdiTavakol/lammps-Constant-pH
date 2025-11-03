@@ -75,11 +75,7 @@ static constexpr double max_lambda_buff_0 = 1.05;
 
 FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
     Fix{lmp, narg, arg}, random_number_seed{1152}, 
-    lambdas{nullptr}, v_lambdas{nullptr}, a_lambdas{nullptr},
-    m_lambdas{nullptr}, H_lambdas{nullptr}, n_lambdas{1}, mass_lambda{20.0},
-    lambdas_prev{nullptr}, v_lambdas_prev{nullptr}, a_lambdas_prev{nullptr},
-    m_lambdas_prev{nullptr}, H_lambdas_prev{nullptr}, n_lambdas_prev{0},
-    GFF{nullptr}, m_lambda_buff{20.0}, fix_adaptive_protonation_id{nullptr},
+    mass_lambda{20.0}, GFF{nullptr}, fix_adaptive_protonation_id{nullptr},
     fixgpu{nullptr}, q_orig{nullptr}, f_orig{nullptr}, peatom_orig{nullptr}, pvatom_orig{nullptr},
     keatom_orig{nullptr}, kvatom_orig{nullptr}, 
     qOWs{-0.834},qHWs{0.278},mu{0.0},ncommands{0},flags{0},fp_flags{0}, write_lambda_nevery{1},
@@ -118,14 +114,14 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
       }
       iarg += 2;
     } else if (strcmp(arg[iarg], "molids") == 0) {
-      n_lambdas = utils::inumeric(FLERR, arg[iarg + 1], false, lmp);
+      n_lambdas_input = utils::inumeric(FLERR, arg[iarg + 1], false, lmp);
       if (flags & ADAPTIVE)
         error->all(FLERR, "molids and Fix_adapative_protonation cannot be used at the same time");
       iarg += 2;
-      molids = std::make_unique<int[]>(n_lambdas);
-      if (narg < iarg + n_lambdas) utils::missing_cmd_args(FLERR,"fix constant_pH",error);
-      for (int i = 0; i < n_lambdas; i++) {
-        molids[i] = utils::inumeric(FLERR, arg[iarg], false, lmp);
+      molids_input = std::make_unique<int[]>(n_lambdas_input);
+      if (narg < iarg + n_lambdas_input) utils::missing_cmd_args(FLERR,"fix constant_pH",error);
+      for (int i = 0; i < n_lambdas_input; i++) {
+        molids_input[i] = utils::inumeric(FLERR, arg[iarg], false, lmp);
         iarg++;
       }
     } else if (strcmp(arg[iarg], "mu") == 0) {
@@ -147,7 +143,7 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
       iarg += 6;
     } else if (strcmp(arg[iarg], "Fix_adaptive_protonation") == 0) {
       flags |= ADAPTIVE;
-      if (molids)
+      if (molids_input)
         error->all(FLERR, "molids and Fix_adapative_protonation cannot be used at the same time");
       if (narg < iarg + 3) utils::missing_cmd_args(FLERR, "fix constant_pH", error);
       fix_adaptive_protonation_id = utils::strdup(arg[iarg + 1]);
@@ -346,10 +342,20 @@ void FixConstantPH::setup(int /*vflag*/)
 
   // I have put this part here on purpose so if the fix_adaptive_protonation reads the initial molids, it is set here
   if (flags & ADAPTIVE) { 
-    fix_adaptive_protonation->get_n_protonable(n_lambdas);
+    fix_adaptive_protonation->get_n_protonable(n_lambdas_input);
+    molids = std::make_unique<int[]>(n_lambdas_input);
+    // get_protonable_molids should be modified to be compatible with std::unique_ptr
+    fix_adaptive_protonation->get_protonable_molids(molids_input.get());
   }
 
+  // dynamic states for lambdas
+  pH_state = std::make_unique<constant_pH_state>(lmp,molids_input,n_lambdas_input,mass_lambda,N_buff);
+  // forcefield variables for lambdas
   set_lambdas();
+
+  double** lambdas = pH_state->lambdas;
+  double lambda_buff = pH_state->lambda_buff;
+  double v_lambda_buff = pH_state->v_lambda_buff;
 
   if (flags & BUFFER) {
     lambda_buff = lambda_buff_0;
@@ -417,14 +423,22 @@ void FixConstantPH::initial_integrate(int /*vflag*/)
          * If a lambda remains the same during fix_adaptive_protonation,
          * I do not want to reset their lambdas and v_lambdas;
          */
-        set_lambdas_prev();
+        pH_state_prev = std::move(pH_state);
 
-        delete_lambdas();
         /* 
          *  we reread the n_lambdas after backing up the lambdas
          */
-        fix_adaptive_protonation->get_n_protonable(this->n_lambdas);
-        set_lambdas();
+        fix_adaptive_protonation->get_n_protonable(n_lambdas_input);
+        molids_input = std::make_unique<int[]>(n_lambdas_input);
+        // get_protonable_molids should be modified to be compatible with std::unique_ptr
+        fix_adaptive_protonation->get_protonable_molids(molids_input.get());
+        // creating it based on the values of the pH_state_prev
+        // For the molids in both the pH_state and pH_state_prev their lambda values are keep.
+        pH_state = std::make_unique<constant_pH_state>(lmp,molids_input,
+          n_lambdas_input,mass_lambda,N_buff,
+          pH_state_prev);
+        // forcefield variables for lambdas
+        set_lambdas(); 
 
         modify->clearstep_compute();
         modify->addstep_compute(update->ntimestep);
@@ -470,30 +484,8 @@ void FixConstantPH::post_force(int /*vflag*/)
    dependent on the n_lambdas
    ----------------------------------------------------------------------  */
 
-void FixConstantPH::delete_lambdas_prev()
-{
-  if (lambdas_prev)   memory->destroy(lambdas_prev);
-  if (v_lambdas_prev) memory->destroy(v_lambdas_prev);
-  if (a_lambdas_prev) memory->destroy(a_lambdas_prev);
-  if (m_lambdas_prev) memory->destroy(m_lambdas_prev);
-  if (H_lambdas_prev) memory->destroy(H_lambdas_prev);
-  molids_prev.reset();
-  lambdas_prev   = nullptr;
-  v_lambdas_prev = nullptr;
-  a_lambdas_prev = nullptr;
-  m_lambdas_prev = nullptr;
-  H_lambdas_prev = nullptr;
-  n_lambdas_prev = 0;
-}
-
 void FixConstantPH::delete_lambdas()
 {
-  if (lambdas) memory->destroy(lambdas);
-  if (v_lambdas) memory->destroy(v_lambdas);
-  if (a_lambdas) memory->destroy(a_lambdas);
-  if (m_lambdas) memory->destroy(m_lambdas);
-  if (H_lambdas) memory->destroy(H_lambdas);
-
   HAs.reset();
   HBs.reset();
   fs.reset();
@@ -502,37 +494,12 @@ void FixConstantPH::delete_lambdas()
   dUs.reset();
   lambdas_j.reset();
   GFF_lambdas.reset();
-  molids.reset();
+  H_lambdas.reset();
 }
 
-
-void FixConstantPH::set_lambdas_prev()
-{
-  n_lambdas_prev = n_lambdas;
-  memory->grow(lambdas_prev,n_lambdas_prev,3,"constant_pH:lambdas_prev");
-  memory->grow(v_lambdas_prev, n_lambdas_prev, 3, "constant_pH:v_lambdas_prev");
-  memory->grow(a_lambdas_prev, n_lambdas_prev, 3, "constant_pH:a_lambdas_prev");
-  memory->grow(m_lambdas_prev, n_lambdas_prev, 3, "constant_pH:m_lambdas_prev");
-  memory->grow(H_lambdas_prev, n_lambdas_prev, "constant_pH:H_lambdas_prev");
-  molids_prev = std::make_unique<int []>(n_lambdas_prev);
-  // When n_lambdas_prev is zero the std::copy tries to access the non-avail memory
-  if (n_lambdas_prev) {
-    std::copy(lambdas[0],lambdas[0]+3*n_lambdas_prev,lambdas_prev[0]);
-    std::copy(v_lambdas[0],v_lambdas[0]+3*n_lambdas_prev,v_lambdas_prev[0]);
-    std::copy(a_lambdas[0],a_lambdas[0]+3*n_lambdas_prev,a_lambdas_prev[0]);
-    std::copy(m_lambdas[0],m_lambdas[0]+3*n_lambdas_prev,m_lambdas_prev[0]);
-    std::copy(H_lambdas,H_lambdas+n_lambdas_prev,H_lambdas_prev);
-    std::copy(molids.get(),molids.get()+n_lambdas_prev,molids_prev.get());
-  }
-}
 
 void FixConstantPH::set_lambdas()
 {
-  memory->create(lambdas, n_lambdas, 3, "constant_pH:lambdas");
-  memory->create(v_lambdas, n_lambdas, 3, "constant_pH:v_lambdas");
-  memory->create(a_lambdas, n_lambdas, 3, "constant_pH:a_lambdas");
-  memory->create(m_lambdas, n_lambdas, 3, "constant_pH:m_lambdas");
-  memory->create(H_lambdas, n_lambdas, "constant_pH:H_lambdas");
 
   HAs = std::make_unique<double[]>(n_lambdas);
   HBs = std::make_unique<double[]>(n_lambdas);
@@ -542,42 +509,9 @@ void FixConstantPH::set_lambdas()
   dUs = std::make_unique<double[]>(n_lambdas);
   lambdas_j = std::make_unique<double[]>(n_lambdas);
   GFF_lambdas = std::make_unique<double[]>(n_lambdas);
+  H_lambdas = std::make_unique<double[]>(n_lambdas);
 
-  if (flags & ADAPTIVE) {
-    molids = std::make_unique<int[]>(n_lambdas);
-    // get_protonable_molids should be modified to be compatible with std::unique_ptr
-    fix_adaptive_protonation->get_protonable_molids(molids.get());
-  }
-
-  int to = 0;
-  if (molids_prev) {
-    for (int i = 0; i < n_lambdas; i++) {
-      auto iter = std::find(molids_prev.get(),molids_prev.get()+n_lambdas_prev,molids[i]);
-      if (iter != molids_prev.get()+n_lambdas_prev) {
-        int from = std::distance(molids_prev.get(),iter);
-        for (int j = 0; j < 3; j++) {
-          lambdas[to][j] = lambdas_prev[from][j];
-          v_lambdas[to][j] = v_lambdas_prev[from][j];
-          a_lambdas[to][j] = a_lambdas_prev[from][j];
-          m_lambdas[to][j] = m_lambdas_prev[from][j];
-        }
-        H_lambdas[to] = H_lambdas_prev[from];
-        to++;
-      }
-    }
-  }
-
-
-  for (int i = to; i < n_lambdas; i++) {
-    GFF_lambdas[i] = 0.0;
-    H_lambdas[i] = 0.0;
-    for (int j = 0; j < 3; j++) {
-      lambdas[i][j] = 0.0;
-      v_lambdas[i][j] = 0.0;
-      a_lambdas[i][j] = 0.0;
-      m_lambdas[i][j] = mass_lambda; // m_lambda == 20.0u taken from https://www.mpinat.mpg.de/627830/usage
-    }
-  }
+  int to = pH_state->reset(n_lambdas,pH_state_prev);
 
   if (n_lambdas) {
     // Initializing lambdas based on the current charge of protonable molecules so there is no jump in the system total charge
@@ -613,6 +547,8 @@ void FixConstantPH::initialize_lambda(const int& to)
   double **pH2qs = pH_structure_storage->pH2qs;
   int *protonable = pH_structure_storage->protonable
                         .get(); 
+
+  double **lambdas = pH_state->lambdas;
 
 
   auto q_local     = std::make_unique<double []>(length);
@@ -670,6 +606,8 @@ void FixConstantPH::update_a_lambda()
   double kT = force->boltz * T;
   double nStructures1Barrier = 0.5 * kT;
   double nStructures2Barrier = 0.5 * kT;
+  double **a_lambdas = pH_state->a_lambdas;
+  double a_lambda_buff = pH_state->a_lambda_buff;
 
   int pHnStructures1 = pH_structure_storage->pHnStructures1;
   int pHnStructures2 = pH_structure_storage->pHnStructures2;
@@ -685,9 +623,9 @@ void FixConstantPH::update_a_lambda()
     double f_lambda_2 = 2 * M_PI * nStructures2Barrier * pHnStructures2 *
         sin(2 * M_PI * pHnStructures2 * lambdas[i][2]);
 
-    this->a_lambdas[i][0] = f_lambda_0 / m_lambdas[i][0]; 
-    this->a_lambdas[i][1] = f_lambda_1 / m_lambdas[i][1];
-    this->a_lambdas[i][2] = f_lambda_2 / m_lambdas[i][2];
+    a_lambdas[i][0] = f_lambda_0 / m_lambdas[i][0]; 
+    a_lambdas[i][1] = f_lambda_1 / m_lambdas[i][1];
+    a_lambdas[i][2] = f_lambda_2 / m_lambdas[i][2];
 
     // I am not sure about the sign of the f*kT*log(10)*(pK-pH)
     this->H_lambdas[i] = lambdas[i][0]*HAs[i] + (1.0-lambdas[i][0])*HBs[i] -fs[i] * kT * log(10) * (pK - pH) + kj2kcal * Us[i] +
@@ -698,7 +636,7 @@ void FixConstantPH::update_a_lambda()
 
   if (flags & BUFFER) {
     double f_lambda_buff = -(kj2kcal * dU_buff);
-    this->a_lambda_buff =
+    a_lambda_buff =
         f_lambda_buff / m_lambda_buff;    // the fix_nh_constant_pH itself takes care of units
     this->H_lambda_buff =
         kj2kcal * U_buff + N_buff * (m_lambda_buff / 2.0) * (v_lambda_buff * v_lambda_buff) * mvv2e;
@@ -730,6 +668,11 @@ void FixConstantPH::return_nparams(int &_n_params) const
    returns the x_lambdas, v_lambdas, ....
    The memories for these should be allocated before hands
    ---------------------------------------------------------------------- */
+
+void FixConstantPH::return_params(constant_pH_state& pH_state_) const
+{
+  pH_state_ = pH_state;
+} 
 
 void FixConstantPH::return_params(double **const _x_lambdas, double **const _v_lambdas,
                                   double **const _a_lambdas, double **const _m_lambdas) const
@@ -794,75 +737,20 @@ void FixConstantPH::return_T_lambda(double &_T_lambda, int component)
     fix styles
     --------------------------------------------------------------------- */
 
-void FixConstantPH::reset_params(double **const _x_lambdas, double **const _v_lambdas,
-                                 double **const _a_lambdas, double **const _m_lambdas,
-                                 const int mode)
+void FixConstantPH::reset_params(const constant_pH_state pH_state_, const int mode)
 {
-  if (n_lambdas <= 0) return;
-  for (int i = 0; i < n_lambdas; i++) {
-    for (int j = 0; j < 3; j++) {
-      lambdas[i][j] = _x_lambdas[i][j];
-      v_lambdas[i][j] = _v_lambdas[i][j];
-      a_lambdas[i][j] = _a_lambdas[i][j];
-      m_lambdas[i][j] = _m_lambdas[i][j];
-    }
-  }
-
-  if (mode == 1) {
-    MPI_Bcast(lambdas[0], n_lambdas * 3, MPI_DOUBLE, 0, world);
-    MPI_Bcast(v_lambdas[0], n_lambdas * 3, MPI_DOUBLE, 0, world);
-    MPI_Bcast(a_lambdas[0], n_lambdas * 3, MPI_DOUBLE, 0, world);
-    MPI_Bcast(m_lambdas[0], n_lambdas * 3, MPI_DOUBLE, 0, world);
-  }
+  pH_state = pH_state_;
+  if (mode == 1)
+    pH_state->broadcast();
 }
 
-/* ----------------------------------------------------------------------
-   returns the buffer parameters
-   ---------------------------------------------------------------------- */
-
-void FixConstantPH::return_buff_params(double &_x_lambda_buff, double &_v_lambda_buff,
-                                       double &_a_lambda_buff, double &_m_lambda_buff,
-                                       int &_N_buff) const
+void FixConstantPH::reset_params(constant_pH_state&& pH_state_, const int mode)
 {
-  if (!(flags & BUFFER)) {
-    error->warning(FLERR,
-                   "There is no buffer in the fix constant pH so you should not have reached here");
-    return;
-  }
-  _x_lambda_buff = this->lambda_buff;
-  _v_lambda_buff = this->v_lambda_buff;
-  _a_lambda_buff = this->a_lambda_buff;
-  _m_lambda_buff = this->m_lambda_buff;
-  _N_buff = this->N_buff;
+  pH_state = pH_state_;
+  if (mode == 1)
+    pH_state->broadcast();
 }
 
-/* ----------------------------------------------------------------------
-   sets the buffer parameters which should be used by the fix_nh_constant_pH
-   the N_buff is not here since I do not want other commands to mess up with
-   the number of buffers
-   ---------------------------------------------------------------------- */
-
-void FixConstantPH::reset_buff_params(const double _x_lambda_buff, const double _v_lambda_buff,
-                                      const double _a_lambda_buff, const double _m_lambda_buff,
-                                      const int mode)
-{
-  if (!(flags & BUFFER)) {
-    error->warning(FLERR,
-                   "There is no buffer in the fix constant pH so you should not have reached here");
-    return;
-  }
-  this->lambda_buff = _x_lambda_buff;
-  this->v_lambda_buff = _v_lambda_buff;
-  this->a_lambda_buff = _a_lambda_buff;
-  this->m_lambda_buff = _m_lambda_buff;
-
-  if (mode == 1) {
-    MPI_Bcast(&lambda_buff, 1, MPI_DOUBLE, 0, world);
-    MPI_Bcast(&v_lambda_buff, 1, MPI_DOUBLE, 0, world);
-    MPI_Bcast(&a_lambda_buff, 1, MPI_DOUBLE, 0, world);
-    MPI_Bcast(&m_lambda_buff, 1, MPI_DOUBLE, 0, world);
-  }
-}
 
 /* ----------------------------------------------------------------------
     Reading the file containing the commands run whenever a lambdas array 
@@ -1225,6 +1113,8 @@ void FixConstantPH::modify_qs(double scale, int j)
   int pHnStructures1 = pH_structure_storage->pHnStructures1;
   int pHnStructures2 = pH_structure_storage->pHnStructures2;
 
+  double **lambdas = pH_state->lambdas;
+
 
   std::unique_ptr<double []> q_changes_local = std::make_unique<double []>(4);
   std::unique_ptr<double []> q_changes = std::make_unique<double []>(4);
@@ -1318,6 +1208,7 @@ void FixConstantPH::modify_qs(double **scales)
   double **pH2qs = pH_structure_storage->pH2qs;
   int pHnStructures1 = pH_structure_storage->pHnStructures1;
   int pHnStructures2 = pH_structure_storage->pHnStructures2;
+  double** lambdas = pH_state->lambdas;
   
 
   std::unique_ptr<double []> q_changes_local = std::make_unique<double []>(5);
@@ -1687,6 +1578,11 @@ void FixConstantPH::write_lambdas_header()
 
 void FixConstantPH::write_lambdas()
 {
+  double** lambdas = pH_state->lambdas;
+  double** v_lambdas = pH_state->v_lambdas;
+  double** a_lambdas = pH_state->a_lambdas;
+  auto& molids = pH_state->molids; 
+
   if (!(flags & ADAPTIVE) && !molids)
     error->all(FLERR, "fix constant_pH requires either 'molids' or 'Fix_adaptive_protonation'.");
 
@@ -1734,8 +1630,14 @@ void FixConstantPH::write_lambdas()
 
 void FixConstantPH::initialize_v_lambda(const double _T_lambda)
 {
-  std::unique_ptr<RanPark> random = std::make_unique<RanPark>(lmp, random_number_seed);
+  auto& v_lambdas = pH_state->v_lambdas;
+  auto& v_lambda_buff = pH_state->v_lambda_buff;
+  auto& n_lambdas = pH_state->n_lambdas;
+  auto& m_lambdas = pH_state->m_lambdas;
+  auto& v_lambda_buff = pH_state->m_lambda_buff;
+  auto& N_buff = pH_state->N_buff;
 
+  std::unique_ptr<RanPark> random = std::make_unique<RanPark>(lmp, random_number_seed);
 
   for (int i = 0; i < n_lambdas; i++)
     for (int j = 0; j < 3; j++) v_lambdas[i][j] = random->gaussian() / std::sqrt(m_lambdas[i][j]);
@@ -1779,6 +1681,13 @@ void FixConstantPH::initialize_v_lambda(const double _T_lambda)
 
 void FixConstantPH::calculate_T_lambda()
 {
+  auto& v_lambdas = pH_state->v_lambdas;
+  auto& v_lambda_buff = pH_state->v_lambda_buff;
+  auto& n_lambdas = pH_state->n_lambdas;
+  auto& m_lambdas = pH_state->m_lambdas;
+  auto& v_lambda_buff = pH_state->m_lambda_buff;
+  auto& N_buff = pH_state->N_buff;
+
   double KE_lambdas[3] = {0.0, 0.0, 0.0};    // lambdas[0][;], lambdas[1:][;], lambdas[;][;]
   double Nfs[3];
   double kB = force->boltz;
@@ -1920,6 +1829,14 @@ double FixConstantPH::compute_array(int i, int j)
 {
   double kj2kcal = 0.239006;
   double kT = force->boltz * T;
+  auto& N_buff = pH_state->N_buff;
+  auto& n_lambdas = pH_state->n_lambdas;
+  auto& lambdas = pH_state->lambdas;
+  auto& v_lambdas = pH_state->v_lambdas;
+  auto& a_lambdas = pH_state->a_lambdas;
+  auto& lambda_buff = pH_state->lambda_buff;
+  auto& v_lambda_buff = pH_state->v_lambda_buff;
+  auto& a_lambda_buff = pH_state->a_lambda_buff;
   switch (i) {
     case 0:
       // 1

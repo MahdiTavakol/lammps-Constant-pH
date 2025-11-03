@@ -125,6 +125,14 @@ constant_pH_state::constant_pH_state(LAMMPS *lmp, std::unique_ptr<int []>& molid
   allocate_lambdas();
 }
 
+constant_pH_state(LAMMPS *lmp, std::unique_ptr<int []>& molids_, 
+  const int& n_lambdas_, const double& mass_lambda_, const int& N_buff_, 
+  const std::unique_ptr<constant_pH_state>& prev_pH_state_):
+  constant_pH_state{lmp,molids_,n_lambdas_,mass_lambda_,N_buff_}
+{
+  reset_lambdas(n_lambdas,prev_pH_state_);
+}
+
 constant_pH_state::~constant_pH_state()
 {
   deallocate_lambdas();
@@ -234,11 +242,68 @@ constant_pH_state& constant_pH_state::operator=(constant_pH_state&& rhs)
 }
 
 
-void constant_pH_state::reset_lambdas(const int& n_lambdas_)
+int constant_pH_state::reset_lambdas(const int& n_lambdas_, const std::unique_ptr<constant_pH_state>& prev_pH_state_) {
+
+  if (n_lambdas != n_lambdas_) {
+    deallocate_lambdas();
+    n_lambdas = n_lambdas_;
+    allocate_lambdas();
+  }
+
+  int to = 0;
+  if (prev_pH_state_ && prev_pH_state_->molids) {
+    using molids_prev = prev_pH_state_->molids;
+    using n_lambdas_prev = prev_pH_state_->n_lambdas;
+    for (int i = 0; i < n_lambdas; i++) {
+      auto iter = std::find(molids_prev.get(),molids_prev.get()+n_lambdas_prev,molids[i]);
+      if (iter != molids_prev.get()+n_lambdas_prev) {
+        int from = std::distance(molids_prev.get(),iter);
+        for (int j = 0; j < 3; j++) {
+          lambdas[to][j] = prev_pH_state_->lambdas[from][j];
+          v_lambdas[to][j] = prev_pH_state_->v_lambdas[from][j];
+          a_lambdas[to][j] = prev_pH_state_->a_lambdas[from][j];
+          m_lambdas[to][j] prev_pH_state_->= m_lambdas[from][j];
+        }
+        H_lambdas[to] = H_lambdas_prev[from];
+        to++;
+      }
+    }
+  }
+
+
+  for (int i = to; i < n_lambdas; i++) {
+    GFF_lambdas[i] = 0.0;
+    H_lambdas[i] = 0.0;
+    for (int j = 0; j < 3; j++) {
+      lambdas[i][j] = 0.0;
+      v_lambdas[i][j] = 0.0;
+      a_lambdas[i][j] = 0.0;
+      m_lambdas[i][j] = mass_lambda; // m_lambda == 20.0u taken from https://www.mpinat.mpg.de/627830/usage
+    }
+  }
+
+  return to;
+}
+
+void constant_pH_state::set_zero()
 {
-  deallocate_lambdas();
-  n_lambdas = n_lambdas_;
-  allocate_lambdas();
+  if (n_lambdas) {
+    std::fill_n(&lambdas[0][0],3*n_lambdas,0.0);
+    std::fill_n(&v_lambdas[0][0],3*n_lambdas,0.0);
+    std::fill_n(&a_lambdas[0][0],3*n_lambdas,0.0);
+  } 
+}
+
+void constant_pH_state::broadcast()
+{
+  MPI_Bcast(lambdas[0], n_lambdas * 3, MPI_DOUBLE, 0, world);
+  MPI_Bcast(v_lambdas[0], n_lambdas * 3, MPI_DOUBLE, 0, world);
+  MPI_Bcast(a_lambdas[0], n_lambdas * 3, MPI_DOUBLE, 0, world);
+  MPI_Bcast(m_lambdas[0], n_lambdas * 3, MPI_DOUBLE, 0, world);
+  MPI_Bcast(&lambda_buff, 1, MPI_DOUBLE, 0, world);
+  MPI_Bcast(&v_lambda_buff, 1, MPI_DOUBLE, 0, world);
+  MPI_Bcast(&a_lambda_buff, 1, MPI_DOUBLE, 0, world);
+  MPI_Bcast(&m_lambda_buff, 1, MPI_DOUBLE, 0, world);
 }
 
 void constant_pH_state::allocate_lambdas()

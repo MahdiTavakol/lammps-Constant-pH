@@ -82,17 +82,19 @@ class FixConstantPH : public Fix {
   // Buffer potential parameters
   double a_buff, b_buff, s_buff, m_buff, w_buff, r_buff, d_buff, k_buff, h_buff;
 
-  // Lambda arrays
-  double **lambdas, **v_lambdas, **a_lambdas, **m_lambdas, *H_lambdas;
-  double T_lambdas[3];
-  std::unique_ptr<int[]> molids;
-  int n_lambdas;
-  double mass_lambda;
-  // Lambda arrays for the previous step before the fix_adaptive_protonation
-  double **lambdas_prev, **v_lambdas_prev, **a_lambdas_prev, **m_lambdas_prev, *H_lambdas_prev;
-  std::unique_ptr<int[]> molids_prev;
-  int n_lambdas_prev;
 
+
+
+  // input params for the pH_state
+  int n_lambdas_input;
+  std::unique_ptr<int []> molids_input;
+  double mass_lambda;
+  // protonation state
+  std::unique_ptr<double []> H_lambdas;
+  double H_lambda_prev;
+  double T_lambdas[3];
+  std::unique_ptr<constant_pH_state> pH_state;
+  std::unique_ptr<constant_pH_state> pH_state_prev;
   
 
   // Temp array to change lambdas in order to get HAs and HBs
@@ -176,6 +178,7 @@ class FixConstantPH : public Fix {
   double *keatom_orig, **kvatom_orig;
 
   // Functions for accessing or reseting the lambda dynamics parameters
+  void return_params(constant_pH_state& pH_state);
   void return_nparams(int &_n_params) const;
   void return_params(double **const _x_lambdas, double **const _v_lambdas,
                      double **const _a_lambdas, double **const _m_lambdas) const;
