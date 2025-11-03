@@ -712,8 +712,9 @@ void FixAdaptiveProtonation::modify_protonation_state()
   double frac = step*nRampStepInv;
   double frac_new = std::min(frac,1.0);
   if (frac_new < frac) {
-    error->warning(FLERR,"Warning caping the frac from {} to 1.0 for step of {}
-       and nRampStepInv of {}",frac,step,nRampStepInv);
+    error->warning(FLERR,
+      "Warning caping the frac from {} to 1.0 for step of {} and nRampStepInv of {}",
+      frac,step,nRampStepInv);
     frac = frac_new;
   }
   double q_new;
