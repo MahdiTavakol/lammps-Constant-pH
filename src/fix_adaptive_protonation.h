@@ -105,7 +105,7 @@ class FixAdaptiveProtonation : public Fix {
   // The original value of q -->> used to gradually change the charges
   std::unique_ptr<double []> q_orig;
   int rampStep;
-  int nRampStep = 3000;
+  int nRampStep = 5000;
   
   // smoothing the mark
   int nSmoothingSteps = 10;
