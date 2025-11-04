@@ -30,7 +30,6 @@ namespace LAMMPS_NS {
 class ComputeTempConstantPH : public ComputeTemp {
  public:
   ComputeTempConstantPH(class LAMMPS *, int, char **);
-  ~ComputeTempConstantPH() override;
   void setup() override;
   double compute_scalar() override;
   // May be I need to implement compute_vector() to be used in the barostat section of the fix_nh.cpp
@@ -41,10 +40,10 @@ class ComputeTempConstantPH : public ComputeTemp {
   void dof_compute() override;
 
 
-  // lambda variables from the fix constant pH  
+  // lambda variables from the fix constant pH 
+  std::string fix_constant_pH_id; 
   FixConstantPH *fix_constant_pH;
-  char *fix_constant_pH_id;
-  double **x_lambdas, **v_lambdas, **a_lambdas, **m_lambdas;
+  std::unique_ptr<constant_pH_state> pH_state;
   int n_lambdas;
 
 };

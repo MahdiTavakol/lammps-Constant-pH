@@ -37,10 +37,11 @@ class constant_pH_structures : protected Pointers {
 };
 
 class constant_pH_state : protected Pointers {
-  friend class ComputeGFFConstantPH;
   friend class FixConstantPH;
   friend class FixNHConstantPH;
   friend class FixAdaptiveProtonation;
+  friend class ComputeGFFConstantPH;
+  friend class ComputeTempConstantPH;
  public:
   // with fix_adaptive_protonation.h class
   constant_pH_state(LAMMPS *lmp, const std::array<double,2>& lambda_masses, const int& N_buff_);
