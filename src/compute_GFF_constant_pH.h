@@ -48,11 +48,10 @@ class ComputeGFFConstantPH : public Compute {
   // lambda variables from the fix constant pH  
   FixConstantPH *fix_constant_pH;
   char *fix_constant_pH_id;
-  double** x_lambdas, **v_lambdas, **a_lambdas, **m_lambdas, *H_lambdas;
-  double x_lambda_buff, v_lambda_buff, a_lambda_buff, m_lambda_buff;
+  std::unique_ptr<constant_pH_state> pH_state;
   double T_lambda;
-  int n_lambdas;
-  int N_buff;
+  int n_lambdas, N_buff;
+  std::array<double,2> mass_lambda = {20.0,20.0};
   int lambda_every;
 
   class Fix *fixgpu;

@@ -37,6 +37,7 @@ class constant_pH_structures : protected Pointers {
 };
 
 class constant_pH_state : protected Pointers {
+  friend class ComputeGFFConstantPH;
   friend class FixConstantPH;
   friend class FixNHConstantPH;
   friend class FixAdaptiveProtonation;
