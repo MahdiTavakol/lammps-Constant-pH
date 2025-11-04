@@ -67,7 +67,7 @@ static constexpr double etol = 1e-6;
 
 FixNHConstantPH::FixNHConstantPH(LAMMPS *lmp, int narg, char **arg) :
     FixNH{lmp, narg, arg}, 
-    fix_constant_pH{nullptr}, fix_constant_pH_id{nullptr}, 
+    fix_constant_pH{nullptr},  
     lambda_integration_flags{0},lambda_thermostat_type{NONE_LAMBDA},
     ranMarsSeed{1111}
 {
@@ -77,7 +77,7 @@ FixNHConstantPH::FixNHConstantPH(LAMMPS *lmp, int narg, char **arg) :
 
   while (iarg < narg) {
     if (strcmp(arg[iarg],"fix_constant_pH_id") == 0) {
-       fix_constant_pH_id = utils::strdup(arg[iarg+1]);
+       fix_constant_pH_id = std::string(arg[iarg+1]);
        iarg += 2;
     } else if (strcmp(arg[iarg],"lambda_andersen") == 0) {
        lambda_thermostat_type = LAMBDA_ANDERSEN;
@@ -119,15 +119,7 @@ FixNHConstantPH::FixNHConstantPH(LAMMPS *lmp, int narg, char **arg) :
   if ((lambda_integration_flags & (BUFFER | CONSTRAIN)) == CONSTRAIN)
    error->one(FLERR,"Constrain total charge in absence of a buffer is not supported yet!");
 
-  if (fix_constant_pH_id == nullptr) error->all(FLERR, "Invalid fix_nh constant_pH");
 
-}
-
-/* ---------------------------------------------------------------------- */
-
-FixNHConstantPH::~FixNHConstantPH()
-{
-  if (fix_constant_pH_id) delete [] fix_constant_pH_id;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -136,7 +128,7 @@ void FixNHConstantPH::init()
 {
   FixNH::init();
   // dynamic_cast so that if it is not of FixConstantPH* type, no coversion happens!
-  fix_constant_pH = dynamic_cast<FixConstantPH*>(modify->get_fix_by_id(fix_constant_pH_id));
+  fix_constant_pH = dynamic_cast<FixConstantPH*>(modify->get_fix_by_id(fix_constant_pH_id.c_str()));
   if (!fix_constant_pH)
    error->all(FLERR,"fix {} is not a FixConstantPH", fix_constant_pH_id); 
 

@@ -75,7 +75,7 @@ static constexpr double max_lambda_buff_0 = 1.05;
 
 FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
     Fix{lmp, narg, arg}, random_number_seed{1152}, 
-    lambda_masses{{20.0,20.0}}, GFF{nullptr}, fix_adaptive_protonation_id{nullptr},
+    lambda_masses{{20.0,20.0}}, GFF{nullptr}, 
     fixgpu{nullptr}, q_orig{nullptr}, f_orig{nullptr}, peatom_orig{nullptr}, pvatom_orig{nullptr},
     keatom_orig{nullptr}, kvatom_orig{nullptr}, 
     qOWs{-0.834},qHWs{0.278},mu{0.0},ncommands{0},flags{0},fp_flags{0}, write_lambda_nevery{1},
@@ -146,10 +146,10 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
       if (molids_input)
         error->all(FLERR, "molids and Fix_adapative_protonation cannot be used at the same time");
       if (narg < iarg + 3) utils::missing_cmd_args(FLERR, "fix constant_pH", error);
-      fix_adaptive_protonation_id = utils::strdup(arg[iarg + 1]);
+      fix_adaptive_protonation_id = std::string(arg[iarg + 1]);
       nevery_fix_adaptive = utils::numeric(FLERR, arg[iarg + 2], false, lmp);
       fix_adaptive_protonation = dynamic_cast<FixAdaptiveProtonation *>(
-          modify->get_fix_by_id(fix_adaptive_protonation_id));
+          modify->get_fix_by_id(fix_adaptive_protonation_id.c_str()));
       if (!fix_adaptive_protonation)
         error->all(FLERR, "Wrong fix type in the adaptive keyword for the constant pH");
       iarg += 3;
@@ -243,9 +243,7 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
 FixConstantPH::~FixConstantPH()
 {
   // According to RAII I do not need to close std::ifstreams
-
-  // deallocate char* variables
-  if (fix_adaptive_protonation_id) delete [] fix_adaptive_protonation_id;   
+ 
   // Since it is allocated with lmp->utils->strdup, it must be deallocated with delete []
 
   if (GFF) memory->destroy(GFF);
@@ -411,7 +409,7 @@ void FixConstantPH::initial_integrate(int /*vflag*/)
 
           // Since there is a possibly to having the fix_adaptive_protonation deleted in 
           // the commands we need to retrieve it again.
-          fix_adaptive_protonation = dynamic_cast<FixAdaptiveProtonation *>(modify->get_fix_by_id(fix_adaptive_protonation_id));
+          fix_adaptive_protonation = dynamic_cast<FixAdaptiveProtonation *>(modify->get_fix_by_id(fix_adaptive_protonation_id.c_str()));
           if (!fix_adaptive_protonation)
             error->all(FLERR, "Wrong fix type in the adaptive keyword for the constant pH");
         }

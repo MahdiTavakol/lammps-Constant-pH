@@ -32,7 +32,6 @@ namespace LAMMPS_NS {
 class FixNHConstantPH : public FixNH {
  public:
   FixNHConstantPH(class LAMMPS *, int, char **);
-  ~FixNHConstantPH() override;
   void init() override;
   double memory_usage() override;
 
@@ -54,7 +53,7 @@ class FixNHConstantPH : public FixNH {
 
   // lambda variables from the fix constant pH
   FixConstantPH *fix_constant_pH;
-  char *fix_constant_pH_id;
+  std::string fix_constant_pH_id;
 
   // pH_state
   std::unique_ptr<constant_pH_state> pH_state;

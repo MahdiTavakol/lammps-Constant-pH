@@ -133,7 +133,7 @@ class FixConstantPH : public Fix {
   double HA_buff, HB_buff;
 
   // Functions needed to communicate with fix adaptive protonation command
-  char *fix_adaptive_protonation_id;
+  std::string fix_adaptive_protonation_id;
   int nevery_fix_adaptive;
   FixAdaptiveProtonation *fix_adaptive_protonation;
 
