@@ -313,6 +313,12 @@ void FixConstantPH::init()
 
   // setting the HCalcNSteps to zero
   HCalcNSteps = 0;
+
+  // dynamic states for lambdas
+  pH_state = std::make_unique<constant_pH_state>(lmp,molids_input,n_lambdas_input,lambda_masses,N_buff);
+
+   // forcefield variables for lambdas
+  set_lambdas();
 }
 
 /* ---------------------------------------------------------------------- */
@@ -346,10 +352,8 @@ void FixConstantPH::setup(int /*vflag*/)
     fix_adaptive_protonation->get_protonable_molids(molids_input);
   }
 
-  // dynamic states for lambdas
-  pH_state = std::make_unique<constant_pH_state>(lmp,molids_input,n_lambdas_input,lambda_masses,N_buff);
-  // forcefield variables for lambdas
-  set_lambdas();
+
+
 
   double** lambdas = pH_state->lambdas;
   double& lambda_buff = pH_state->lambda_buff;
