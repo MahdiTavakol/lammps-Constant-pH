@@ -101,7 +101,7 @@ void constant_pH_structures::read_pH_structure_files()
       }
     }
 
-    MPI_Bcase(&pHnTypes,1,MPI_INT,0,world);
+    MPI_Bcast(&pHnTypes,1,MPI_INT,0,world);
     MPI_Bcast(protonable.get(), ntypes + 1, MPI_INT, 0, world);
     MPI_Bcast(typePerProtMol.get(), ntypes + 1, MPI_INT, 0, world);
     MPI_Bcast(pHqs[0], (ntypes + 1) * (nStructures), MPI_DOUBLE, 0, world);
@@ -278,7 +278,7 @@ int constant_pH_state::reset_lambdas(const int& n_lambdas_, const std::unique_pt
     for (int i = 0; i < n_lambdas; i++) {
       auto iter = idx.find(molids[i]);
       if (iter != idx.end()) {
-        int from = iter.second;
+        int from = iter->second;
         for (int j = 0; j < 3; j++) {
           lambdas[to][j] = prev_pH_state_->lambdas[from][j];
           v_lambdas[to][j] = prev_pH_state_->v_lambdas[from][j];

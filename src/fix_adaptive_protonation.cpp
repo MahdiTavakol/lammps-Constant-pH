@@ -271,7 +271,7 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
     
     
   // This is required since the fix_constant_pH.cpp does not deal with those molecules in the solid
-  if (neighBuildRatio <= neighBuildRatioCutoff) {
+  if (neighBuildRatioPrev <= neighBuildRatioCutoff) {
     modify_protonation_state();
     rampStep++;
   }
