@@ -88,9 +88,10 @@ class FixConstantPH : public Fix {
   // input params for the pH_state
   int n_lambdas_input;
   std::unique_ptr<int []> molids_input;
-  double mass_lambda;
+  std::array<double,2> lambda_masses;
   // protonation state
   std::unique_ptr<double []> H_lambdas;
+  double H_lambda_buff;
   double H_lambda_prev;
   double T_lambdas[3];
   std::unique_ptr<constant_pH_state> pH_state;
@@ -176,33 +177,13 @@ class FixConstantPH : public Fix {
   double *keatom_orig, **kvatom_orig;
 
   // Functions for accessing or reseting the lambda dynamics parameters
-  void return_params(std::unique_ptr<constant_pH_state>& pH_state);
-  reset_params(const std::unique_ptr<constant_pH_state>& pH_state_, const int mode = 1);
-  reset_params(std::unique_ptr<constant_pH_state>&& pH_state_, const int mode = 1);
-
+  void return_params(std::unique_ptr<constant_pH_state>& pH_state) const;
+  void reset_params(const std::unique_ptr<constant_pH_state>& pH_state_, const int mode = 1);
+  void reset_params(std::unique_ptr<constant_pH_state>&& pH_state_, const int mode = 1);
   void return_nparams(int &_n_params) const;
-  void return_params(double **const _x_lambdas, double **const _v_lambdas,
-                     double **const _a_lambdas, double **const _m_lambdas) const;
-  void reset_params(double **const _x_lambdas, double **const _v_lambdas, double **const _a_lambdas,
-                    double **const _m_lambdas, const int mode);
-  void reset_params(double **const _x_lambdas, double **const _v_lambdas, double **const _a_lambdas,
-                    double **const _m_lambdas)
-  {
-    reset_params(_x_lambdas, _v_lambdas, _a_lambdas, _m_lambdas, 1);
-  }
   void return_H_lambdas(double *_H_lambdas) const;
   void return_T_lambda(double &_T_lambda, int component = 2);
 
-  // Functions to return the buffer parameters
-  void return_buff_params(double &_x_lambda_buff, double &_v_lambda_buff, double &_a_lambda_buff,
-                          double &_m_lambda_buff, int &_N_buff) const;
-  void reset_buff_params(const double _x_lambda_buff, const double _v_lambda_buff,
-                         const double _a_lambda_buff, const double _m_lambda_buff, const int mode);
-  void reset_buff_params(const double _x_lambda_buff, const double _v_lambda_buff,
-                         const double _a_lambda_buff, const double _m_lambda_buff)
-  {
-    reset_buff_params(_x_lambda_buff, _v_lambda_buff, _a_lambda_buff, _m_lambda_buff, 1);
-  }
 
   // Function to set the charges based on the lambdas and lambda_buff values
   void reset_qs();

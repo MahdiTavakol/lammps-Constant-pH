@@ -5,6 +5,7 @@
 #include "error.h"
 #include "memory.h"
 
+#include <algorithm>
 #include <sstream>
 
 using namespace LAMMPS_NS;
@@ -108,27 +109,29 @@ void constant_pH_structures::read_pH_structure_files()
   parse_file(pHStructureFile2, pHnStructures2, pH2qs, pHnTypes2, "constant_pH:pH2qs");
 }
 
-constant_pH_state::constant_pH_state(LAMMPS *lmp, const double& mass_lambda_, const int& N_buff_):
+constant_pH_state::constant_pH_state(LAMMPS *lmp, const std::array<double,2>& lambda_masses, const int& N_buff_):
   Pointers{lmp},
   lambdas{nullptr}, v_lambdas{nullptr}, a_lambdas{nullptr}, m_lambdas{nullptr},
-  n_lambdas{0}, mass_lambda{mass_lambda_},
-  lambda_buff{0.0}, v_lambda_buff{0.0}, a_lambda_buff{0.0}, m_lambda_buff{mass_lambda},
+  n_lambdas{0}, mass_lambda{lambda_masses[0]},
+  lambda_buff{0.0}, v_lambda_buff{0.0}, a_lambda_buff{0.0}, m_lambda_buff{lambda_masses[1]},
   N_buff{N_buff_} {}
 
-constant_pH_state::constant_pH_state(LAMMPS *lmp, std::unique_ptr<int []>& molids_, const int& n_lambdas_, const double& mass_lambda_, const int& N_buff_):
+constant_pH_state::constant_pH_state(LAMMPS *lmp, std::unique_ptr<int []>& molids_, 
+  const int& n_lambdas_, const std::array<double,2>& lambda_masses, const int& N_buff_):
   Pointers{lmp},
   lambdas{nullptr}, v_lambdas{nullptr}, a_lambdas{nullptr}, m_lambdas{nullptr},
   molids{std::move(molids_)},
-  n_lambdas{n_lambdas_}, mass_lambda{mass_lambda_},
+  n_lambdas{n_lambdas_}, mass_lambda{lambda_masses[0]},
+  lambda_buff{0.0}, v_lambda_buff{0.0}, a_lambda_buff{0.0}, m_lambda_buff{lambda_masses[1]},
   N_buff{N_buff_}
 {
   allocate_lambdas();
 }
 
-constant_pH_state(LAMMPS *lmp, std::unique_ptr<int []>& molids_, 
-  const int& n_lambdas_, const double& mass_lambda_, const int& N_buff_, 
+constant_pH_state::constant_pH_state(LAMMPS *lmp, std::unique_ptr<int []>& molids_, 
+  const int& n_lambdas_, const std::array<double,2>& lambda_masses, const int& N_buff_, 
   const std::unique_ptr<constant_pH_state>& prev_pH_state_):
-  constant_pH_state{lmp,molids_,n_lambdas_,mass_lambda_,N_buff_}
+  constant_pH_state{lmp,molids_,n_lambdas_,lambda_masses,N_buff_}
 {
   reset_lambdas(n_lambdas,prev_pH_state_);
 }
@@ -158,16 +161,19 @@ constant_pH_state::constant_pH_state(const constant_pH_state& rhs):
 
 constant_pH_state& constant_pH_state::operator=(const constant_pH_state& rhs)
 {
+  // Checking for self assignment
   if (this != &rhs) {
+    // May be the number of lambdas are not the same
+    // so we need to reallocate
     if (n_lambdas != rhs.n_lambdas) {
-      mass_lambda = rhs.mass_lambda;
       deallocate_lambdas();
+      mass_lambda = rhs.mass_lambda;
       n_lambdas = rhs.n_lambdas;
       allocate_lambdas();
-    } else if (mass_lambdas != rhs.mass_lambdas) {
+      // or the mass_lambda is different
+    } else if (mass_lambda != rhs.mass_lambda || m_lambda_buff != rhs.m_lambda_buff) {
       mass_lambda = rhs.mass_lambda;
-      std::fill_n(&m_lambdas[0][0],3*n_lambdas,mass_lambda);
-      m_lambda_buff = mass_lambda;
+      m_lambda_buff = rhs.m_lambda_buff;
     }
     
 
@@ -188,7 +194,7 @@ constant_pH_state& constant_pH_state::operator=(const constant_pH_state& rhs)
   return *this;
 }
 
-constant_pH_state::constant_pH_state(constant_pH_state&& rhs):
+constant_pH_state::constant_pH_state(constant_pH_state&& rhs) noexcept:
  Pointers{rhs.lmp},
  lambdas{rhs.lambdas}, v_lambdas{rhs.v_lambdas},
  a_lambdas{rhs.a_lambdas}, m_lambdas{rhs.m_lambdas},
@@ -211,7 +217,7 @@ constant_pH_state::constant_pH_state(constant_pH_state&& rhs):
   rhs.N_buff = 0;
 }
 
-constant_pH_state& constant_pH_state::operator=(constant_pH_state&& rhs)
+constant_pH_state& constant_pH_state::operator=(constant_pH_state&& rhs) noexcept
 {
   if (this != &rhs) {
     deallocate_lambdas();
@@ -259,8 +265,8 @@ int constant_pH_state::reset_lambdas(const int& n_lambdas_, const std::unique_pt
 
   int to = 0;
   if (prev_pH_state_ && prev_pH_state_->molids) {
-    using molids_prev = prev_pH_state_->molids;
-    using n_lambdas_prev = prev_pH_state_->n_lambdas;
+    auto& molids_prev = prev_pH_state_->molids;
+    auto& n_lambdas_prev = prev_pH_state_->n_lambdas;
     for (int i = 0; i < n_lambdas; i++) {
       auto iter = std::find(molids_prev.get(),molids_prev.get()+n_lambdas_prev,molids[i]);
       if (iter != molids_prev.get()+n_lambdas_prev) {
@@ -269,9 +275,8 @@ int constant_pH_state::reset_lambdas(const int& n_lambdas_, const std::unique_pt
           lambdas[to][j] = prev_pH_state_->lambdas[from][j];
           v_lambdas[to][j] = prev_pH_state_->v_lambdas[from][j];
           a_lambdas[to][j] = prev_pH_state_->a_lambdas[from][j];
-          m_lambdas[to][j] prev_pH_state_->= m_lambdas[from][j];
+          m_lambdas[to][j] = prev_pH_state_->m_lambdas[from][j];
         }
-        H_lambdas[to] = H_lambdas_prev[from];
         to++;
       }
     }
@@ -279,8 +284,6 @@ int constant_pH_state::reset_lambdas(const int& n_lambdas_, const std::unique_pt
 
 
   for (int i = to; i < n_lambdas; i++) {
-    GFF_lambdas[i] = 0.0;
-    H_lambdas[i] = 0.0;
     for (int j = 0; j < 3; j++) {
       lambdas[i][j] = 0.0;
       v_lambdas[i][j] = 0.0;

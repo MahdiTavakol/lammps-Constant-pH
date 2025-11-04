@@ -68,7 +68,6 @@ static constexpr double etol = 1e-6;
 FixNHConstantPH::FixNHConstantPH(LAMMPS *lmp, int narg, char **arg) :
     FixNH{lmp, narg, arg}, 
     fix_constant_pH{nullptr}, fix_constant_pH_id{nullptr}, 
-    x_lambdas{nullptr}, v_lambdas{nullptr}, a_lambdas{nullptr}, m_lambdas{nullptr},
     lambda_integration_flags{0},lambda_thermostat_type{NONE_LAMBDA},
     ranMarsSeed{1111}
 {
@@ -166,6 +165,8 @@ void FixNHConstantPH::nve_v()
   // Getting the lambda_parameters from the fix_constant_pH.
   fix_constant_pH->return_params(pH_state);
   double** v_lambdas = pH_state->v_lambdas;
+  const int& n_lambdas = pH_state->n_lambdas;
+  double** a_lambdas = pH_state->a_lambdas;
   for (int i = 0; i < n_lambdas; i++) 
    for (int j = 0; j < 3; j++)
     v_lambdas[i][j] += dtf * a_lambdas[i][j];
@@ -173,6 +174,7 @@ void FixNHConstantPH::nve_v()
 
  if (lambda_integration_flags & BUFFER) {
   double& v_lambda_buff = pH_state->v_lambda_buff;
+  auto& a_lambda_buff = pH_state->a_lambda_buff;
   v_lambda_buff += dtf * a_lambda_buff;
  }
 
@@ -191,6 +193,8 @@ void FixNHConstantPH::nve_x()
   // Getting the lambda_parameters from the fix_constant_pH.
   fix_constant_pH->return_params(pH_state);
   double** x_lambdas = pH_state->lambdas;
+  double** const v_lambdas = pH_state->v_lambdas;
+  const int& n_lambdas = pH_state->n_lambdas;
   for (int i = 0; i < n_lambdas; i++)
    for (int j = 0; j < 3; j++)
     x_lambdas[i][j] += dtv * v_lambdas[i][j];
@@ -227,11 +231,14 @@ void FixNHConstantPH::nh_v_temp()
 
   // Getting the lambda_parameters from the fix_constant_pH.
   fix_constant_pH->return_params(pH_state);
-  auto& n_lambdas = pH_state->n_lambdas;
-  double** x_lambdas = pH_state->x_lambdas;
+  const int& n_lambdas = pH_state->n_lambdas;
+  double** x_lambdas = pH_state->lambdas;
   double** v_lambdas = pH_state->v_lambdas;
-  auto& x_lambda_buff = pH_state->x_lambda_buff;
+  auto& x_lambda_buff = pH_state->lambda_buff;
   auto& v_lambda_buff = pH_state->v_lambda_buff;
+  double** m_lambdas = pH_state->m_lambdas;
+  const double& m_lambda_buff = pH_state->m_lambda_buff;
+  const int& N_buff = pH_state->N_buff; 
      
   // The number of degrees of freedom
   double Nf_lambdas = static_cast<double>(3*n_lambdas);
@@ -422,7 +429,11 @@ void FixNHConstantPH::constrain_lambdas()
    double q_total;
    double sigma_lambda;
    double sigma_mass_inverse;
-   double N_buff_double = static_cast<double>(N_buff);
+   double N_buff = pH_state->N_buff;
+   double N_buff_double = static_cast<double>(pH_state->N_buff);
+   const int& n_lambdas = pH_state->n_lambdas;
+   double** m_lambdas = pH_state->m_lambdas;
+   auto& m_lambda_buff = pH_state->m_lambda_buff; 
    
 
    int maxCycles = 10000;
@@ -438,11 +449,8 @@ void FixNHConstantPH::constrain_lambdas()
       sigma_mass_inverse = 0.0;
 
       fix_constant_pH->return_params(pH_state);
-      auto& N_buff = pH_state->N_buff;
       double** x_lambdas = pH_state->lambdas;
-      double** m_lambdas = pH_state->m_lambdas;
       auto& x_lambda_buff = pH_state->lambda_buff;
-      auto& m_lambda_buff = pH_state->m_lambda_buff; 
       
       
       /* Checking if the charge content of the N_buff is large enough for n_lambdas
@@ -519,6 +527,7 @@ double FixNHConstantPH::compute_q_total()
 
 double FixNHConstantPH::memory_usage()
 {
+  int& n_lambdas = pH_state->n_lambdas;
   double bytes = 0.0;
   bytes += 4.0*3.0*n_lambdas*sizeof(double); // x_lambdas, v_lambdas, a_lambdas and m_lambdas
   if (irregular) bytes += irregular->memory_usage();
