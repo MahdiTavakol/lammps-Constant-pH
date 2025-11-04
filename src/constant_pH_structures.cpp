@@ -100,6 +100,7 @@ void constant_pH_structures::read_pH_structure_files()
       }
     }
 
+    MPI_Bcase(&pHnTypes,1,MPI_INT,0,world);
     MPI_Bcast(protonable.get(), ntypes + 1, MPI_INT, 0, world);
     MPI_Bcast(typePerProtMol.get(), ntypes + 1, MPI_INT, 0, world);
     MPI_Bcast(pHqs[0], (ntypes + 1) * (nStructures), MPI_DOUBLE, 0, world);
@@ -265,12 +266,17 @@ int constant_pH_state::reset_lambdas(const int& n_lambdas_, const std::unique_pt
 
   int to = 0;
   if (prev_pH_state_ && prev_pH_state_->molids) {
-    auto& molids_prev = prev_pH_state_->molids;
-    auto& n_lambdas_prev = prev_pH_state_->n_lambdas;
+    int n_lambdas_prev = prev_pH_state_->n_lambdas;
+    std::unordered_map<int,int> idx;
+    idx.reserve(n_lambdas_prev);
+    for (int k = 0; k < n_lambdas_prev; k++)
+      idx[prev_pH_state_->molids[k]] = k;
+
+
     for (int i = 0; i < n_lambdas; i++) {
-      auto iter = std::find(molids_prev.get(),molids_prev.get()+n_lambdas_prev,molids[i]);
-      if (iter != molids_prev.get()+n_lambdas_prev) {
-        int from = std::distance(molids_prev.get(),iter);
+      auto iter = idx.find(molids[i]);
+      if (iter != idx.end()) {
+        int from = iter.second;
         for (int j = 0; j < 3; j++) {
           lambdas[to][j] = prev_pH_state_->lambdas[from][j];
           v_lambdas[to][j] = prev_pH_state_->v_lambdas[from][j];
@@ -306,10 +312,12 @@ void constant_pH_state::set_zero()
 
 void constant_pH_state::broadcast()
 {
-  MPI_Bcast(lambdas[0], n_lambdas * 3, MPI_DOUBLE, 0, world);
-  MPI_Bcast(v_lambdas[0], n_lambdas * 3, MPI_DOUBLE, 0, world);
-  MPI_Bcast(a_lambdas[0], n_lambdas * 3, MPI_DOUBLE, 0, world);
-  MPI_Bcast(m_lambdas[0], n_lambdas * 3, MPI_DOUBLE, 0, world);
+  if (n_lambdas) {
+    MPI_Bcast(lambdas[0], n_lambdas * 3, MPI_DOUBLE, 0, world);
+    MPI_Bcast(v_lambdas[0], n_lambdas * 3, MPI_DOUBLE, 0, world);
+    MPI_Bcast(a_lambdas[0], n_lambdas * 3, MPI_DOUBLE, 0, world);
+    MPI_Bcast(m_lambdas[0], n_lambdas * 3, MPI_DOUBLE, 0, world);
+  }
   MPI_Bcast(&lambda_buff, 1, MPI_DOUBLE, 0, world);
   MPI_Bcast(&v_lambda_buff, 1, MPI_DOUBLE, 0, world);
   MPI_Bcast(&a_lambda_buff, 1, MPI_DOUBLE, 0, world);
