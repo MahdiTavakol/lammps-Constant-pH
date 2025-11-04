@@ -1,8 +1,8 @@
-#ifndef LMP_CONSTANT_PH_DATA_H
-#define LMP_CONSTANT_PH_DATA_H
+#pragma once
 
 #include <fstream>
 #include <string>
+#include <array>
 
 #include "pointers.h"
 
@@ -82,4 +82,3 @@ class constant_pH_state : protected Pointers {
 };
 }    // namespace LAMMPS_NS
 
-#endif

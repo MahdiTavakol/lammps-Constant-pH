@@ -318,15 +318,16 @@ void constant_pH_state::broadcast()
 
 void constant_pH_state::allocate_lambdas()
 {
-  memory->create(lambdas, n_lambdas, 3, "constant_pH:lambdas");
-  memory->create(v_lambdas, n_lambdas, 3, "constant_pH:v_lambdas");
-  memory->create(a_lambdas, n_lambdas, 3, "constant_pH:a_lambdas");
-  memory->create(m_lambdas, n_lambdas, 3, "constant_pH:m_lambdas");
+  if (n_lambdas) {
+    memory->create(lambdas, n_lambdas, 3, "constant_pH:lambdas");
+    memory->create(v_lambdas, n_lambdas, 3, "constant_pH:v_lambdas");
+    memory->create(a_lambdas, n_lambdas, 3, "constant_pH:a_lambdas");
+    memory->create(m_lambdas, n_lambdas, 3, "constant_pH:m_lambdas");
 
-  molids = std::make_unique<int []>(n_lambdas);
+    molids = std::make_unique<int []>(n_lambdas);
 
-  std::fill_n(&m_lambdas[0][0],3*n_lambdas,mass_lambda);
-  m_lambda_buff = mass_lambda;
+    std::fill_n(&m_lambdas[0][0],3*n_lambdas,mass_lambda);
+  }
 }
 
 void constant_pH_state::deallocate_lambdas()
