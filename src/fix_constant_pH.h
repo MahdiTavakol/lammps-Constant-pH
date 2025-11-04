@@ -86,7 +86,7 @@ class FixConstantPH : public Fix {
 
 
   // input params for the pH_state
-  int n_lambdas_input;
+  int n_lambdas_input = 0;
   std::unique_ptr<int []> molids_input;
   std::array<double,2> lambda_masses;
   // protonation state

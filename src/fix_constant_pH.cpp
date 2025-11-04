@@ -498,6 +498,10 @@ void FixConstantPH::delete_lambdas()
   H_lambdas.reset();
 }
 
+/* ----------------------------------------------------------------------
+   This function allocates the storage for memories whose sizes are 
+   dependent on the n_lambdas
+   ----------------------------------------------------------------------  */
 
 void FixConstantPH::set_lambdas()
 {
@@ -1580,9 +1584,10 @@ void FixConstantPH::write_lambdas_header()
       if (file.flag == LAMBDA_S_FP) {
         *(file.fp) << std::endl;
         continue;
-      } else if (flags & BUFFER)
+      } else if (flags & BUFFER) {
         if (n_lambdas > 0) *(file.fp) << ",";
         *(file.fp) << "lambda-buffer";
+      }
       *(file.fp) << std::endl;
     }
   }
@@ -1640,9 +1645,10 @@ void FixConstantPH::write_lambdas()
       if (file.flag == LAMBDA_S_FP) {
         *(file.fp) << std::endl;
         continue;
-      } else if (flags & BUFFER)
+      } else if (flags & BUFFER) {
         if (n_lambdas > 0) *(file.fp) << ",";
         *(file.fp) << file.buff_value;
+      }
       *(file.fp) << std::endl;
     }
   }
@@ -1691,8 +1697,8 @@ void FixConstantPH::initialize_v_lambda(const double _T_lambda)
 
   if (flags & BUFFER) v_lambda_buff -= v_cm;
 
-
-  MPI_Bcast(v_lambdas[0], n_lambdas * 3, MPI_DOUBLE, 0, world);
+  if (n_lambdas > 0)
+    MPI_Bcast(v_lambdas[0], n_lambdas * 3, MPI_DOUBLE, 0, world);
   if (flags & BUFFER) MPI_Bcast(&v_lambda_buff,1,MPI_DOUBLE,0,world);
   
   // Updating the T_lambdas
@@ -1859,6 +1865,7 @@ double FixConstantPH::compute_array(int i, int j)
   auto& lambda_buff = pH_state->lambda_buff;
   auto& v_lambda_buff = pH_state->v_lambda_buff;
   auto& a_lambda_buff = pH_state->a_lambda_buff;
+  
   switch (i) {
     case 0:
       // 1

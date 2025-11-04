@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <sstream>
+#include <unordered_map>
 
 using namespace LAMMPS_NS;
 
@@ -267,6 +268,7 @@ int constant_pH_state::reset_lambdas(const int& n_lambdas_, const std::unique_pt
   int to = 0;
   if (prev_pH_state_ && prev_pH_state_->molids) {
     int n_lambdas_prev = prev_pH_state_->n_lambdas;
+    //molid to index map : find has O(1) runtime
     std::unordered_map<int,int> idx;
     idx.reserve(n_lambdas_prev);
     for (int k = 0; k < n_lambdas_prev; k++)
