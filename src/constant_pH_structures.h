@@ -61,7 +61,7 @@ class constant_pH_state : protected Pointers {
   constant_pH_state& operator=(constant_pH_state&& rhs) noexcept;
 
 
-  int  reset_lambdas(const int& n_lambdas_, const std::unique_ptr<constant_pH_state>& prev_pH_state_);
+  int  reset_lambdas(const std::unique_ptr<constant_pH_state>& prev_pH_state_);
   void set_zero();
   void broadcast();
 
@@ -78,7 +78,7 @@ class constant_pH_state : protected Pointers {
   // number of buffer points
   int N_buff;
 
-  void allocate_lambdas();
+  void allocate_lambdas(const bool keepMolids = false);
   void deallocate_lambdas();
 
 };

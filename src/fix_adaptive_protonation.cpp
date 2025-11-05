@@ -671,7 +671,7 @@ void FixAdaptiveProtonation::get_protonable_molids(std::unique_ptr<int []>& moli
 {
   if (n_protonable)
     molids_ = std::make_unique<int []>(n_protonable);
-  for (int i = 0; i < n_protonable; i++) { molids_[i] = protonable_molids[i]; }
+  std::copy_n(protonable_molids.get(),n_protonable,molids_.get());
 }
 
 /* ----------------------------------------------------------------------------------------

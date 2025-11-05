@@ -437,12 +437,11 @@ void FixConstantPH::initial_integrate(int /*vflag*/)
         molids_input = std::make_unique<int[]>(n_lambdas_input);
         // get_protonable_molids should be modified to be compatible with std::unique_ptr
         fix_adaptive_protonation->get_protonable_molids(molids_input);
-        // creating it based on the values of the pH_state_prev
-        // For the molids in both the pH_state and pH_state_prev their lambda values are keep.
+        // 
         pH_state = std::make_unique<constant_pH_state>(lmp,molids_input,
-          n_lambdas_input,lambda_masses,N_buff,
-          pH_state_prev);
+          n_lambdas_input,lambda_masses,N_buff);
         // forcefield variables for lambdas
+        // This part used the pH_state_prev to keep the lambdas available in the previous step.
         set_lambdas(); 
 
         modify->clearstep_compute();
@@ -520,7 +519,7 @@ void FixConstantPH::set_lambdas()
   GFF_lambdas = std::make_unique<double[]>(n_lambdas);
   H_lambdas = std::make_unique<double[]>(n_lambdas);
 
-  int to = pH_state->reset_lambdas(n_lambdas,pH_state_prev);
+  int to = pH_state->reset_lambdas(pH_state_prev);
 
   if (n_lambdas) {
     // Initializing lambdas based on the current charge of protonable molecules so there is no jump in the system total charge

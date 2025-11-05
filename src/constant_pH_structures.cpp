@@ -127,7 +127,7 @@ constant_pH_state::constant_pH_state(LAMMPS *lmp, std::unique_ptr<int []>& molid
   lambda_buff{0.0}, v_lambda_buff{0.0}, a_lambda_buff{0.0}, m_lambda_buff{lambda_masses[1]},
   N_buff{N_buff_}
 {
-  allocate_lambdas();
+  allocate_lambdas(true);
 }
 
 constant_pH_state::constant_pH_state(LAMMPS *lmp, std::unique_ptr<int []>& molids_, 
@@ -135,7 +135,7 @@ constant_pH_state::constant_pH_state(LAMMPS *lmp, std::unique_ptr<int []>& molid
   const std::unique_ptr<constant_pH_state>& prev_pH_state_):
   constant_pH_state{lmp,molids_,n_lambdas_,lambda_masses,N_buff_}
 {
-  reset_lambdas(n_lambdas,prev_pH_state_);
+  reset_lambdas(prev_pH_state_);
 }
 
 constant_pH_state::~constant_pH_state()
@@ -264,13 +264,7 @@ constant_pH_state& constant_pH_state::operator=(constant_pH_state&& rhs) noexcep
 }
 
 
-int constant_pH_state::reset_lambdas(const int& n_lambdas_, const std::unique_ptr<constant_pH_state>& prev_pH_state_) {
-
-  if (n_lambdas != n_lambdas_) {
-    deallocate_lambdas();
-    n_lambdas = n_lambdas_;
-    allocate_lambdas();
-  }
+int constant_pH_state::reset_lambdas( const std::unique_ptr<constant_pH_state>& prev_pH_state_) {
 
   int to = 0;
   if (prev_pH_state_ && prev_pH_state_->molids) {
@@ -333,7 +327,7 @@ void constant_pH_state::broadcast()
   MPI_Bcast(&m_lambda_buff, 1, MPI_DOUBLE, 0, world);
 }
 
-void constant_pH_state::allocate_lambdas()
+void constant_pH_state::allocate_lambdas(const bool keepMolids)
 {
   if (n_lambdas) {
     memory->create(lambdas, n_lambdas, 3, "constant_pH:lambdas");
@@ -341,7 +335,8 @@ void constant_pH_state::allocate_lambdas()
     memory->create(a_lambdas, n_lambdas, 3, "constant_pH:a_lambdas");
     memory->create(m_lambdas, n_lambdas, 3, "constant_pH:m_lambdas");
 
-    molids = std::make_unique<int []>(n_lambdas);
+    if (!keepMolids)
+      molids = std::make_unique<int []>(n_lambdas);
 
     std::fill_n(&m_lambdas[0][0],3*n_lambdas,mass_lambda);
   }

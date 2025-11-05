@@ -111,8 +111,7 @@ void ComputeGFFConstantPH::compute_array()
    int n_params;
    fix_constant_pH->return_nparams(n_params);
    if (n_lambdas < n_params) {
-      int n_lambdas = n_params;
-      pH_state->reset_lambdas(n_lambdas,nullptr);
+      n_lambdas = n_params;
       deallocate_storage();
       allocate_storage();
    }
