@@ -264,44 +264,76 @@ constant_pH_state& constant_pH_state::operator=(constant_pH_state&& rhs) noexcep
 }
 
 
-int constant_pH_state::reset_lambdas( const std::unique_ptr<constant_pH_state>& prev_pH_state_) {
+int constant_pH_state::reset_lambdas(const std::unique_ptr<constant_pH_state>& prev_pH_state_) {
+  // A sanity check
+  if (lmp != prev_pH_state_->lmp)
+    error->all(FLERR, "reset_lambdas: mismatched LAMMPS instances");
+  // fast path
+  if (!prev_pH_state_ || !prev_pH_state_->molids)
+  {
+    std::fill_n(lambdas[0],3*n_lambdas,0.0);
+    std::fill_n(v_lambdas[0],3*n_lambdas,0.0);
+    std::fill_n(a_lambdas[0],3*n_lambdas,0.0);
+    std::fill_n(m_lambdas[0],3*n_lambdas,mass_lambda);
+    lambda_buff = 1.0;
+    v_lambda_buff = 0.0;
+    a_lambda_buff = 0.0;
+    m_lambda_buff = mass_lambda;
+    return 0;
+  }
 
-  int to = 0;
-  if (prev_pH_state_ && prev_pH_state_->molids) {
-    int n_lambdas_prev = prev_pH_state_->n_lambdas;
-    //molid to index map : find has O(1) runtime
-    std::unordered_map<int,int> idx;
-    idx.reserve(n_lambdas_prev);
-    for (int k = 0; k < n_lambdas_prev; k++)
-      idx[prev_pH_state_->molids[k]] = k;
+  // hash table
+  //molid to index map : find has O(1) runtime
+  int n_lambdas_prev = prev_pH_state_->n_lambdas;
+  std::unordered_map<int,int> idx;
+  idx.reserve(n_lambdas_prev);
+  for (int k = 0; k < n_lambdas_prev; k++)
+    idx[prev_pH_state_->molids[k]] = k;
 
+  // front and end locations
+  int front = 0;
+  int back = n_lambdas - 1;
+  
+  // temp arrays
+  auto molids_temp  = std::make_unique<int []>(n_lambdas);
+  auto x_temp = std::make_unique<double []>(3*n_lambdas);
+  auto v_temp = std::make_unique<double []>(3*n_lambdas);
+  auto a_temp = std::make_unique<double []>(3*n_lambdas);
+  auto m_temp = std::make_unique<double []>(3*n_lambdas);
 
-    for (int i = 0; i < n_lambdas; i++) {
-      auto iter = idx.find(molids[i]);
-      if (iter != idx.end()) {
-        int from = iter->second;
-        for (int j = 0; j < 3; j++) {
-          lambdas[to][j] = prev_pH_state_->lambdas[from][j];
-          v_lambdas[to][j] = prev_pH_state_->v_lambdas[from][j];
-          a_lambdas[to][j] = prev_pH_state_->a_lambdas[from][j];
-          m_lambdas[to][j] = prev_pH_state_->m_lambdas[from][j];
-        }
-        to++;
-      }
+  for (int i = 0; i < n_lambdas; i++) {
+    auto iter = idx.find(molids[i]);
+    if (iter != idx.end()) {
+      int from = iter->second;
+      molids_temp[front] = prev_pH_state_->molids[from];
+      std::copy_n(prev_pH_state_->lambdas[from],3,x_temp.get()+3*front);
+      std::copy_n(prev_pH_state_->v_lambdas[from],3,v_temp.get()+3*front);
+      std::copy_n(prev_pH_state_->a_lambdas[from],3,a_temp.get()+3*front);
+      std::copy_n(prev_pH_state_->m_lambdas[from],3,m_temp.get()+3*front);
+      front++;
+    } else {
+      molids_temp[back] = molids[i];
+      std::fill_n(x_temp.get()+3*back,3,0.0);
+      std::fill_n(v_temp.get()+3*back,3,0.0);
+      std::fill_n(a_temp.get()+3*back,3,0.0);
+      std::fill_n(m_temp.get()+3*back,3,mass_lambda);// m_lambda == 20.0u taken from https://www.mpinat.mpg.de/627830/usage
+      back--;
     }
   }
 
+  lambda_buff = prev_pH_state_->lambda_buff;
+  v_lambda_buff = prev_pH_state_->v_lambda_buff;
+  a_lambda_buff = prev_pH_state_->a_lambda_buff;
+  m_lambda_buff = prev_pH_state_->m_lambda_buff;
+  N_buff = prev_pH_state_->N_buff;
 
-  for (int i = to; i < n_lambdas; i++) {
-    for (int j = 0; j < 3; j++) {
-      lambdas[i][j] = 0.0;
-      v_lambdas[i][j] = 0.0;
-      a_lambdas[i][j] = 0.0;
-      m_lambdas[i][j] = mass_lambda; // m_lambda == 20.0u taken from https://www.mpinat.mpg.de/627830/usage
-    }
-  }
+  molids = std::move(molids_temp);
+  std::copy_n(x_temp.get(),3*n_lambdas,lambdas[0]);
+  std::copy_n(v_temp.get(),3*n_lambdas,v_lambdas[0]);
+  std::copy_n(a_temp.get(),3*n_lambdas,a_lambdas[0]);
+  std::copy_n(m_temp.get(),3*n_lambdas,m_lambdas[0]);
 
-  return to;
+  return front;
 }
 
 void constant_pH_state::set_zero()

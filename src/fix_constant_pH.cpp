@@ -525,7 +525,7 @@ void FixConstantPH::set_lambdas()
     // Initializing lambdas based on the current charge of protonable molecules so there is no jump in the system total charge
     initialize_lambda(to);
     // This would not work in the initialize section as the m_lambda has not been set yet!
-    initialize_v_lambda(this->T);
+    initialize_v_lambda(this->T,to);
   }
 
   // Resetting the vector_atom to the default value
@@ -1659,7 +1659,7 @@ void FixConstantPH::write_lambdas()
 
 /* --------------------------------------------------------------------- */
 
-void FixConstantPH::initialize_v_lambda(const double _T_lambda)
+void FixConstantPH::initialize_v_lambda(const double _T_lambda, const int& to)
 {
   auto& v_lambdas = pH_state->v_lambdas;
   auto& v_lambda_buff = pH_state->v_lambda_buff;
@@ -1670,7 +1670,7 @@ void FixConstantPH::initialize_v_lambda(const double _T_lambda)
 
   std::unique_ptr<RanPark> random = std::make_unique<RanPark>(lmp, random_number_seed);
 
-  for (int i = 0; i < n_lambdas; i++)
+  for (int i = to; i < n_lambdas; i++)
     for (int j = 0; j < 3; j++) v_lambdas[i][j] = random->gaussian() / std::sqrt(m_lambdas[i][j]);
 
   if (flags & BUFFER) v_lambda_buff = random->gaussian() / std::sqrt(m_lambda_buff);
@@ -1679,7 +1679,7 @@ void FixConstantPH::initialize_v_lambda(const double _T_lambda)
 
   double scaling_factor = std::sqrt(_T_lambda / T_lambdas[2]);
 
-  for (int i = 0; i < n_lambdas; i++)
+  for (int i = to; i < n_lambdas; i++)
     for (int j = 0; j < 3; j++) v_lambdas[i][j] *= scaling_factor;
 
   if (flags & BUFFER) v_lambda_buff *= scaling_factor;
