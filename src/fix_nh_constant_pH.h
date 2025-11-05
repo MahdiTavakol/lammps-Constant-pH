@@ -44,7 +44,6 @@ class FixNHConstantPH : public FixNH {
   // functions related to lambdas
   void deallocate_lambda_storage();
   void allocate_lambda_storage();
-  void update_lambda_params();
 
   // constraining total charge through change lambdas and lambda_buff
   template <int mode> void constrain_lambdas();

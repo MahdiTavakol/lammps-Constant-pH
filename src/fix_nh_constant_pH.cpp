@@ -138,15 +138,6 @@ void FixNHConstantPH::init()
 }
 
 /* ----------------------------------------------------------------------
-   updating the lambda parameters from the fix constant_pH
-   ---------------------------------------------------------------------- */
-   
-void FixNHConstantPH::update_lambda_params()
-{
-  fix_constant_pH->return_params(pH_state);
-}
-
-/* ----------------------------------------------------------------------
    perform half-step update of velocities
 -----------------------------------------------------------------------*/
 
