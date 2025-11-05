@@ -144,7 +144,7 @@ constant_pH_state::~constant_pH_state()
 }
 
 constant_pH_state::constant_pH_state(const constant_pH_state& rhs):
-  Pointers{rhs.lmp},
+  Pointers{lmp},
   lambdas{nullptr}, v_lambdas{nullptr}, a_lambdas{nullptr}, m_lambdas{nullptr},
   n_lambdas{rhs.n_lambdas}, mass_lambda{rhs.mass_lambda},
   lambda_buff{rhs.lambda_buff}, v_lambda_buff{rhs.v_lambda_buff},
