@@ -468,20 +468,20 @@ void FixNHConstantPH::constrain_lambdas()
       domega = -q_total / 
           (mols_charge_change*mols_charge_change*sigma_mass_inverse + (N_buff_double*buff_charge_change*buff_charge_change/m_lambda_buff));
 
-      omega += domega;
+      //omega += domega;
       
       for (int i = 0; i < n_lambdas; i++)
-         x_lambdas[i][0] += (omega * mols_charge_change / m_lambdas[i][0]);
+         x_lambdas[i][0] += (domega * mols_charge_change / m_lambdas[i][0]);
 
-      x_lambda_buff += buff_charge_change * omega / m_lambda_buff;
+      x_lambda_buff += buff_charge_change * domega / m_lambda_buff;
      
 
       fix_constant_pH->reset_params(pH_state,1);
       fix_constant_pH->reset_qs();
    }
    
-   fix_constant_pH->reset_params(pH_state,1);
-   fix_constant_pH->reset_qs();
+   //fix_constant_pH->reset_params(pH_state,1);
+   //fix_constant_pH->reset_qs();
 }
 
 /* ----------------------------------------------------------------------
