@@ -476,11 +476,11 @@ void FixNHConstantPH::constrain_lambdas()
       x_lambda_buff += buff_charge_change * omega / m_lambda_buff;
      
 
-      fix_constant_pH->reset_params(pH_state,0);
+      fix_constant_pH->reset_params(pH_state,1);
       fix_constant_pH->reset_qs();
    }
    
-   fix_constant_pH->reset_params(pH_state);
+   fix_constant_pH->reset_params(pH_state,1);
    fix_constant_pH->reset_qs();
 }
 
