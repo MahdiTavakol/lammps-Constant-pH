@@ -43,6 +43,8 @@ class constant_pH_state : protected Pointers {
   friend class ComputeGFFConstantPH;
   friend class ComputeTempConstantPH;
  public:
+  // deleting the default constructor 
+  constant_pH_state() = delete;
   // with fix_adaptive_protonation.h class
   constant_pH_state(LAMMPS *lmp, const std::array<double,2>& lambda_masses, const int& N_buff_);
   // set in the input arguments of the fix_constant_pH.h class

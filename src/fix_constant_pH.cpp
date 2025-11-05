@@ -680,7 +680,7 @@ void FixConstantPH::calculate_H_once()
 
 void FixConstantPH::return_nparams(int &_n_params) const
 {
-  _n_params = pH_state->n_lambdas;
+  _n_params = this->pH_state->n_lambdas;
 }
 
 /* ----------------------------------------------------------------------
@@ -1869,7 +1869,7 @@ double FixConstantPH::compute_array(int i, int j)
   auto& lambda_buff = pH_state->lambda_buff;
   auto& v_lambda_buff = pH_state->v_lambda_buff;
   auto& a_lambda_buff = pH_state->a_lambda_buff;
-  
+
   switch (i) {
     case 0:
       // 1

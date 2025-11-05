@@ -144,7 +144,7 @@ constant_pH_state::~constant_pH_state()
 }
 
 constant_pH_state::constant_pH_state(const constant_pH_state& rhs):
-  Pointers{lmp},
+  Pointers{rhs.lmp},
   lambdas{nullptr}, v_lambdas{nullptr}, a_lambdas{nullptr}, m_lambdas{nullptr},
   n_lambdas{rhs.n_lambdas}, mass_lambda{rhs.mass_lambda},
   lambda_buff{rhs.lambda_buff}, v_lambda_buff{rhs.v_lambda_buff},
@@ -165,6 +165,9 @@ constant_pH_state& constant_pH_state::operator=(const constant_pH_state& rhs)
 {
   // Checking for self assignment
   if (this != &rhs) {
+    // check if the lammps instance is the same for both
+    if (this->lmp != rhs.lmp)
+      error->one(FLERR,"Cannot assign two constant_pH_struture objects with different lmp instances!");
     // May be the number of lambdas are not the same
     // so we need to reallocate
     if (n_lambdas != rhs.n_lambdas) {
@@ -222,6 +225,10 @@ constant_pH_state::constant_pH_state(constant_pH_state&& rhs) noexcept:
 constant_pH_state& constant_pH_state::operator=(constant_pH_state&& rhs) noexcept
 {
   if (this != &rhs) {
+    // check if the lammps instance is the same for both
+    if (this->lmp != rhs.lmp)
+    error->one(FLERR,"Cannot assign two constant_pH_struture objects with different lmp instances!");
+
     deallocate_lambdas();
     // we have just one movable item here
     molids = std::move(rhs.molids);
