@@ -44,6 +44,7 @@
 #include <cmath>
 #include <cstring>
 #include <array>
+#include <vector>
 
 using namespace LAMMPS_NS;
 using namespace FixConst;
@@ -59,7 +60,7 @@ enum {
        CONSTRAIN=1<<1,
      };
 
-static constexpr double etol = 1e-6; 
+
 
 /* ----------------------------------------------------------------------
    NVT,NPH,NPT integrators for improved Nose-Hoover equations of motion
@@ -415,13 +416,15 @@ void FixNHConstantPH::constrain_lambdas()
    
 
    int maxCycles = 10000;
+   constexpr double alpha = 0.5; 
+   constexpr double etol = 1e-6; 
    int cycle = 0;
    
    
    
-   /* The while(true) loop was used on purpose so that even when the loop termination condition
+   /* The do while loop was used on purpose so that even when the loop termination condition
       is satisfied the q_total is calculated for the last time with final values of lambdas */
-   while(true) {
+   do {
       // Just doing this on the root and then broadcasting the results
       sigma_lambda = 0.0;
       sigma_mass_inverse = 0.0;
@@ -459,14 +462,12 @@ void FixNHConstantPH::constrain_lambdas()
       else error->one(FLERR,"You should never have reached here!!!");
 
 
-      if (std::abs(q_total) < etol || cycle++ > maxCycles) {
-         if (comm->me == 0 && cycle > maxCycles)
-             error->warning(FLERR,"Charge constrain did not reach convergence after {} iterations",maxCycles);
-         break;
-      }
       
-      domega = -q_total / 
-          (mols_charge_change*mols_charge_change*sigma_mass_inverse + (N_buff_double*buff_charge_change*buff_charge_change/m_lambda_buff));
+      double denom = (mols_charge_change*mols_charge_change*sigma_mass_inverse + (N_buff_double*buff_charge_change*buff_charge_change/m_lambda_buff));
+
+      if (!std::isfinite(denom)) error->one(FLERR,"The denom is inifinite!");
+
+      domega = -alpha*q_total / denom;
 
       //omega += domega;
       
@@ -478,10 +479,12 @@ void FixNHConstantPH::constrain_lambdas()
 
       fix_constant_pH->reset_params(pH_state,1);
       fix_constant_pH->reset_qs();
-   }
-   
-   //fix_constant_pH->reset_params(pH_state,1);
-   //fix_constant_pH->reset_qs();
+
+   } while (std::abs(q_total) > etol && ++cycle < maxCycles);
+
+   if (comm->me == 0 && cycle >= maxCycles)
+      error->warning(FLERR,"Charge constrain did not reach convergence after {} iterations: {}",maxCycles,q_total);
+
 }
 
 /* ----------------------------------------------------------------------
