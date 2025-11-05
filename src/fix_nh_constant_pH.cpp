@@ -412,11 +412,6 @@ void FixNHConstantPH::constrain_lambdas()
    double q_total;
    double sigma_lambda;
    double sigma_mass_inverse;
-   double N_buff = pH_state->N_buff;
-   double N_buff_double = static_cast<double>(pH_state->N_buff);
-   const int& n_lambdas = pH_state->n_lambdas;
-   double** m_lambdas = pH_state->m_lambdas;
-   auto& m_lambda_buff = pH_state->m_lambda_buff; 
    
 
    int maxCycles = 10000;
@@ -432,56 +427,65 @@ void FixNHConstantPH::constrain_lambdas()
       sigma_mass_inverse = 0.0;
 
       fix_constant_pH->return_params(pH_state);
+      const int n_lambdas = pH_state->n_lambdas;
+      const double N_buff = pH_state->N_buff;
+      const double N_buff_double = static_cast<double>(N_buff);
       double** x_lambdas = pH_state->lambdas;
       auto& x_lambda_buff = pH_state->lambda_buff;
+      double** m_lambdas = pH_state->m_lambdas;
+      double m_lambda_buff = pH_state->m_lambda_buff;
       
       
-      /* Checking if the charge content of the N_buff is large enough for n_lambdas
-       * Since there is a possibility that the n_lambdas change during the simulation by 
-       * the fix_adaptive_protonation.cpp command, the check should be done here. 
-       */
+      /* Since at the end the reset_params broadcast everything form the rank zero we 
+       * just update the parameters in the first rank.
+      */
+      if (comm->me == 0) {
+         /* Checking if the charge content of the N_buff is large enough for n_lambdas
+          * Since there is a possibility that the n_lambdas change during the simulation by 
+          * the fix_adaptive_protonation.cpp command, the check should be done here. 
+          */
+         if (cycle == 0 && comm->me == 0) 
+            if (N_buff < mols_charge_change*n_lambdas)
+               error->one(FLERR,"The charge content of N_buff={} is not large enough for n_lambdas={}: Please increase the N_buff\n",N_buff,n_lambdas);
       
-      if (cycle == 0 && comm->me == 0) 
-         if (N_buff < mols_charge_change*n_lambdas)
-            error->one(FLERR,"The charge content of N_buff={} is not large enough for n_lambdas={}: Please increase the N_buff\n",N_buff,n_lambdas);
-      
-      for (int i = 0; i < n_lambdas; i++) {
-         sigma_lambda += x_lambdas[i][0];
-         if (m_lambdas[i][0] == 0) error->all(FLERR,"m_lambdas[{},0] is zero in fix_nh_constant_pH",i);
-         sigma_mass_inverse += (1.0/m_lambdas[i][0]);
-      }
+         for (int i = 0; i < n_lambdas; i++) {
+            sigma_lambda += x_lambdas[i][0];
+            if (m_lambdas[i][0] == 0) error->all(FLERR,"m_lambdas[{},0] is zero in fix_nh_constant_pH",i);
+            sigma_mass_inverse += (1.0/m_lambdas[i][0]);
+         }
 
-      if (m_lambda_buff == 0) error->all(FLERR,"Buffer mass is zero in fix_nh_constant_pH");
+         if (m_lambda_buff == 0) error->all(FLERR,"Buffer mass is zero in fix_nh_constant_pH");
       
-      if (mode == 1)
-         q_total = mols_charge_change*sigma_lambda+buff_charge_change*N_buff_double*x_lambda_buff-total_charge;
-      else if (mode == 2) 
-         q_total = compute_q_total();
-      else error->one(FLERR,"You should never have reached here!!!");
+         if (mode == 1)
+            q_total = mols_charge_change*sigma_lambda+buff_charge_change*N_buff_double*x_lambda_buff-total_charge;
+         else if (mode == 2) 
+            q_total = compute_q_total();
+         else error->one(FLERR,"You should never have reached here!!!");
 
 
-      if (std::abs(q_total) < etol || cycle++ > maxCycles) {
-         if (comm->me == 0 && cycle > maxCycles)
-             error->warning(FLERR,"Charge constrain did not reach convergence after {} iterations",maxCycles);
-         break;
-      }
+         if (std::abs(q_total) < etol || cycle++ > maxCycles) {
+            if (comm->me == 0 && cycle > maxCycles)
+                error->warning(FLERR,"Charge constrain did not reach convergence after {} iterations",maxCycles);
+            break;
+         }
       
-      domega = -q_total / 
+         domega = -q_total / 
           (mols_charge_change*mols_charge_change*sigma_mass_inverse + (N_buff_double*buff_charge_change*buff_charge_change/m_lambda_buff));
 
-      omega += domega;
+         omega += domega;
       
-      for (int i = 0; i < n_lambdas; i++)
-         x_lambdas[i][0] += (omega * mols_charge_change / m_lambdas[i][0]);
+         for (int i = 0; i < n_lambdas; i++)
+            x_lambdas[i][0] += (omega * mols_charge_change / m_lambdas[i][0]);
 
-      x_lambda_buff += buff_charge_change * omega / m_lambda_buff;
+         x_lambda_buff += buff_charge_change * omega / m_lambda_buff;
+      }
      
 
-      fix_constant_pH->reset_params(pH_state,0);
+      fix_constant_pH->reset_params(pH_state,1);
       fix_constant_pH->reset_qs();
    }
    
-   fix_constant_pH->reset_params(pH_state);
+   fix_constant_pH->reset_params(pH_state,1);
    fix_constant_pH->reset_qs();
 }
 

@@ -222,8 +222,7 @@ void FixAdaptiveProtonation::setup(int /*vflag*/)
 {
   if (!list)
     error->all(FLERR, "Neighbor list not initialized for adaptive_protonation");
-  //neighbor->build_one(list);
-  neighbor->build(1);
+  neighbor->build_one(list);
 
   // Counting the number of water molecules surrounding the protonable molecules
   rampStep = 1;
