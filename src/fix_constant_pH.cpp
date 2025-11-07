@@ -74,12 +74,18 @@ static constexpr double max_lambda_buff_0 = 1.05;
 /* ---------------------------------------------------------------------- */
 
 FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
-    Fix{lmp, narg, arg}, random_number_seed{1152}, 
-    lambda_masses{{20.0,20.0}}, GFF{nullptr}, 
-    fixgpu{nullptr}, q_orig{nullptr}, f_orig{nullptr}, peatom_orig{nullptr}, pvatom_orig{nullptr},
-    keatom_orig{nullptr}, kvatom_orig{nullptr}, 
-    qOWs{-0.834},qHWs{0.278},mu{0.0},ncommands{0},flags{0},fp_flags{0}, write_lambda_nevery{1},
-    GFF_flag{false}, print_Udwp_flag{false}
+    Fix{lmp, narg, arg},
+    flags{0}, 
+    ncommands{0}, mu{0.0},
+    random_number_seed{1152}, 
+    lambda_masses{{20.0,20.0}}, 
+    GFF_flag{false}, GFF{nullptr},
+    print_Udwp_flag{false},
+    qHWs{0.278}, qOWs{-0.834}, 
+    fix_adaptive_protonation{nullptr},
+    fp_flags{0}, write_lambda_nevery{1}, 
+    fixgpu{nullptr}, 
+    q_orig{nullptr}, f_orig{nullptr}, peatom_orig{nullptr}, pvatom_orig{nullptr}, keatom_orig{nullptr}, kvatom_orig{nullptr}
 {
   if (narg < 9) utils::missing_cmd_args(FLERR, "fix constant_pH", error);
 

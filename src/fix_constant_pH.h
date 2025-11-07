@@ -67,11 +67,23 @@ class FixConstantPH : public Fix {
   // Input variables for constant values
   double pK, pH, T;
 
+  // Forcefield parameters
   double a, b, s, m, w, r, d, k, h;
+  // Buffer potential parameters
+  double a_buff, b_buff, s_buff, m_buff, w_buff, r_buff, d_buff, k_buff, h_buff;
+
+  // Environment correlation parameters
   std::unique_ptr<double[]> HAs;
   std::unique_ptr<double[]> HBs;
+
+  // The step function 
   std::unique_ptr<double[]> Us;
   std::unique_ptr<double[]> dUs;
+  double U_buff, dU_buff;
+
+  // The smoothing function
+  std::unique_ptr<double[]> fs;
+  std::unique_ptr<double[]> dfs;
 
   // parameter for shifting the minima of the potential near lambda = 0 and lambda = 1
   double mu;
@@ -79,34 +91,31 @@ class FixConstantPH : public Fix {
   // Random number seed for the creation of initial v_lambdas
   double random_number_seed;
 
-  // Buffer potential parameters
-  double a_buff, b_buff, s_buff, m_buff, w_buff, r_buff, d_buff, k_buff, h_buff;
-
-
-
 
   // input params for the pH_state
   int n_lambdas_input = 0;
   std::unique_ptr<int []> molids_input;
   std::array<double,2> lambda_masses;
-  // protonation state
+
+  // lambda energies
   std::unique_ptr<double []> H_lambdas;
   double H_lambda_buff;
   double H_lambda_prev;
+  double HA_buff, HB_buff;
+
+  // lambda temperature
   double T_lambdas[3];
+
+  // pH protonation state
   std::unique_ptr<constant_pH_state> pH_state;
+  // pH protonation state from the previous fix_adaptive_protonation step to keep similar lambdas.
   std::unique_ptr<constant_pH_state> pH_state_prev;
   
 
-  // Temp array to change lambdas in order to get HAs and HBs
+  // Temporary array to change lambdas in order to get HAs and HBs
   std::unique_ptr<double[]> lambdas_j;
 
-  // The smoothing function
-  std::unique_ptr<double[]> fs;
-  std::unique_ptr<double[]> dfs;
-
-
-  // Parameters for the forcefield modifiction term
+  // Parameters for the forcefield modification term
   bool GFF_flag;
   std::ifstream fp;
   double **GFF;
@@ -126,12 +135,8 @@ class FixConstantPH : public Fix {
   // Hydrogen and Oxygens types of the hydronium ions
   int typeHWs, typeOWs;
   double qHWs, qOWs;
-  int num_HWs, num_OWs;
-
-  // Buffer potential
-  double U_buff, dU_buff;
-  double HA_buff, HB_buff;
-
+  int num_HWs, num_OWs; 
+ 
   // Functions needed to communicate with fix adaptive protonation command
   std::string fix_adaptive_protonation_id;
   int nevery_fix_adaptive;
@@ -151,9 +156,10 @@ class FixConstantPH : public Fix {
 
   // Function required to be called by the compute_GFF
   void calculate_H_once();
-  int HCalcNSteps; // Number of steps when HA was calculated
+  // Number of steps when HA was calculated
+  int HCalcNSteps; 
 
-  // The q_total used to calculate the HW charges
+  // the total charge parameter and functions.
   double q_total;
   double compute_q_total(const bool silent = false);
   void check_q_total();
@@ -188,10 +194,15 @@ class FixConstantPH : public Fix {
   // Function to set the charges based on the lambdas and lambda_buff values
   void reset_qs();
 
+  // The function to calculate Hs
   void calculate_Hs();
+  // The function that checks that the ratio of OWs to HWs is 1.0 to 3.0
   void check_num_OWs_HWs();
+  // Reading the structures at different pH values
   void read_pH_structure_files();
+  // Reading the commands that should run after each time fix_adaptive_protonation is called
   void read_commands_file();
+  // 
   void restore_epsilon();
   void delete_lambdas();
   void set_lambdas();
