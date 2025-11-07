@@ -255,7 +255,7 @@ FixConstantPH::~FixConstantPH()
 
   // deallocate the memories with size dependent on the n_lambda
   delete_lambdas();
-
+  = std::make_uniqu
   // deallocate memories whose size is dependent on natoms
   deallocate_storage();
 
@@ -1033,8 +1033,10 @@ void FixConstantPH::deallocate_storage()
 
   q_orig = nullptr;
   f_orig = nullptr;
-  peatom_orig = keatom_orig = nullptr;
-  pvatom_orig = kvatom_orig = nullptr;
+  peatom_orig = nullptr;
+  pvatom_orig = nullptr;
+  keatom_orig = nullptr;
+  kvatom_orig = nullptr;
 
   vector_atom = nullptr;
 }
