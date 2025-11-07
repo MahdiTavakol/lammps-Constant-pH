@@ -971,8 +971,8 @@ void FixConstantPH::print_Udwp()
 {
   double lambda_Udwp, U_Udwp, dU_Udwp;
 
-  const int n_points = 100;
-  const double dlambda_Udwp = 2.0 / (double) n_points;
+  constexpr int n_points = 100;
+  constexpr double dlambda_Udwp = 2.0 / static_cast<double>(n_points);
 
   lambda_Udwp = -0.5;
 
