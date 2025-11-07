@@ -272,10 +272,12 @@ int constant_pH_state::reset_lambdas(const std::unique_ptr<constant_pH_state>& p
   // fast path
   if (!prev_pH_state_ || !prev_pH_state_->molids)
   {
-    std::fill_n(lambdas[0],3*n_lambdas,0.0);
-    std::fill_n(v_lambdas[0],3*n_lambdas,0.0);
-    std::fill_n(a_lambdas[0],3*n_lambdas,0.0);
-    std::fill_n(m_lambdas[0],3*n_lambdas,mass_lambda);
+    if (n_lambdas) {
+      std::fill_n(lambdas[0],3*n_lambdas,0.0);
+      std::fill_n(v_lambdas[0],3*n_lambdas,0.0);
+      std::fill_n(a_lambdas[0],3*n_lambdas,0.0);
+      std::fill_n(m_lambdas[0],3*n_lambdas,mass_lambda);
+    }
     lambda_buff = 1.0;
     v_lambda_buff = 0.0;
     a_lambda_buff = 0.0;
@@ -293,14 +295,14 @@ int constant_pH_state::reset_lambdas(const std::unique_ptr<constant_pH_state>& p
 
   // front and end locations
   int front = 0;
-  int back = n_lambdas - 1;
+  int back  = n_lambdas - 1;
   
   // temp arrays
-  auto molids_temp  = std::make_unique<int []>(n_lambdas);
-  auto x_temp = std::make_unique<double []>(3*n_lambdas);
-  auto v_temp = std::make_unique<double []>(3*n_lambdas);
-  auto a_temp = std::make_unique<double []>(3*n_lambdas);
-  auto m_temp = std::make_unique<double []>(3*n_lambdas);
+  auto molids_temp  = std::make_unique<int    []>(n_lambdas);
+  auto x_temp       = std::make_unique<double []>(3*n_lambdas);
+  auto v_temp       = std::make_unique<double []>(3*n_lambdas);
+  auto a_temp       = std::make_unique<double []>(3*n_lambdas);
+  auto m_temp       = std::make_unique<double []>(3*n_lambdas);
 
   for (int i = 0; i < n_lambdas; i++) {
     auto iter = idx.find(molids[i]);
