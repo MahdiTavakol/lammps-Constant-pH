@@ -1428,6 +1428,16 @@ void FixConstantPH::calculate_GFFs()
 
 void FixConstantPH::init_GFF()
 {
+  /*
+   * file format:
+   * number of GFF element
+   * lambda_1,GFF_1
+   * lambda_2,GFF_2
+   * lambda_3,GFF_3
+   * ....
+   * lambda_n,GFF_n
+   */
+
   std::string line;
   std::stringstream iss;
 
@@ -1447,18 +1457,18 @@ void FixConstantPH::init_GFF()
 
     if (!std::getline(iss2, token, ','))
       error->one(FLERR, "The GFF correction file in the fix constant_pH is in a wrong format!");
-    _lambda = std::stof(token);
+    _lambda = std::stod(token);
 
     if (!std::getline(iss2, token, ','))
       error->one(FLERR, "The GFF correction file in the fix constant_pH is in a wrong format!");
-    _GFF = std::stof(token);
+    _GFF = std::stod(token);
 
     GFF[i][0] = _lambda;
     GFF[i][1] = _GFF;
   }
 
   if (i != GFF_size)
-    error->one(FLERR, "The GFF correction file in the fix constant_pH is in a wrong format!");
+    error->warning(FLERR, "Not enough data in GFF correction file in the fix constant_pH!");
 }
 
 
