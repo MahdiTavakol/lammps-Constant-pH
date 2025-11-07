@@ -332,6 +332,13 @@ void FixConstantPH::init()
 
 void FixConstantPH::setup(int /*vflag*/)
 {
+  // Getting the required parameters from the pH_state variable.
+  double** lambdas = pH_state->lambdas;
+  double& lambda_buff = pH_state->lambda_buff;
+  double& v_lambda_buff = pH_state->v_lambda_buff;
+  int& n_lambdas = pH_state->n_lambdas;
+  int& N_buff = pH_state->N_buff; 
+
   // Checking if we have correct number of hydronium ions
   if (flags & BUFFER) check_num_OWs_HWs();
 
@@ -360,15 +367,6 @@ void FixConstantPH::setup(int /*vflag*/)
     // itself allocates the molids_input with n_lambdas so no need for manual allocation here!
     fix_adaptive_protonation->get_protonable_molids(molids_input);
   }
-
-
-
-
-  double** lambdas = pH_state->lambdas;
-  double& lambda_buff = pH_state->lambda_buff;
-  double& v_lambda_buff = pH_state->v_lambda_buff;
-  int& n_lambdas = pH_state->n_lambdas;
-  int& N_buff = pH_state->N_buff; 
 
   if (flags & BUFFER) {
     lambda_buff = lambda_buff_0;
@@ -1230,8 +1228,8 @@ void FixConstantPH::modify_qs(double **scales)
   int *type = atom->type;
   double *q = atom->q;
 
-  int *protonable = pH_structure_storage->protonable
-                        .get();    // Not safe, I should use std::shared_ptr instead...
+  // Not safe, I should use std::shared_ptr instead.....
+  int *protonable = pH_structure_storage->protonable.get();    
   double **pH1qs = pH_structure_storage->pH1qs;
   double **pH2qs = pH_structure_storage->pH2qs;
   int pHnStructures1 = pH_structure_storage->pHnStructures1;
@@ -1242,9 +1240,9 @@ void FixConstantPH::modify_qs(double **scales)
   
 
   std::unique_ptr<double []> q_changes_local = std::make_unique<double []>(5);
-  std::unique_ptr<double []> q_changes = std::make_unique<double []>(5);
+  std::unique_ptr<double []> q_changes       = std::make_unique<double []>(5);
   std::fill_n(q_changes_local.get(),5,0.0);
-  std::fill_n(q_changes.get(),5,0.0);
+
 
   std::fill_n(vector_atom,nmax,-1);
 
@@ -1253,9 +1251,9 @@ void FixConstantPH::modify_qs(double **scales)
   for (int j = 0; j < n_lambdas; j++) {
     double scale0 = scales[j][0];
     int indx11 = std::floor(lambdas[j][1] * pHnStructures1 - 0.5);
-    int indx12 = std::ceil(lambdas[j][1] * pHnStructures1 - 0.5);
+    int indx12 = std::ceil(lambdas[j][1]  * pHnStructures1 - 0.5);
     int indx21 = std::floor(lambdas[j][2] * pHnStructures2 - 0.5);
-    int indx22 = std::ceil(lambdas[j][2] * pHnStructures2 - 0.5);
+    int indx22 = std::ceil(lambdas[j][2]  * pHnStructures2 - 0.5);
 
 
     // Wrapping around 
@@ -1305,12 +1303,6 @@ void FixConstantPH::modify_qs(double **scales)
   if (comm->me == 0 && false) {
     double sigma_scale = 0.0;
     for (int i = 0; i < n_lambdas; i++) sigma_scale += scales[i][0];
-    //std::cout << "scale[" << i <<"] = " << scales[i][0] << std::endl;
-    //std::cout << "sigma_scale = " << sigma_scale << std::endl;
-    //std::cout << " q_changes = " << q_changes[1] << std::endl;
-    //std::cout << " q_changes = " << q_changes[2] << std::endl;
-    //std::cout << " q_changes = " << q_changes[3] << std::endl;
-    //std::cout << " q_changes = " << q_changes[4] << std::endl;
   }
 
   /* If the buffer is set the modify_q_buffer modifies the charge of the buffer 
@@ -1328,16 +1320,6 @@ void FixConstantPH::modify_qs(double **scales)
         q_changes_local[3] += (q[i] - q_init);
       }
     }
-
-    /* The purpose of this part this is just to debug the total charge.
-           So, in the final version of the code this part should be 
-           commented out!
-        */
-    /*if (update->ntimestep % nevery == 0) {
-    	      MPI_Allreduce(q_changes_local,q_changes,4,MPI_DOUBLE,MPI_SUM,world);
-    	     if (comm->me == 0) error->warning(FLERR,"protonable q change = {}, HW q change = {}, protonable charge change = {}, HW charge change = {}",q_changes[0],q_changes[2],q_changes[1],q_changes[3]);
-        }
-        compute_q_total();*/
   }
 
 }
@@ -1353,7 +1335,6 @@ void FixConstantPH::modify_q_buff(const double _scale)
   double *q = atom->q;
 
   // update the charges
-
   for (int i = 0; i < nlocal; i++) {
     if (type[i] == typeHWs) {
       q[i] = (_scale - qOWs) / 3.0;
@@ -1802,11 +1783,12 @@ void FixConstantPH::calculate_T_lambda(const int& to)
 double FixConstantPH::compute_q_total(const bool silent)
 {
   double *q = atom->q;
-  double q_local = 0.0;
   int nlocal = atom->nlocal;
   bigint ntimestep = update->ntimestep;
+  double q_local = 0.0;
 
-  for (int i = 0; i < nlocal; i++) q_local += q[i];
+  for (int i = 0; i < nlocal; i++)
+    q_local += q[i];
 
   MPI_Allreduce(&q_local, &q_total, 1, MPI_DOUBLE, MPI_SUM, world);
 
