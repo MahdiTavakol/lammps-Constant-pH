@@ -266,7 +266,8 @@ constant_pH_state& constant_pH_state::operator=(constant_pH_state&& rhs) noexcep
 
 int constant_pH_state::reset_lambdas(const std::unique_ptr<constant_pH_state>& prev_pH_state_) {
   // A sanity check
-  if (lmp != prev_pH_state_->lmp)
+  if (prev_pH_state_)
+    if (lmp != prev_pH_state_->lmp)
     error->all(FLERR, "reset_lambdas: mismatched LAMMPS instances");
   // fast path
   if (!prev_pH_state_ || !prev_pH_state_->molids)
