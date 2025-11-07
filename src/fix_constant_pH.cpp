@@ -255,7 +255,7 @@ FixConstantPH::~FixConstantPH()
 
   // deallocate the memories with size dependent on the n_lambda
   delete_lambdas();
-  = std::make_uniqu
+
   // deallocate memories whose size is dependent on natoms
   deallocate_storage();
 
