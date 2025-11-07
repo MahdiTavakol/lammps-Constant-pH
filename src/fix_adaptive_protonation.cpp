@@ -274,6 +274,10 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
   if (neighBuildRatioPrev <= neighBuildRatioCutoff) {
     modify_protonation_state();
     rampStep++;
+  } else {
+    if (comm->me == 0)
+      error->warning(FLERR,"The percentage of steps with neighbor build ({}) is higher than the cutoff ({}) - Skipping charge change",
+                        neighBuildRatioPrev,neighBuildRatioCutoff);
   }
     
 
