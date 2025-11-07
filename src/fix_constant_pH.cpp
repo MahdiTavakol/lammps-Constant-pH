@@ -338,12 +338,12 @@ void FixConstantPH::setup(int /*vflag*/)
   fixgpu = modify->get_fix_by_id("package_gpu");
 
   /* 
-    * As it is hypothesized that the initial values for 
-    * lambdas are zero the initial value for the lambda_buff
-    * should be one so there is enough protons to be exchanged
-    * between the lambdas and buffer due to the contraint on
-    * the lambas[0] + ... + lambdas[n] + lambda_buff
-    */
+   * As it is hypothesized that the initial values for 
+   * lambdas are zero the initial value for the lambda_buff
+   * should be one so there is enough protons to be exchanged
+   * between the lambdas and buffer due to the contraint on
+   * the lambas[0] + ... + lambdas[n] + lambda_buff
+   */
 
   if (GFF_flag) init_GFF();
 
