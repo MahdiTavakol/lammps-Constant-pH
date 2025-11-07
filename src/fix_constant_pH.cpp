@@ -1673,21 +1673,22 @@ void FixConstantPH::write_lambdas()
 
 void FixConstantPH::initialize_v_lambda(const double _T_lambda, const int& to)
 {
-  auto& v_lambdas = pH_state->v_lambdas;
+  auto& v_lambdas     = pH_state->v_lambdas;
   auto& v_lambda_buff = pH_state->v_lambda_buff;
-  auto& n_lambdas = pH_state->n_lambdas;
-  auto& m_lambdas = pH_state->m_lambdas;
+  auto& m_lambdas     = pH_state->m_lambdas;
   auto& m_lambda_buff = pH_state->m_lambda_buff;
-  auto& N_buff = pH_state->N_buff;
+  auto& n_lambdas     = pH_state->n_lambdas;
+  auto& N_buff        = pH_state->N_buff;
 
   std::unique_ptr<RanPark> random = std::make_unique<RanPark>(lmp, random_number_seed);
 
   for (int i = to; i < n_lambdas; i++)
-    for (int j = 0; j < 3; j++) v_lambdas[i][j] = random->gaussian() / std::sqrt(m_lambdas[i][j]);
+    for (int j = 0; j < 3; j++)
+      v_lambdas[i][j] = random->gaussian() / std::sqrt(m_lambdas[i][j]);
 
   if (flags & BUFFER) v_lambda_buff = random->gaussian() / std::sqrt(m_lambda_buff);
 
-  this->calculate_T_lambda();
+  this->calculate_T_lambda(to);
 
   double scaling_factor = std::sqrt(_T_lambda / T_lambdas[2]);
 
@@ -1698,7 +1699,7 @@ void FixConstantPH::initialize_v_lambda(const double _T_lambda, const int& to)
 
 
   double v_cm = 0.0;
-  for (int i = 0; i < n_lambdas; i++) v_cm += v_lambdas[i][0];
+  for (int i = to; i < n_lambdas; i++) v_cm += v_lambdas[i][0];
 
   if (flags & BUFFER) v_cm += N_buff * v_lambda_buff;
 
@@ -1708,7 +1709,7 @@ void FixConstantPH::initialize_v_lambda(const double _T_lambda, const int& to)
 
   v_cm /= n_cm;
 
-  for (int i = 0; i < n_lambdas; i++) v_lambdas[i][0] -= v_cm;
+  for (int i = to; i < n_lambdas; i++) v_lambdas[i][0] -= v_cm;
 
   if (flags & BUFFER) v_lambda_buff -= v_cm;
 
@@ -1722,7 +1723,7 @@ void FixConstantPH::initialize_v_lambda(const double _T_lambda, const int& to)
 
 /* --------------------------------------------------------------------- */
 
-void FixConstantPH::calculate_T_lambda()
+void FixConstantPH::calculate_T_lambda(const int& to)
 {
   auto& n_lambdas = pH_state->n_lambdas;
   auto& v_lambdas = pH_state->v_lambdas;
@@ -1736,8 +1737,8 @@ void FixConstantPH::calculate_T_lambda()
   double kB = force->boltz;
   double mvv2e = force->mvv2e;
 
-  Nfs[0] = static_cast<double>(n_lambdas);
-  Nfs[1] = static_cast<double>(2 * n_lambdas);
+  Nfs[0] = static_cast<double>(n_lambdas - to);
+  Nfs[1] = static_cast<double>(2 * (n_lambdas - to));
   Nfs[2] = Nfs[0] + Nfs[1];
 
   if (comm->me == 0) {
@@ -1750,7 +1751,7 @@ void FixConstantPH::calculate_T_lambda()
       Nfs[2] -= 1.0;
     }
 
-    for (int j = 0; j < n_lambdas; j++) {
+    for (int j = to; j < n_lambdas; j++) {
       KE_lambdas[0] += 0.5 * m_lambdas[j][0] * v_lambdas[j][0] * v_lambdas[j][0] * mvv2e;
       for (int k = 1; k < 3; k++)
         KE_lambdas[1] += 0.5 * m_lambdas[j][k] * v_lambdas[j][k] * v_lambdas[j][k] * mvv2e;
