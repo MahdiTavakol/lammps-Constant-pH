@@ -963,7 +963,7 @@ void FixConstantPH::calculate_dU(const double &_lambda, double &_U, double &_dU)
   dU3 = -((_lambda - 0.5) / (s * s)) * U3;
   dU4 = -0.5 * w * r * 2 * std::exp(-r * r * (_lambda + m) * (_lambda + m)) / std::sqrt(M_PI);
   dU5 = 0.5 * w * r * 2 * std::exp(-r * r * (_lambda - 1 - m) * (_lambda - 1 - m)) / std::sqrt(M_PI);
-  
+
   _U = U1 + U2 + U3 + U4 + U5;
   _dU = dU1 + dU2 + dU3 + dU4 + dU5;
 }
@@ -1481,6 +1481,7 @@ void FixConstantPH::calculate_Hs()
   auto& n_lambdas = pH_state->n_lambdas;
    
    
+  // you could have also used a map which seems more natural.
   auto distArray = std::make_unique<int[]>(nlocal);
   for (int i = 0; i < nlocal; i++)
   {
@@ -1822,6 +1823,7 @@ double FixConstantPH::compute_epair()
       their difference afterall */
 
   // To convert to kcal/mol the total energy must be devided by the number of atoms
+  // this division might be the culprit!!!!!
   energy /= static_cast<double>(natoms);    
   return energy;
 }
