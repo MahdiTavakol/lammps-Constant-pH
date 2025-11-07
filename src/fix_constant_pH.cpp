@@ -90,7 +90,7 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
   if (narg < 9) utils::missing_cmd_args(FLERR, "fix constant_pH", error);
 
   nevery = utils::inumeric(FLERR, arg[3], false, lmp);
-  if (nevery < 0) error->all(FLERR, "Illegal fix constant_pH every value {}", nevery);
+  if (nevery <= 0) error->all(FLERR, "Illegal fix constant_pH every value {}", nevery);
 
   //files that contain the charges before and after protonation/deprotonation
   fileName1 = arg[4];
@@ -98,7 +98,7 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
 
   pK = utils::numeric(FLERR, arg[6], false, lmp);
   pH = utils::numeric(FLERR, arg[7], false, lmp);
-  T = utils::numeric(FLERR, arg[8], false, lmp);
+  T  = utils::numeric(FLERR, arg[8], false, lmp);
 
 
   int iarg = 9;
@@ -108,7 +108,7 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
       if (comm->me == 0) {
         fp.open(arg[iarg + 1], std::ifstream::in);
         if (!fp.is_open())
-          error->one(FLERR, "Cannot find fix constant_pH the GFF correction file {}", arg[iarg + 1]);
+          error->one(FLERR, "Cannot find fix constant_pH the GFF correction file {}", arg[iarg+1]);
       }
       iarg += 2;
     } else if (strcmp(arg[iarg], "Print_Udwp") == 0) {
@@ -120,7 +120,7 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
       }
       iarg += 2;
     } else if (strcmp(arg[iarg], "molids") == 0) {
-      n_lambdas_input = utils::inumeric(FLERR, arg[iarg + 1], false, lmp);
+      n_lambdas_input = utils::inumeric(FLERR, arg[iarg+1], false, lmp);
       if (flags & ADAPTIVE)
         error->all(FLERR, "molids and Fix_adapative_protonation cannot be used at the same time");
       iarg += 2;
@@ -132,20 +132,20 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
       }
     } else if (strcmp(arg[iarg], "mu") == 0) {
       if (narg < iarg + 2) utils::missing_cmd_args(FLERR, "fix constant_pH", error);
-      mu = utils::numeric(FLERR, arg[iarg + 1], false, lmp);
+      mu = utils::numeric(FLERR, arg[iarg+1], false, lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg], "buffer") == 0) {
       flags |= BUFFER;
       if (narg < iarg + 6) utils::missing_cmd_args(FLERR, "fix constant_pH", error);
-      N_buff = utils::inumeric(FLERR, arg[iarg + 1], false, lmp);
-      typeOWs = utils::inumeric(FLERR, arg[iarg + 2], false, lmp);
-      typeHWs = utils::inumeric(FLERR, arg[iarg + 3], false, lmp);
+      N_buff  = utils::inumeric(FLERR, arg[iarg+1], false, lmp);
+      typeOWs = utils::inumeric(FLERR, arg[iarg+2], false, lmp);
+      typeHWs = utils::inumeric(FLERR, arg[iarg+3], false, lmp);
+      qOWs = utils::numeric(FLERR, arg[iarg+4], false, lmp);
+      qHWs = utils::numeric(FLERR, arg[iarg+5], false, lmp);
       if (typeOWs > atom->ntypes)
         error->all(FLERR, "Illegal fix constant_pH atom type {}", typeOWs);
       if (typeHWs > atom->ntypes)
         error->all(FLERR, "Illegal fix constant_pH atom type {}", typeHWs);
-      qOWs = utils::numeric(FLERR, arg[iarg + 4], false, lmp);
-      qHWs = utils::numeric(FLERR, arg[iarg + 5], false, lmp);
       iarg += 6;
     } else if (strcmp(arg[iarg], "Fix_adaptive_protonation") == 0) {
       flags |= ADAPTIVE;
@@ -228,7 +228,6 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
   if (write_lambda_nevery == 1 && comm->me == 0)
     error->warning(FLERR,"The default value of write_lambda_nevery leads to large output files in long simulations!");
 
-  fixgpu = nullptr;
 
   array_flag = 1;
   size_array_rows = 11;
@@ -777,12 +776,14 @@ void FixConstantPH::read_commands_file()
   /*
     * The file format
     * ncommands
-    * comment 1
-    * comment 2
-    * command1
-    * command2
+    * comment-#1
+    * comment-#2
+    * command-#1
+    * command-#2
+    * command-#3
+    * command-#4
     * ...
-    * commandn
+    * command-#n
     */
 
   string line;
@@ -798,8 +799,8 @@ void FixConstantPH::read_commands_file()
 
 
   if (comm->me == 0) {
-    getline(commandsFile, line);    // comment-1
-    getline(commandsFile, line);    // comment-2
+    getline(commandsFile, line);    // comment-#1
+    getline(commandsFile, line);    // comment-#2
 
     for (int i = 0; i < ncommands; i++) {
       if (!getline(commandsFile, line)) error->one(FLERR, "Error reading commands lines");
