@@ -1567,7 +1567,7 @@ void FixConstantPH::calculate_Hs()
 
 void FixConstantPH::write_lambdas_header()
 {
-  auto& molids = pH_state->molids;
+  auto& molids  = pH_state->molids;
   int n_lambdas = pH_state->n_lambdas;
 
   if (!(flags & ADAPTIVE) && !molids)
@@ -1583,9 +1583,9 @@ void FixConstantPH::write_lambdas_header()
 
   for (auto &file : files) {
     if (fp_flags & file.flag && file.fp) {
-      
       *(file.fp) << "n_lambdas=" << n_lambdas << std::endl;
-      for (int i = 0; i < n_lambdas - 1; i++) *(file.fp) << "lambda-" << molids[i] << ",";
+      for (int i = 0; i < n_lambdas - 1; i++)
+        *(file.fp) << "lambda-" << molids[i] << ",";
       if (n_lambdas > 0)
         *(file.fp) << "lambda-" << molids[n_lambdas - 1];
       if (file.flag == LAMBDA_S_FP) {
