@@ -153,7 +153,7 @@ constant_pH_state::constant_pH_state(const constant_pH_state& rhs):
 {
   allocate_lambdas();
   if (n_lambdas) {
-    std::copy_n(&rhs.lambdas[0][0],3*n_lambdas,&lambdas[0][0]);
+    std::copy_n(&rhs.lambdas[0][0],  3*n_lambdas,  &lambdas[0][0]);
     std::copy_n(&rhs.v_lambdas[0][0],3*n_lambdas,&v_lambdas[0][0]);
     std::copy_n(&rhs.a_lambdas[0][0],3*n_lambdas,&a_lambdas[0][0]);
     std::copy_n(&rhs.m_lambdas[0][0],3*n_lambdas,&m_lambdas[0][0]);
@@ -183,7 +183,7 @@ constant_pH_state& constant_pH_state::operator=(const constant_pH_state& rhs)
     
 
     if (n_lambdas) {
-      std::copy_n(&rhs.lambdas[0][0],3*n_lambdas,&lambdas[0][0]);
+      std::copy_n(&rhs.lambdas[0][0],  3*n_lambdas,  &lambdas[0][0]);
       std::copy_n(&rhs.v_lambdas[0][0],3*n_lambdas,&v_lambdas[0][0]);
       std::copy_n(&rhs.a_lambdas[0][0],3*n_lambdas,&a_lambdas[0][0]);
       std::copy_n(&rhs.m_lambdas[0][0],3*n_lambdas,&m_lambdas[0][0]);
@@ -227,7 +227,7 @@ constant_pH_state& constant_pH_state::operator=(constant_pH_state&& rhs) noexcep
   if (this != &rhs) {
     // check if the lammps instance is the same for both
     if (this->lmp != rhs.lmp)
-    error->one(FLERR,"Cannot assign two constant_pH_struture objects with different lmp instances!");
+      error->one(FLERR,"Cannot assign two constant_pH_struture objects with different lmp instances!");
 
     deallocate_lambdas();
     // we have just one movable item here
@@ -256,8 +256,7 @@ constant_pH_state& constant_pH_state::operator=(constant_pH_state&& rhs) noexcep
     rhs.lambda_buff = 0.0;
     rhs.v_lambda_buff = 0.0;
     rhs.a_lambda_buff = 0.0;
-    rhs.m_lambda_buff = 0;
-    rhs.n_lambdas = 0;
+    rhs.m_lambda_buff = 0.0;
     rhs.N_buff = 0;
   }
   return *this;
@@ -268,7 +267,7 @@ int constant_pH_state::reset_lambdas(const std::unique_ptr<constant_pH_state>& p
   // A sanity check
   if (prev_pH_state_)
     if (lmp != prev_pH_state_->lmp)
-    error->all(FLERR, "reset_lambdas: mismatched LAMMPS instances");
+      error->all(FLERR, "reset_lambdas: mismatched LAMMPS instances");
   // fast path
   if (!prev_pH_state_ || !prev_pH_state_->molids)
   {
@@ -309,7 +308,7 @@ int constant_pH_state::reset_lambdas(const std::unique_ptr<constant_pH_state>& p
     if (iter != idx.end()) {
       int from = iter->second;
       molids_temp[front] = prev_pH_state_->molids[from];
-      std::copy_n(prev_pH_state_->lambdas[from],3,x_temp.get()+3*front);
+      std::copy_n(prev_pH_state_->lambdas[from]  ,3,x_temp.get()+3*front);
       std::copy_n(prev_pH_state_->v_lambdas[from],3,v_temp.get()+3*front);
       std::copy_n(prev_pH_state_->a_lambdas[from],3,a_temp.get()+3*front);
       std::copy_n(prev_pH_state_->m_lambdas[from],3,m_temp.get()+3*front);
@@ -324,11 +323,11 @@ int constant_pH_state::reset_lambdas(const std::unique_ptr<constant_pH_state>& p
     }
   }
 
-  lambda_buff = prev_pH_state_->lambda_buff;
+  lambda_buff   = prev_pH_state_->lambda_buff;
   v_lambda_buff = prev_pH_state_->v_lambda_buff;
   a_lambda_buff = prev_pH_state_->a_lambda_buff;
   m_lambda_buff = prev_pH_state_->m_lambda_buff;
-  N_buff = prev_pH_state_->N_buff;
+  N_buff        = prev_pH_state_->N_buff;
 
   molids = std::move(molids_temp);
   std::copy_n(x_temp.get(),3*n_lambdas,lambdas[0]);
@@ -351,7 +350,11 @@ void constant_pH_state::set_zero()
 void constant_pH_state::broadcast()
 {
   if (n_lambdas) {
-    MPI_Bcast(lambdas[0], n_lambdas * 3, MPI_DOUBLE, 0, world);
+    if (!lambdas   ||
+        !v_lambdas ||
+        !a_lambdas ||
+        !m_lambdas) error->one(FLERR,"Cannot broadcast empty storage!");
+    MPI_Bcast(lambdas[0],   n_lambdas * 3, MPI_DOUBLE, 0, world);
     MPI_Bcast(v_lambdas[0], n_lambdas * 3, MPI_DOUBLE, 0, world);
     MPI_Bcast(a_lambdas[0], n_lambdas * 3, MPI_DOUBLE, 0, world);
     MPI_Bcast(m_lambdas[0], n_lambdas * 3, MPI_DOUBLE, 0, world);
@@ -379,14 +382,14 @@ void constant_pH_state::allocate_lambdas(const bool keepMolids)
 
 void constant_pH_state::deallocate_lambdas()
 {
-  if (lambdas) memory->destroy(lambdas);
+  if (lambdas)   memory->destroy(lambdas);
   if (v_lambdas) memory->destroy(v_lambdas);
   if (a_lambdas) memory->destroy(a_lambdas);
   if (m_lambdas) memory->destroy(m_lambdas);
 
   molids.reset();
 
-  lambdas = nullptr;
+  lambdas   = nullptr;
   v_lambdas = nullptr;
   a_lambdas = nullptr;
   m_lambdas = nullptr;
