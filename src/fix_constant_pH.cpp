@@ -353,9 +353,11 @@ void FixConstantPH::setup(int /*vflag*/)
 
   // I have put this part here on purpose so if the fix_adaptive_protonation reads the initial molids, it is set here
   if (flags & ADAPTIVE) { 
-    fix_adaptive_protonation->get_n_protonable(n_lambdas_input);
-    molids_input = std::make_unique<int[]>(n_lambdas_input);
+    //fix_adaptive_protonation->get_n_protonable(n_lambdas_input);
+    //molids_input = std::make_unique<int[]>(n_lambdas_input);
     // get_protonable_molids should be modified to be compatible with std::unique_ptr
+    // The get_protonable_molids method of the fix_adaptive_protonation class
+    // itself allocates the molids_input with n_lambdas so no need for manual allocation here!
     fix_adaptive_protonation->get_protonable_molids(molids_input);
   }
 
@@ -975,7 +977,6 @@ void FixConstantPH::print_Udwp()
   constexpr double dlambda_Udwp = 2.0 / static_cast<double>(n_points);
 
   lambda_Udwp = -0.5;
-
   if (comm->me == 0) {
     if (!Udwp_fp.is_open()) error->one(FLERR, "Udwp_fp file stream is not open");
 
