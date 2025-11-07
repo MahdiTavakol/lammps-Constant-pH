@@ -70,6 +70,8 @@ enum {
 
 static constexpr double tol = 1e-5;
 static constexpr double max_lambda_buff_0 = 1.05;
+static constexpr double min_lambda = -0.1;
+static constexpr double max_lambda = 1.1;
 
 /* ---------------------------------------------------------------------- */
 
@@ -516,13 +518,13 @@ void FixConstantPH::set_lambdas()
   const int& n_lambdas = pH_state->n_lambdas;
   HAs = std::make_unique<double[]>(n_lambdas);
   HBs = std::make_unique<double[]>(n_lambdas);
-  fs = std::make_unique<double[]>(n_lambdas);
+  fs  = std::make_unique<double[]>(n_lambdas);
   dfs = std::make_unique<double[]>(n_lambdas);
-  Us = std::make_unique<double[]>(n_lambdas);
+  Us  = std::make_unique<double[]>(n_lambdas);
   dUs = std::make_unique<double[]>(n_lambdas);
-  lambdas_j = std::make_unique<double[]>(n_lambdas);
+  lambdas_j   = std::make_unique<double[]>(n_lambdas);
   GFF_lambdas = std::make_unique<double[]>(n_lambdas);
-  H_lambdas = std::make_unique<double[]>(n_lambdas);
+  H_lambdas   = std::make_unique<double[]>(n_lambdas);
 
   int to = pH_state->reset_lambdas(pH_state_prev);
 
@@ -545,25 +547,24 @@ void FixConstantPH::set_lambdas()
 
 void FixConstantPH::initialize_lambda(const int& to)
 {
-  const int nlocal = atom->nlocal;
-  double *q = atom->q;
-  int *type = atom->type;
-  int *molecule = atom->molecule;
+  const int nlocal     = atom->nlocal;
+  double *q            = atom->q;
+  int *type            = atom->type;
+  int *molecule        = atom->molecule;
   const int& n_lambdas = pH_state->n_lambdas;
-  const int length = n_lambdas - to;
+  const int length     = n_lambdas - to;
 
   // These three are not safe for the pH*qs I should
   // use the mdspan with std::unique_ptr and 
   // for the protonable I have to use std::unique_ptr
   // and set up the get functions to return a cons ref
   // to them as std::unique_ptr is not copyable.
-  double **pH1qs = pH_structure_storage->pH1qs;
-  double **pH2qs = pH_structure_storage->pH2qs;
-  int *protonable = pH_structure_storage->protonable
-                        .get(); 
+  double **pH1qs  = pH_structure_storage->pH1qs;
+  double **pH2qs  = pH_structure_storage->pH2qs;
+  int *protonable = pH_structure_storage->protonable.get(); 
 
   double **lambdas = pH_state->lambdas;
-  auto& molids = pH_state->molids;
+  auto& molids     = pH_state->molids;
 
 
   auto q_local     = std::make_unique<double []>(length);
@@ -579,7 +580,8 @@ void FixConstantPH::initialize_lambda(const int& to)
 
   for (int i = 0; i < nlocal; i++) {
     const int type_i = type[i];
-    if (!protonable[type_i]) continue;
+    if (!protonable[type_i])
+      continue;
     for (int j = to; j < n_lambdas; j++) {
       const int indx = j - to;
       if (molecule[i] == molids[j]) {
@@ -595,14 +597,15 @@ void FixConstantPH::initialize_lambda(const int& to)
   MPI_Allreduce(q_local_pH2.get(),q_total_pH2.get(),length,MPI_DOUBLE,MPI_SUM,world);
 
   for (int j = 0; j < length; j++) {
-    if (std::abs(q_total_pH1[j] - q_total_pH2[j]) < tol) {
+    double denom = q_total_pH2[j] - q_total_pH1[j];
+    if (std::abs(denom) < tol) {
       lambdas[to+j][0] = 0.0;
       continue;
     }
-    double lambda_j = (q_total[j]-q_total_pH1[j])/(q_total_pH2[j]-q_total_pH1[j]);
-    if (comm->me == 0 && (lambda_j < -0.1 || lambda_j > 1.1)) {
+    double lambda_j = (q_total[j]-q_total_pH1[j])/denom;
+    if (comm->me == 0 && (lambda_j < min_lambda || lambda_j > max_lambda)) {
       error->warning(FLERR,"out of range value for the initialization of the lambda_{}=={}, The simulation might crash!",j,lambda_j);
-      lambdas[to+j][0] = MAX(0.0,MIN(1.0,lambda_j));
+      lambdas[to+j][0] = std::max(min_lambda,std::min(max_lambda,lambda_j));
     } 
     else
       lambdas[to+j][0] = lambda_j;
