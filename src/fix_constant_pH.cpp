@@ -433,16 +433,17 @@ void FixConstantPH::initial_integrate(int /*vflag*/)
          * Backing up lambdas, v_lambdas, a_lambdas,
          * m_lambdas and H_lambdas
          * If a lambda remains the same during fix_adaptive_protonation,
-         * I do not want to reset their lambdas and v_lambdas;
+         * I do not want to reset their lambdas, v_lambdas, a_lambdas and m_lambdas;
          */
         pH_state_prev = std::move(pH_state);
 
         /* 
          *  we reread the n_lambdas after backing up the lambdas
          */
-        fix_adaptive_protonation->get_n_protonable(n_lambdas_input);
-        molids_input = std::make_unique<int[]>(n_lambdas_input);
+        //fix_adaptive_protonation->get_n_protonable(n_lambdas_input);
+        //molids_input = std::make_unique<int[]>(n_lambdas_input);
         // get_protonable_molids should be modified to be compatible with std::unique_ptr
+        // get_protonable_molids itself allocates the required storage.
         fix_adaptive_protonation->get_protonable_molids(molids_input);
         // 
         pH_state = std::make_unique<constant_pH_state>(lmp,molids_input,
@@ -864,10 +865,11 @@ void FixConstantPH::check_num_OWs_HWs()
 
 void FixConstantPH::calculate_dfs()
 {
-  auto& n_lambdas = pH_state->n_lambdas;
+  auto&  n_lambdas = pH_state->n_lambdas;
   double** lambdas = pH_state->lambdas;
+
   //Taken from https://gitlab.com/gromacs-constantph/constantph/-/blob/main/gromacs-constantph/src/gromacs/applied_forces/constant_ph/constant_ph.cpp
-  const double k_step  = 5.0 * r;   // ensure k > 0 if you want an increasing step
+  const double k_step  = 5.0 * r;   
   const double x0_step  = 2.0 * a;
 
   // If pH == pK, everything is zero; skip work.
@@ -901,15 +903,16 @@ void FixConstantPH::calculate_dfs()
 
 void FixConstantPH::calculate_dUs()
 {
-  auto& n_lambdas = pH_state->n_lambdas;
-  double** lambdas = pH_state->lambdas;
-  double lambda_buff = pH_state->lambda_buff;
+  auto&    n_lambdas   = pH_state->n_lambdas;
+  double** lambdas     = pH_state->lambdas;
+  double   lambda_buff = pH_state->lambda_buff;
+
   double U1, U2, U3, U4, U5;
   double dU1, dU2, dU3, dU4, dU5;
   for (int j = 0; j < n_lambdas; j++) {
     U1 = -k * std::exp(-(lambdas[j][0] - 1.0 - mu - b) * (lambdas[j][0] - 1.0 - mu - b) / (2.0 * a * a));
     U2 = -k * std::exp(-(lambdas[j][0] + mu + b) * (lambdas[j][0] + mu + b) / (2.0 * a * a));
-    U3 = d * std::exp(-(lambdas[j][0] - 0.5) * (lambdas[j][0] - 0.5) / (2.0 * s * s));
+    U3 =  d * std::exp(-(lambdas[j][0] - 0.5) * (lambdas[j][0] - 0.5) / (2.0 * s * s));
     U4 = 0.5 * w * (1.0 - std::erf(r * (lambdas[j][0] + m)));
     U5 = 0.5 * w * (1.0 + std::erf(r * (lambdas[j][0] - 1.0 - m)));
     dU1 = -((lambdas[j][0] - 1.0 - mu - b) / (a * a)) * U1;
@@ -960,7 +963,7 @@ void FixConstantPH::calculate_dU(const double &_lambda, double &_U, double &_dU)
   dU3 = -((_lambda - 0.5) / (s * s)) * U3;
   dU4 = -0.5 * w * r * 2 * std::exp(-r * r * (_lambda + m) * (_lambda + m)) / std::sqrt(M_PI);
   dU5 = 0.5 * w * r * 2 * std::exp(-r * r * (_lambda - 1 - m) * (_lambda - 1 - m)) / std::sqrt(M_PI);
-
+  
   _U = U1 + U2 + U3 + U4 + U5;
   _dU = dU1 + dU2 + dU3 + dU4 + dU5;
 }
