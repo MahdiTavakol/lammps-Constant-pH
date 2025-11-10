@@ -11,18 +11,15 @@
 
    See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
-#include <random>
 
 #include "fix.h"
 #include "fix_constant_pH.h"
 
 #include "atom.h"
-#include "atom_masks.h"
 #include "error.h"
 
 #include "comm.h"
 #include "force.h"
-#include "group.h"
 #include "input.h"
 #include "kspace.h"
 #include "math_const.h"
@@ -39,7 +36,6 @@
 #include <array>
 #include <cstring>
 #include <iomanip>
-#include <map>
 #include <sstream>
 #include <string>
 #include <vector>
