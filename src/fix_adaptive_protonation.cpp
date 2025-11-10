@@ -727,7 +727,7 @@ void FixAdaptiveProtonation::modify_protonation_state()
         nchanges[0]++;   // total flips
         nchanges[1]++;   // to solvent
       } else if (cur == SOLID && (prev == SOLVENT || prev == NEITHER)) {
-        nchanges[0]++;
+        nchanges[0]++;   // total flips
         nchanges[2]++;   // to solid
       }
     }
@@ -735,7 +735,6 @@ void FixAdaptiveProtonation::modify_protonation_state()
 
   MPI_Bcast(nchanges.data(),3,MPI_INT,0,world);
 
-  //double frac = std::min(step*nstepInv,1.0);
   // I am not clamping it on purpose so that 
   // I can check if there is any atomic 
   // exchange that make q_orig irrelevant.
@@ -760,12 +759,7 @@ void FixAdaptiveProtonation::modify_protonation_state()
         // The molecule was in the solid before or it is the first step
         if (mark_prev[molecule[i]] == SOLID || mark_prev[molecule[i]]== NEITHER)
         {
-          // The initial charge is set by the lambda 
-          //q_init = q[i];
-          //q_new = q_orig[i] + frac*(pH2qs[type[i]][0]-q_orig[i]);
-          //if (!std::isfinite(q_new)) error->one(FLERR,"The q[{}] is infinite!",i);
-          //q[i] = q_new;
-          //q_change_local += q[i] - q_init;
+          // The fix_constant_pH takes care of this one!
         }
         else if (mark_prev[molecule[i]] == SOLVENT)
           break;
@@ -775,7 +769,10 @@ void FixAdaptiveProtonation::modify_protonation_state()
 
       case SOLID:    // The molecule is in the solid
         // It came from the water ----> deprotonate it
-        // I do not want to mess up the initial charge distribution in the interior of the solid
+        // The charge distribution in the solid interior remains intact.
+        // Even though the total system charge might change, the
+        // constrain function of the fix_nh_constant_pH neutralizes
+        // the system.
         if (mark_prev[molecule[i]] == SOLVENT) {
           q_init = q[i];
           q_new = q_orig[i] + frac*(pH1qs[type[i]][0]-q_orig[i]);
