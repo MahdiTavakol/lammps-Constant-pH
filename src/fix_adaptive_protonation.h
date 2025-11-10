@@ -44,6 +44,7 @@ class FixAdaptiveProtonation : public Fix {
   double memory_usage() override;
   void init_list(int, class NeighList *) override;
 
+  // functions to exchange q_init during atom exchange between ranks
   int pack_exchange(int, double *) override;
   int unpack_exchange(int, double *) override; 
   void grow_arrays(int) override;
@@ -128,9 +129,9 @@ class FixAdaptiveProtonation : public Fix {
   int nmax;
   int nmolecules;
 
-  // Deallocating storage
+  // Deallocating nmolecules related storage
   void deallocate_storage();
-  // Allocating storage
+  // Allocating nmolecules related storage
   void allocate_storage();
   // Reseting all the molids
   void set_molecule_id();
