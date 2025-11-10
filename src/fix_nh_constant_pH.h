@@ -57,7 +57,6 @@ class FixNHConstantPH : public FixNH {
   // pH_state
   std::unique_ptr<constant_pH_state> pH_state;
   double T_lambda;
-  int lambda_every;
 
 
   // Integration flags for lambda, should I constrain total charge and also is there any buffer

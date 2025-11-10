@@ -374,8 +374,7 @@ FixNH::FixNH(LAMMPS *lmp, int narg, char **arg) :
       iarg++;
     } else if (strcmp(arg[iarg],"constrain_total_charge") == 0) {
       iarg+=4;
-    } else if (strcmp(arg[iarg],"lambda_every") == 0) {
-      iarg+=2;
+    
 
     // unknown keywords
     } else error->all(FLERR,"Unknown fix {} keyword: {}", style, arg[iarg]);

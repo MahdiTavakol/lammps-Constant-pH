@@ -59,7 +59,7 @@ enum {
 
 
 /* ----------------------------------------------------------------------
-   NVT,NPH,NPT integrators for improved Nose-Hoover equations of motion
+   NVT,NPH,NPT integrators for lambdas
  ---------------------------------------------------------------------- */
 
 FixNHConstantPH::FixNHConstantPH(LAMMPS *lmp, int narg, char **arg) :
@@ -97,11 +97,6 @@ FixNHConstantPH::FixNHConstantPH(LAMMPS *lmp, int narg, char **arg) :
        buff_charge_change = utils::numeric(FLERR,arg[iarg+2],false,lmp);
        total_charge = utils::numeric(FLERR,arg[iarg+3],false,lmp);
        iarg += 4;
-    } else if (strcmp(arg[iarg],"lambda_every") == 0) {
-       lambda_every = utils::inumeric(FLERR,arg[iarg+1],false,lmp);
-       if (lambda_every <= 0)
-         error->one(FLERR,"The lambda_every parameter must be positive");
-       iarg+=2; 
     } else if (strcmp(arg[iarg],"lambda_seed") == 0) {
       ranMarsSeed = utils::inumeric(FLERR,arg[iarg+1],false,lmp);
       if (ranMarsSeed <= 0)
