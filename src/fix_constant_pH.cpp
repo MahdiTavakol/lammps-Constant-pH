@@ -602,7 +602,7 @@ void FixConstantPH::initialize_lambda(const int& to)
     double lambda_j = (q_total[j]-q_total_pH1[j])/denom;
     if (comm->me == 0 && (lambda_j < min_lambda || lambda_j > max_lambda)) {
       error->warning(FLERR,"out of range value for the initialization of the lambda_{}=={}, The simulation might crash!",j,lambda_j);
-      lambdas[to+j][0] = std::max(min_lambda,std::min(max_lambda,lambda_j));
+      lambdas[to+j][0] = std::clamp(lambda_j,min_lambda,max_lambda);
     } 
     else
       lambdas[to+j][0] = lambda_j;
@@ -862,16 +862,16 @@ void FixConstantPH::calculate_dfs()
   auto&  n_lambdas = pH_state->n_lambdas;
   double** lambdas = pH_state->lambdas;
 
-  //Taken from https://gitlab.com/gromacs-constantph/constantph/-/blob/main/gromacs-constantph/src/gromacs/applied_forces/constant_ph/constant_ph.cpp
-  const double k_step  = 5.0 * r;   
-  const double x0_step  = 2.0 * a;
-
   // If pH == pK, everything is zero; skip work.
   if (std::abs(pH -pK) < 1e-12) {
       std::fill(fs.get(),fs.get()+n_lambdas,0.0);
       std::fill(dfs.get(),dfs.get()+n_lambdas,0.0);
       return;
   }
+
+  //Taken from https://gitlab.com/gromacs-constantph/constantph/-/blob/main/gromacs-constantph/src/gromacs/applied_forces/constant_ph/constant_ph.cpp
+  const double k_step  = 5.0 * r;   
+  const double x0_step  = 2.0 * a;
 
   auto step = [&](double &x) {
       if (pH < pK)      x = 1.0 / (1.0 + std::exp(-k_step  * (x + x0_step  - 1.0)));
@@ -1527,8 +1527,6 @@ void FixConstantPH::calculate_Hs()
       // backing up qs
       backup_restore_qfev<1>();
       // protonated
-      double VA = 0.0;
-      // protonated
       double lambda_j = 1.0;
       // modifying the atom charges
       modify_qs(lambda_j,j);
@@ -1538,8 +1536,6 @@ void FixConstantPH::calculate_Hs()
       update_lmp();
       // getting the electrostatic energy + kspace energy
       HAs[j] = compute_epair();
-      // deprotonated
-      double VB = 0.0;
       // deprotonated
       lambda_j = 0.0;
       // modifying the atom charges
@@ -1803,7 +1799,6 @@ double FixConstantPH::compute_epair()
   //if (update->eflag_global != update->ntimestep)
   //   error->all(FLERR,"Energy was not tallied on the needed timestep");
 
-  int natoms = atom->natoms;
 
   double one = 0.0;
   double energy;
