@@ -25,7 +25,7 @@ FixStyle(adaptive_protonation,FixAdaptiveProtonation);
 #ifndef LMP_FIX_ADAPTIVE_PROTONATION_H
 #define LMP_FIX_ADAPTIVE_PROTONATION_H
 
-#include "atom_vec.h"
+
 #include "constant_pH_structures.h"
 #include "fix.h"
 

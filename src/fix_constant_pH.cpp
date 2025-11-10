@@ -17,13 +17,11 @@
    mahditavakol90@gmail.com
 ------------------------------------------------------------------------- */
 
-#include "fix.h"
 #include "fix_constant_pH.h"
 
 #include "atom.h"
-#include "error.h"
-
 #include "comm.h"
+#include "error.h"
 #include "force.h"
 #include "input.h"
 #include "kspace.h"
@@ -35,6 +33,7 @@
 #include "random_park.h"
 #include "timer.h"
 #include "update.h"
+#include "utils.h"
 
 #include <algorithm>
 #include <cmath>
