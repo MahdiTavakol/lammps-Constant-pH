@@ -12,6 +12,11 @@
    See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
 
+/* ----------------------------------------------------------------------
+   Contributing author: Mahdi Tavakol (Oxford)
+   mahditavakol90@gmail.com
+------------------------------------------------------------------------- */
+
 #include "fix.h"
 #include "fix_constant_pH.h"
 

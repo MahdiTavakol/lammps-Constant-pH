@@ -10,6 +10,12 @@
 
    See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
+
+/* ----------------------------------------------------------------------
+   Contributing author: Mahdi Tavakol (Oxford)
+   mahditavakol90@gmail.com
+------------------------------------------------------------------------- */
+
 #include "fix_adaptive_protonation.h"
 
 #include "atom.h"

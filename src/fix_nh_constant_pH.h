@@ -13,8 +13,8 @@
 ------------------------------------------------------------------------- */
 
 /* ----------------------------------------------------------------------
-   Constant pH support added by: Mahdi Tavakol (Oxford)
-   v0.08.21
+   Contributing author: Mahdi Tavakol (Oxford)
+   mahditavakol90@gmail.com
 ------------------------------------------------------------------------- */
 
 #ifndef LMP_FIX_NH_CONSTANT_PH_H

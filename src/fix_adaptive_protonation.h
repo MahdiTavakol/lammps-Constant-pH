@@ -10,7 +10,11 @@
 
    See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
-/* ---v0.10.15----- */
+
+/* ----------------------------------------------------------------------
+   Contributing author: Mahdi Tavakol (Oxford)
+   mahditavakol90@gmail.com
+------------------------------------------------------------------------- */
 
 #ifdef FIX_CLASS
 // clang-format off

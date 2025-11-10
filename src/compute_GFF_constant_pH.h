@@ -11,6 +11,11 @@
    See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
 
+/* ----------------------------------------------------------------------
+   Contributing author: Mahdi Tavakol (Oxford)
+   mahditavakol90@gmail.com
+------------------------------------------------------------------------- */
+
 #ifdef COMPUTE_CLASS
 // clang-format off
 ComputeStyle(constant_pH/GFF,ComputeGFFConstantPH);
