@@ -138,10 +138,14 @@ void FixNHConstantPH::nve_v()
   FixNH::nve_v();
   
   // Getting the lambda_parameters from the fix_constant_pH.
+  // Here while fixNH is modifiying pH_state no other classes
+  // wants to use it.. so may be I can use the std::move(pH_state)
+  // to call the rvalue return_params function.
   fix_constant_pH->return_params(pH_state);
-  double** v_lambdas = pH_state->v_lambdas;
+  double** v_lambdas   = pH_state->v_lambdas;
   const int& n_lambdas = pH_state->n_lambdas;
-  double** a_lambdas = pH_state->a_lambdas;
+  double** a_lambdas   = pH_state->a_lambdas;
+
   for (int i = 0; i < n_lambdas; i++) 
    for (int j = 0; j < 3; j++)
     v_lambdas[i][j] += dtf * a_lambdas[i][j];
@@ -149,7 +153,7 @@ void FixNHConstantPH::nve_v()
 
  if (lambda_integration_flags & BUFFER) {
   double& v_lambda_buff = pH_state->v_lambda_buff;
-  auto& a_lambda_buff = pH_state->a_lambda_buff;
+  auto&   a_lambda_buff = pH_state->a_lambda_buff;
   v_lambda_buff += dtf * a_lambda_buff;
  }
 
@@ -170,6 +174,8 @@ void FixNHConstantPH::nve_x()
   double** x_lambdas = pH_state->lambdas;
   double** const v_lambdas = pH_state->v_lambdas;
   const int& n_lambdas = pH_state->n_lambdas;
+
+
   for (int i = 0; i < n_lambdas; i++)
    for (int j = 0; j < 3; j++)
     x_lambdas[i][j] += dtv * v_lambdas[i][j];
@@ -178,14 +184,23 @@ void FixNHConstantPH::nve_x()
   // Returning the modified parameters to the fix_constant_pH.
   fix_constant_pH->reset_params(pH_state);
 
-    // This function sets the charges (qs) in the system based on the current value of x_lambdas and x_lambda_buffs
-    fix_constant_pH->reset_qs();    
+  // This function sets the charges (qs) in the system based on the current value of x_lambdas and x_lambda_buffs
+  fix_constant_pH->reset_qs();    
 
   if (lambda_integration_flags & BUFFER) {
    auto& x_lambda_buff = pH_state->lambda_buff;
    auto& v_lambda_buff = pH_state->v_lambda_buff;
    x_lambda_buff += dtv * v_lambda_buff;
      if (lambda_integration_flags & CONSTRAIN) constrain_lambdas<2>();
+     else {
+       /*
+        * The constrain_lambdas have a reset_qs() function
+        * Just for the case with no constrain_lambdas() 
+        * there is a need for a  reset_qs()
+        */
+       fix_constant_pH->reset_params(pH_state);
+       fix_constant_pH->reset_qs();
+     }
   }
 }
 
@@ -392,7 +407,6 @@ void FixNHConstantPH::nh_v_temp()
    The constraint equations were taken from the Tuckerman statistical mechanics
    book 2nd edition pages 106.
 
-   Just one step of the shake iteration is enough as the constraint is very simple.
    
    --------------------------------------------------------------------- */
    
@@ -440,7 +454,7 @@ void FixNHConstantPH::constrain_lambdas()
       
       for (int i = 0; i < n_lambdas; i++) {
          sigma_lambda += x_lambdas[i][0];
-         if (m_lambdas[i][0] == 0) error->all(FLERR,"m_lambdas[{},0] is zero in fix_nh_constant_pH",i);
+         if (m_lambdas[i][0] == 0) error->all(FLERR,"m_lambdas({},0) is zero in fix_nh_constant_pH",i);
          sigma_mass_inverse += (1.0/m_lambdas[i][0]);
       }
 
