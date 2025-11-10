@@ -624,23 +624,21 @@ void FixConstantPH::update_a_lambda()
   double kj2kcal = 0.239006;
   double kT = force->boltz * T;
   double nStructures1Barrier = 0.5 * kT;
-  double nStructures2Barrier = 0.5 * kT;
+  double nStructures2Barrier = 0.5 * kT; 
 
-  double **lambdas = pH_state->lambdas;
-  double **v_lambdas = pH_state->v_lambdas;
-  double **a_lambdas = pH_state->a_lambdas;
-  double **m_lambdas = pH_state->m_lambdas;
-  double& lambda_buff = pH_state->lambda_buff;
-  double& v_lambda_buff = pH_state->v_lambda_buff;
-  double& a_lambda_buff = pH_state->a_lambda_buff;
-  double& m_lambda_buff = pH_state->m_lambda_buff;
-  int& n_lambdas = pH_state->n_lambdas;
+  double** lambdas       = pH_state->lambdas;
+  double** v_lambdas     = pH_state->v_lambdas;
+  double** a_lambdas     = pH_state->a_lambdas;
+  double** m_lambdas     = pH_state->m_lambdas;
+  double&  lambda_buff   = pH_state->lambda_buff;
+  double&  v_lambda_buff = pH_state->v_lambda_buff;
+  double&  a_lambda_buff = pH_state->a_lambda_buff;
+  double&  m_lambda_buff = pH_state->m_lambda_buff;
+  int&     n_lambdas     = pH_state->n_lambdas;
 
   int pHnStructures1 = pH_structure_storage->pHnStructures1;
   int pHnStructures2 = pH_structure_storage->pHnStructures2;
 
-  //df = 1.0;
-  //f = 1.0;
 
   for (int i = 0; i < n_lambdas; i++) {
     double f_lambda_0 = -(HAs[i] - HBs[i] -dfs[i] * kT * log(10) * (pK - pH) + kj2kcal * dUs[i] - GFF_lambdas[i]);    
@@ -1811,20 +1809,37 @@ double FixConstantPH::compute_epair()
 
   int natoms = atom->natoms;
 
-  double energy = 0.0;
-  if (force->pair) energy += force->pair->eng_coul;
-  // Adding the kspace component
-  if (force->kspace)
-    energy += force->kspace->energy;
+  double one = 0.0;
+  double energy;
+  if (force->pair) one += force->pair->eng_coul;
 
   /* As the bond, angle, dihedral and improper energies 
-      do not change with the espilon, we do not need to 
+      do not change with the lambda, we do not need to 
       include them in the energy. We are interested in 
       their difference afterall */
 
-  // To convert to kcal/mol the total energy must be devided by the number of atoms
-  // this division might be the culprit!!!!!
-  energy /= static_cast<double>(natoms);    
+  // the eng_coul and eng_vdwl are accumulated per rank.
+  // Since the vdwl energy does not change too much with the lambda value
+  // we do not include it here.
+  MPI_Allreduce(&one,&energy,1,MPI_DOUBLE,MPI_SUM,world);
+
+
+  // Adding the kspace component
+  // the kspace energy is the value accumulated for all the ranks.
+  // Look at src/compute_pe.cpp
+  if (force->kspace)
+    energy += force->kspace->energy;
+  
+  
+  /*
+   * This value must not be divided by the number of atoms for two reasons:
+   * (1) in the lammps doc (https://docs.lammps.org/compute_pe.html)
+   *     this value has been mentioned as extensive.
+   *     The same procedure in the compute_pe.cpp has been used.
+   * (2) in the updatelamdas function of the gromacs implementation 
+   *     an extensive value has been used. 
+   */ 
+
   return energy;
 }
 
