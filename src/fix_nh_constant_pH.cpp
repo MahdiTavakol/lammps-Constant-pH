@@ -23,24 +23,17 @@
 
 #include "atom.h"
 #include "comm.h"
-#include "compute.h"
-#include "domain.h"
 #include "error.h"
-#include "fix_deform.h"
 #include "force.h"
-#include "group.h"
 #include "irregular.h"
-#include "kspace.h"
-#include "memory.h"
 #include "modify.h"
-#include "neighbor.h"
-#include "respa.h"
+#include "random_mars.h"
 #include "update.h"
+#include "utils.h"
 
 #include <cmath>
 #include <cstring>
 #include <array>
-#include <vector>
 
 using namespace LAMMPS_NS;
 using namespace FixConst;
@@ -57,6 +50,7 @@ enum {
      };
 
 
+constexpr double eps = 1e-20;
 
 /* ----------------------------------------------------------------------
    NVT,NPH,NPT integrators for lambdas
@@ -75,18 +69,23 @@ FixNHConstantPH::FixNHConstantPH(LAMMPS *lmp, int narg, char **arg) :
   while (iarg < narg) {
     if (strcmp(arg[iarg],"fix_constant_pH_id") == 0) {
        fix_constant_pH_id = std::string(arg[iarg+1]);
+       if (fix_constant_pH_id.empty())
+         error->all(FLERR,"fix_nh_constant_pH requires 'fix_constant_pH_id <id>'");
        iarg += 2;
     } else if (strcmp(arg[iarg],"lambda_andersen") == 0) {
        lambda_thermostat_type = LAMBDA_ANDERSEN;
        t_andersen = utils::numeric(FLERR,arg[iarg+1],false,lmp);
+       if (t_andersen <= 0.0) error->all(FLERR,"lambda_andersen requires t_andersen > 0");
        iarg+=2;
     } else if (strcmp(arg[iarg],"lambda_bussi") == 0) {
        lambda_thermostat_type = LAMBDA_BUSSI;
        tau_t_bussi = utils::numeric(FLERR,arg[iarg+1],false,lmp);
+       if (tau_t_bussi <= 0.0) error->all(FLERR,"lambda_bussi requires tau_t_bussi > 0");
        iarg+=2;
     } else if (strcmp(arg[iarg],"lambda_nose-hoover") == 0) {
        lambda_thermostat_type = LAMBDA_NOSEHOOVER;
        Q_lambda_nose_hoover = utils::numeric(FLERR,arg[iarg+1],false,lmp);
+       if (Q_lambda_nose_hoover <= 0.0) error->all(FLERR,"lambda_nose-hoover requires Q > 0");
        iarg+=2;
     } else if (strcmp(arg[iarg],"buffer") == 0) {
        lambda_integration_flags |= BUFFER;
@@ -470,7 +469,8 @@ void FixNHConstantPH::constrain_lambdas()
       
       double denom = (mols_charge_change*mols_charge_change*sigma_mass_inverse + (N_buff_double*buff_charge_change*buff_charge_change/m_lambda_buff));
 
-      if (!std::isfinite(denom)) error->one(FLERR,"The denom is inifinite!");
+      if (!std::isfinite(denom) || std::abs(denom) < eps)
+         error->one(FLERR,"Denominator is invalid (non-finite or too small) in constrain_lambdas");
 
       domega = -alpha*q_total / denom;
 
