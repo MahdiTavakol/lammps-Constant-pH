@@ -56,3 +56,49 @@ You can also create these doc pages locally:
 % cd doc
 % make html                # creates HTML pages in doc/html
 % make pdf                 # creates Manual.pdf
+
+----------------------------------------------------------------------
+Constant-pH Molecular Dynamics Extension
+
+Contributing author: Mahdi Tavakol (University of Oxford)
+Email: mahditavakol90@gmail.com
+
+This fork of LAMMPS adds a complete framework for performing constant-pH molecular dynamics simulations using λ-dynamics and adaptive charge interpolation.
+The method allows on-the-fly protonation and deprotonation of molecules or residues while maintaining overall charge neutrality through optional buffer ions.
+
+The implementation extends the standard Nose-Hoover (NVT, NPT, and NH) integrators with additional λ degrees of freedom that evolve dynamically together with atomic coordinates.
+Thermostatting of λ variables can be done via Andersen, Bussi, or Nose-Hoover schemes.
+An optional total-charge constraint enforces electroneutrality when buffer particles are used.
+
+The new package is fully parallelized, compatible with domain decomposition, and can be combined with all standard LAMMPS pair, bond, angle, and k-space styles.
+
+Files added
+
+constant_pH_structures.cpp, constant_pH_structures.h
+Reads and stores charge templates for protonated and deprotonated states and broadcasts them to all ranks.
+
+fix_constant_pH.cpp, fix_constant_pH.h
+Core fix that manages λ variables, charge interpolation between protonated and deprotonated states, bias potentials, λ accelerations, and state output.
+
+fix_adaptive_protonation.cpp, fix_adaptive_protonation.h
+Detects changes in solvent exposure and adaptively updates the list of protonable molecules during the run.
+
+fix_nh_constant_pH.cpp, fix_nh_constant_pH.h
+Nose-Hoover-style λ integrator that supports Andersen, Bussi, and Nose-Hoover thermostats and optional total-charge constraints.
+
+fix_nvt_constant_pH.cpp, fix_nvt_constant_pH.h
+NVT ensemble version that creates a dedicated temperature compute for the λ subsystem.
+
+fix_npt_constant_pH.cpp, fix_npt_constant_pH.h
+NPT ensemble version that couples λ dynamics to a barostat and pressure compute.
+
+compute_temp_constant_pH.cpp, compute_temp_constant_pH.h
+Compute that includes λ kinetic energy when calculating temperature.
+
+compute_GFF_constant_pH.cpp, compute_GFF_constant_pH.h
+Computes the generalized free-energy correction (ΔG_FF) using finite-difference sampling of H(λ ± δ).
+
+Files modified
+
+fix_nh.cpp, fix_nh.h
+Lightly modified version of the LAMMPS Nose-Hoover integrator exposing hooks for λ-coupling.
