@@ -48,12 +48,12 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
 
   nevery = utils::numeric(FLERR, arg[3], false, lmp);
 
-  if (nevery < 0) error->all(FLERR, "Illegal fix adaptive_protonation every value {}", nevery);
+  if (nevery <= 0) error->all(FLERR, "Illegal fix adaptive_protonation every value {}", nevery);
 
   fileName1 = arg[4];
   fileName2 = arg[5];
 
-  typeOW = utils::numeric(FLERR, arg[6], false, lmp);
+  typeOW    = utils::numeric(FLERR, arg[6], false, lmp);
   threshold = utils::numeric(FLERR, arg[7], false, lmp);
 
   flags = 0;
