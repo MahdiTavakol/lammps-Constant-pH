@@ -360,12 +360,12 @@ void FixConstantPH::setup(int /*vflag*/)
 
   // I have put this part here on purpose so if the fix_adaptive_protonation reads the initial molids, it is set here
   if (flags & ADAPTIVE) { 
-    //fix_adaptive_protonation->get_n_protonable(n_lambdas_input);
-    //molids_input = std::make_unique<int[]>(n_lambdas_input);
-    // get_protonable_molids should be modified to be compatible with std::unique_ptr
+    //
     // The get_protonable_molids method of the fix_adaptive_protonation class
     // itself allocates the molids_input with n_lambdas so no need for manual allocation here!
     fix_adaptive_protonation->get_protonable_molids(molids_input);
+    // the molids_input does not have any info on its size.
+    fix_adaptive_protonation->get_n_protonable(n_lambdas_input);
   }
 
   if (flags & BUFFER) {
@@ -440,12 +440,12 @@ void FixConstantPH::initial_integrate(int /*vflag*/)
         /* 
          *  we reread the n_lambdas after backing up the lambdas
          */
-        //fix_adaptive_protonation->get_n_protonable(n_lambdas_input);
-        //molids_input = std::make_unique<int[]>(n_lambdas_input);
-        // get_protonable_molids should be modified to be compatible with std::unique_ptr
         // get_protonable_molids itself allocates the required storage.
         fix_adaptive_protonation->get_protonable_molids(molids_input);
-        // 
+        // The molids_input even though allocated by the fix_adaptive_protonation
+        // it does not include any information regarding its size
+        fix_adaptive_protonation->get_n_protonable(n_lambdas_input);
+
         pH_state = std::make_unique<constant_pH_state>(lmp,molids_input,
           n_lambdas_input,lambda_masses,N_buff);
         // forcefield variables for lambdas
