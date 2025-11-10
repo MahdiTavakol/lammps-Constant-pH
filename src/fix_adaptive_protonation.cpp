@@ -110,7 +110,7 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
 
 
   /* This part used to be in the setup() function, 
-    * however since this fix adaptive protonation is
+    * however since this fix adaptive protonation might be
     * deleted and added everytime the number of protonation
     * state changes this part has to be inside the constructor
     */
@@ -137,7 +137,8 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
   nmolecules++;
   // molecule_id is in 1-based indexing
   for (int i = 0; i < nlocal; i++) {
-    if (molecule[i] == 0) molecule[i] = nmolecules;
+    if (molecule[i] == 0)
+      molecule[i] = nmolecules;
   }
 
   // The allocate_storage() function needs to know the nmolecules to set the arrays
@@ -146,8 +147,8 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
   if (flags & INIT_MID) read_molids_file();
 
   /* Only if it has not read the molids from a file the n_protonable should set to zero.
-    *  Otherwise, it had been set by the read_molids_file()
-    */
+   * Otherwise, it had been set by the read_molids_file()
+   */
   if (!(flags & INIT_MID)) n_protonable = 0;
 
 
@@ -257,7 +258,8 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
   int nmolecules_total;
     
   for (int i = 0; i < atom->nlocal; i++) {
-    if (atom->molecule[i] > nmolecules_local) nmolecules_local = atom->molecule[i];
+    if (atom->molecule[i] > nmolecules_local) 
+      nmolecules_local = atom->molecule[i];
   }
     
   MPI_Allreduce(&nmolecules_local, &nmolecules_total, 1, MPI_INT, MPI_MAX, world);
@@ -284,7 +286,7 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
   
   // Resetting the mark_prev parameter to help us keep the track of which molecule moves from solid to solvent and vice versa
   // If neighBuildRatio is higher than 50% neigher the mark is updated nor
-  // the mark_prev nor is set and also the reset_mark_sum_running is not called
+  // the mark_prev is set and also the reset_mark_sum_running is not called
   // --->>> status quo
   if (update->ntimestep%nevery == 0 && neighBuildRatioPrev <= neighBuildRatioCutoff) {
     set_mark_prev();
@@ -298,7 +300,11 @@ void FixAdaptiveProtonation::post_force(int /*vflag*/)
 {
   /* 
    * Building the neighbor list
-   * a step before every nevery steps 
+   * a step before every nevery steps
+   * Between the post_force of the previous step and initial_integrate
+   * of the current step there is no neighbor exchange in the LAMMPS timestepping.
+   * We do need to mark_protoation_deprotonation in the initial_integrate which is when
+   * the fix_constant_pH needs that information. 
    */
   if ((update->ntimestep+1)%nevery == 0) {
     if (!list)
@@ -310,6 +316,8 @@ void FixAdaptiveProtonation::post_force(int /*vflag*/)
   }
 
   // incrementing the nNeighBuildSteps
+  // This measures the neighbor builds for the forcefield
+  // not our own neighbor build!
   if (neighbor->ago == 0)
     nNeighBuildSteps++;
 
@@ -317,7 +325,7 @@ void FixAdaptiveProtonation::post_force(int /*vflag*/)
   // Counting the number of water molecules surrounding the protonable molecules
   int innernevery;
   if (nSmoothingSteps)
-    innernevery = MAX(1,nevery / nSmoothingSteps);
+    innernevery = std::max(1,nevery / nSmoothingSteps);
   else 
     error->all(FLERR,"nSmoothingSteps in the fix_adaptive_protonation is zero");
 
@@ -367,12 +375,12 @@ void FixAdaptiveProtonation::grow_arrays(int nmax_new)
 {
   auto q_new = std::make_unique<double []>(nmax_new);
   int keep = std::min(nmax,nmax_new);
-  if (keep > 0) std::copy(q_orig.get(),q_orig.get()+keep,q_new.get());
+  if (keep > 0) std::copy_n(q_orig.get(),keep,q_new.get());
   if (keep < nmax_new) std::fill(q_new.get()+keep,q_new.get()+nmax_new,0.0);
   q_orig.swap(q_new);
 
   double *new_vector_atom = new double[nmax_new];
-  if (keep > 0) std::copy(vector_atom,vector_atom+keep,new_vector_atom);
+  if (keep > 0) std::copy_n(vector_atom,keep,new_vector_atom);
   if (keep < nmax_new) std::fill(new_vector_atom+keep,new_vector_atom+nmax_new,0.0);
   delete [] vector_atom;
   vector_atom = new_vector_atom;
@@ -433,6 +441,8 @@ void FixAdaptiveProtonation::allocate_storage()
   protonable_molids     = make_unique<int[]>(nmolecules);
   mark                  = make_unique<int[]>(nmolecules + 1);
   mark_prev             = make_unique<int[]>(nmolecules + 1);
+  // I do not want to allocate and deallocate this array 
+  // in the mark_protonation_deprotonation repeatedly.
   mark_local            = make_unique<int[]>(nmolecules + 1);
   mark_total            = make_unique<int[]>(nmolecules + 1);
   mark_sum_running      = make_unique<double[]>(nmolecules + 1);
@@ -467,16 +477,17 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
 
   // resetting the mark_local and molecule_size_local before going through atoms
   std::fill_n(mark_local.get(),nmolecules+1,0);
-  //std::fill_n(mark_total.get(),nmolecules+1,0);
   std::fill_n(protonable_size_local.get(),nmolecules+1,0);
   std::fill_n(vector_atom,nmax,0.0);
 
-  inum = list->inum;    // I do not need ghost atoms for inum. however, I need them in jnum
-  ilist = list->ilist;
-  numneigh = list->numneigh;
+
+  // I do not need ghost atoms for inum. however, I need them in jnum
+  inum       = list->inum;    
+  ilist      = list->ilist;
+  numneigh   = list->numneigh;
   firstneigh = list->firstneigh;
 
-  int *type = atom->type;
+  int *type     = atom->type;
   int *molecule = atom->molecule;
 
   for (int ii = 0; ii < inum; ii++) {
@@ -490,10 +501,16 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
     }
 
     jlist = firstneigh[i];
-    jnum = numneigh[i];
+    jnum  = numneigh[i];
     for (int jj = 0; jj < jnum; jj++) {
       int j = jlist[jj];
       j &= NEIGHMASK;
+
+      // We are counting the number of neighboring Oxygen atoms from waters.
+      /* Just considering the Oxygens since
+       * it is possible that both O and H from
+       * the same water molecule are close to this atom.
+       */
 
       if (type[j] != typeOW) continue;
 
@@ -504,7 +521,7 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
       domain->minimum_image(dx,dy,dz);
       double r = dx*dx+dy*dy+dz*dz;
       if (r < rprobe*rprobe)
-        vector_atom[i] += 1.0;    // Just considering the Oxygens. It is possible that both O and H from the same water molecule are close to this atom.
+        vector_atom[i] += 1.0;    
     }
 
     if (vector_atom[i] >= threshold) {
@@ -572,9 +589,9 @@ void FixAdaptiveProtonation::backup_init_qs()
 
 void FixAdaptiveProtonation::set_molecule_id()
 {
-  int nlocal = atom->nlocal;
-  int *molecule = atom->molecule;
-  int *num_bond = atom->num_bond;
+  int nlocal      = atom->nlocal;
+  int *molecule   = atom->molecule;
+  int *num_bond   = atom->num_bond;
   int **bond_atom = atom->bond_atom;
    
   bool changed;
@@ -585,7 +602,7 @@ void FixAdaptiveProtonation::set_molecule_id()
       for (int k = 0; k < num_bond[i]; k++) {
         const int j = atom->map(bond_atom[i][k]);
         if (j < 0) continue;
-        const int mmin = MIN(mi, molecule[j]);
+        const int mmin = std::min(mi, molecule[j]);
         if (mmin != mi) { 
           mi = mmin;
           changed = true;
@@ -593,7 +610,8 @@ void FixAdaptiveProtonation::set_molecule_id()
       }
       molecule[i] = mi;
     }
-    int any = changed ? 1 : 0, any_global = 0;
+    int any = changed ? 1 : 0;
+    int any_global = 0;
     MPI_Allreduce(&any, &any_global, 1, MPI_INT, MPI_MAX, world);
     if (!any_global) break;
     comm->exchange();
@@ -651,7 +669,7 @@ void FixAdaptiveProtonation::read_molids_file()
   // chaning the mark_prev from NEITHER to 0 does not matter
   // as in the modify_protonation_state we check if the atom 
   // type is protonable or not (NEITHER)
-  fill(mark_prev.get(), mark_prev.get() + nmolecules + 1, 0);    // zero is for SOLID
+  fill(mark_prev.get(), mark_prev.get() + nmolecules + 1,SOLID);
   for (int i = 0; i < n_protonable; i++) mark_prev[protonable_molids[i]] = SOLVENT;
   // protonable molecules are exposed to the SOLVENT.
 }
@@ -801,7 +819,8 @@ void FixAdaptiveProtonation::modify_protonation_state()
 
 void FixAdaptiveProtonation::set_mark_prev()
 {
-  for (int i = 0; i < nmolecules + 1; i++) mark_prev[i] = mark[i];
+  for (int i = 0; i < nmolecules + 1; i++)
+    mark_prev[i] = mark[i];
 }
 
 /* --------------------------------------------------------------------------
