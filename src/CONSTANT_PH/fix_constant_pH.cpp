@@ -533,7 +533,8 @@ void FixConstantPH::set_lambdas()
     // Initializing lambdas based on the current charge of protonable molecules so there is no jump in the system total charge
     initialize_lambda(to);
     // This would not work in the initialize section as the m_lambda has not been set yet!
-    initialize_v_lambda(this->T,to);
+    initialize_v_lambda(this->T,0);
+    //initialize_v_lambda(this->T,to);
   }
 
   // Resetting the vector_atom to the default value
@@ -554,6 +555,8 @@ void FixConstantPH::initialize_lambda(const int& to)
   int *molecule        = atom->molecule;
   const int& n_lambdas = pH_state->n_lambdas;
   const int length     = n_lambdas - to;
+
+  if (length <= 0) return;
 
   // These three are not safe for the pH*qs I should
   // use the mdspan with std::unique_ptr and 
