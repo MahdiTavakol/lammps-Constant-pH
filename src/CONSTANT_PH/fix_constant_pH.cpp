@@ -1809,7 +1809,7 @@ double FixConstantPH::compute_epair()
 
   double one = 0.0;
   double energy;
-  if (force->pair) one += force->pair->eng_coul;
+  if (force->pair) one += force->pair->eng_vdwl + force->pair->eng_coul;
 
   /* As the bond, angle, dihedral and improper energies 
       do not change with the lambda, we do not need to 
@@ -1827,6 +1827,8 @@ double FixConstantPH::compute_epair()
   // Look at src/compute_pe.cpp
   if (force->kspace)
     energy += force->kspace->energy;
+
+  if (modify->n_energy_global) energy += modify->energy_global();
   
   
   /*
