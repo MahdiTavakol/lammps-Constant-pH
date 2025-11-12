@@ -80,6 +80,8 @@ class FixConstantPH : public Fix {
   // Environment correlation parameters
   std::unique_ptr<double[]> HAs;
   std::unique_ptr<double[]> HBs;
+  double HA_buff, HB_buff;
+
 
   // The step function 
   std::unique_ptr<double[]> Us;
@@ -106,7 +108,7 @@ class FixConstantPH : public Fix {
   std::unique_ptr<double []> H_lambdas;
   double H_lambda_buff;
   double H_lambda_prev;
-  double HA_buff, HB_buff;
+  
 
   // lambda temperature
   double T_lambdas[3];
@@ -201,6 +203,8 @@ class FixConstantPH : public Fix {
 
   // The function to calculate Hs
   void calculate_Hs();
+  // Resetting the total charge (used in the calculate_Hs())
+  void neutralize(bool buffer = true);
   // The function that checks that the ratio of OWs to HWs is 1.0 to 3.0
   void check_num_OWs_HWs();
   // Reading the structures at different pH values

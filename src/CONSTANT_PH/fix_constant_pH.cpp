@@ -1515,6 +1515,8 @@ void FixConstantPH::calculate_Hs()
         else if (dist != n_lambdas)
           q[i] = lambdas[dist][0] * pH2qs[type[i]][0] + (1 - lambdas[dist][0]) * pH1qs[type[i]][0];
       }
+      // Neutralizing the system 
+      neutralize();
       // forward comm so that ghost atoms are consistent
       comm->forward_comm();
       // calculating the energies
@@ -1534,6 +1536,8 @@ void FixConstantPH::calculate_Hs()
       double lambda_j = 1.0;
       // modifying the atom charges
       modify_qs(lambda_j,j);
+      // Neutralizing the system 
+      neutralize();
       // forward comm so that ghost atoms are consistent
       comm->forward_comm();
       // calculating the energies
@@ -1544,6 +1548,8 @@ void FixConstantPH::calculate_Hs()
       lambda_j = 0.0;
       // modifying the atom charges
       modify_qs(lambda_j,j);
+      // Neutralizing the system 
+      neutralize();
       // forward comm so that ghost atoms are consistent
       comm->forward_comm();
       // calculating the energies
@@ -1582,6 +1588,20 @@ void FixConstantPH::calculate_Hs()
 
 
   HCalcNSteps++;
+}
+
+/* --------------------------------------------------------------------- 
+    Neutralizing the total charges in the calculate_Hs()
+   --------------------------------------------------------------------- */
+
+void FixConstantPH::neutralize(bool buffer)
+{
+  if (buffer) {
+    double q_total = compute_q_total(true);
+    double N_buff_double = pH_state->N_buff;
+    double lambda_buff = -q_total / N_buff_double;
+    modify_q_buff(lambda_buff);
+  }
 }
 
 /* --------------------------------------------------------------------- 
