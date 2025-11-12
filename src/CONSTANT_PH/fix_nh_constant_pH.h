@@ -34,6 +34,8 @@ class FixNHConstantPH : public FixNH {
   FixNHConstantPH(class LAMMPS *, int, char **);
   void init() override;
   double memory_usage() override;
+  void initial_integrate(int) override;
+  void final_integrate() override;
 
  protected:
   // integration functions (x and lambdas)
@@ -46,7 +48,8 @@ class FixNHConstantPH : public FixNH {
   void allocate_lambda_storage();
 
   // constraining total charge through change lambdas and lambda_buff
-  template <int mode> void constrain_lambdas();
+  void constrain_lambdas();
+  void constrain_v_lambdas();
   // computing the total charge
   double compute_q_total();
 
@@ -81,6 +84,8 @@ class FixNHConstantPH : public FixNH {
  private:
   std::unique_ptr<RanMars> ranMars;
   int ranMarsSeed;
+  // previous step shake coefficient
+  double omegaPrev = 0.0;
 };
 
 }    // namespace LAMMPS_NS

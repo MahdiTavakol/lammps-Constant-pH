@@ -128,9 +128,31 @@ void FixNHConstantPH::init()
   ranMars = std::make_unique<RanMars>(lmp,ranMarsSeed);
 }
 
+/* ---------------------------------------------------------------------
+   Adding the shake constraint to the 1st step of the velocity verlet 
+   --------------------------------------------------------------------- */
+
+void FixNHConstantPH::initial_integrate(int vflag)
+{
+   FixNH::initial_integrate(vflag);
+   if (lambda_integration_flags & CONSTRAIN)
+      constrain_lambdas();
+}
+
+/* ---------------------------------------------------------------------
+   Adding the shake constraint to the 2nd step of the velocity verlet
+   --------------------------------------------------------------------- */
+
+void FixNHConstantPH::final_integrate()
+{
+   FixNH::final_integrate();
+   if (lambda_integration_flags & CONSTRAIN)
+      constrain_v_lambdas();
+}
+
 /* ----------------------------------------------------------------------
    perform half-step update of velocities
------------------------------------------------------------------------*/
+   --------------------------------------------------------------------- */
 
 void FixNHConstantPH::nve_v()
 {
@@ -180,27 +202,16 @@ void FixNHConstantPH::nve_x()
     x_lambdas[i][j] += dtv * v_lambdas[i][j];
   
      
-  // Returning the modified parameters to the fix_constant_pH.
-  fix_constant_pH->reset_params(pH_state);
-
-  // This function sets the charges (qs) in the system based on the current value of x_lambdas and x_lambda_buffs
-  fix_constant_pH->reset_qs();    
-
   if (lambda_integration_flags & BUFFER) {
    auto& x_lambda_buff = pH_state->lambda_buff;
    auto& v_lambda_buff = pH_state->v_lambda_buff;
    x_lambda_buff += dtv * v_lambda_buff;
-     if (lambda_integration_flags & CONSTRAIN) constrain_lambdas<2>();
-     else {
-       /*
-        * The constrain_lambdas have a reset_qs() function
-        * Just for the case with no constrain_lambdas() 
-        * there is a need for a  reset_qs()
-        */
-       fix_constant_pH->reset_params(pH_state);
-       fix_constant_pH->reset_qs();
-     }
   }
+
+  // Returning the modified parameters to the fix_constant_pH.
+  fix_constant_pH->reset_params(pH_state);
+  // This function sets the charges (qs) in the system based on the current value of x_lambdas and x_lambda_buffs
+  fix_constant_pH->reset_qs();   
 }
 
 /* ----------------------------------------------------------------------
@@ -409,20 +420,38 @@ void FixNHConstantPH::nh_v_temp()
    
    --------------------------------------------------------------------- */
    
-template <int mode>
+
 void FixNHConstantPH::constrain_lambdas()
 {
    double omega = 0.0;
-   double domega;
+   double domega = omegaPrev;
    double q_total;
    double sigma_lambda;
    double sigma_mass_inverse;
    
 
-   int maxCycles = 10000;
+   constexpr int maxCycles = 10000;
    constexpr double alpha = 0.5; 
    constexpr double etol = 1e-6; 
    int cycle = 0;
+
+   /* Some sanity checks */
+   if (comm->me == 0) {
+      const int n_lambdas = pH_state->n_lambdas;
+      int N_buff = pH_state->N_buff;
+      double ** m_lambdas = pH_state->m_lambdas;
+      double m_lambda_buff = pH_state->m_lambda_buff;
+
+      /* Checking if the charge content of the N_buff is large enough for n_lambdas
+       * Since there is a possibility that the n_lambdas change during the simulation by 
+       * the fix_adaptive_protonation.cpp command, the check should be done here. 
+       */
+      if (N_buff < mols_charge_change*n_lambdas)
+         error->one(FLERR,"The charge content of N_buff={} is not large enough for n_lambdas={}: Please increase the N_buff\n",N_buff,n_lambdas);
+      for (int i =0; i < n_lambdas; i++)
+         if (m_lambdas[i][0] == 0) error->all(FLERR,"m_lambdas({},0) is zero in fix_nh_constant_pH",i);
+      if (m_lambda_buff == 0) error->all(FLERR,"Buffer mass is zero in fix_nh_constant_pH");
+   }
    
    
    
@@ -435,36 +464,33 @@ void FixNHConstantPH::constrain_lambdas()
 
       fix_constant_pH->return_params(pH_state);
       const int n_lambdas = pH_state->n_lambdas;
-      const double N_buff = pH_state->N_buff;
+      const int N_buff = pH_state->N_buff;
       const double N_buff_double = static_cast<double>(N_buff);
       double** x_lambdas = pH_state->lambdas;
       auto& x_lambda_buff = pH_state->lambda_buff;
       double** m_lambdas = pH_state->m_lambdas;
       double m_lambda_buff = pH_state->m_lambda_buff;
-      
 
-      /* Checking if the charge content of the N_buff is large enough for n_lambdas
-       * Since there is a possibility that the n_lambdas change during the simulation by 
-       * the fix_adaptive_protonation.cpp command, the check should be done here. 
-       */
-      if (cycle == 0 && comm->me == 0) 
-         if (N_buff < mols_charge_change*n_lambdas)
-            error->one(FLERR,"The charge content of N_buff={} is not large enough for n_lambdas={}: Please increase the N_buff\n",N_buff,n_lambdas);
+      // At the first iteration there is an update with the initial value
+      // of domega which is the omegaPrev
+
+      omega += domega;
+      for (int i = 0; i < n_lambdas; i++)
+         x_lambdas[i][0] += (domega * mols_charge_change / m_lambdas[i][0]);
+      x_lambda_buff += buff_charge_change * domega / m_lambda_buff;
+     
+
+      fix_constant_pH->reset_params(pH_state,1);
+      fix_constant_pH->reset_qs();
+      
       
       for (int i = 0; i < n_lambdas; i++) {
          sigma_lambda += x_lambdas[i][0];
-         if (m_lambdas[i][0] == 0) error->all(FLERR,"m_lambdas({},0) is zero in fix_nh_constant_pH",i);
          sigma_mass_inverse += (1.0/m_lambdas[i][0]);
       }
 
-      if (m_lambda_buff == 0) error->all(FLERR,"Buffer mass is zero in fix_nh_constant_pH");
-      
-      if (mode == 1)
-         q_total = mols_charge_change*sigma_lambda+buff_charge_change*N_buff_double*x_lambda_buff-total_charge;
-      else if (mode == 2) 
-         q_total = compute_q_total();
-      else error->one(FLERR,"You should never have reached here!!!");
-
+   
+      q_total = compute_q_total();
 
       
       double denom = (mols_charge_change*mols_charge_change*sigma_mass_inverse + (N_buff_double*buff_charge_change*buff_charge_change/m_lambda_buff));
@@ -474,22 +500,64 @@ void FixNHConstantPH::constrain_lambdas()
 
       domega = -alpha*q_total / denom;
 
-      omega += domega;
-      
-      for (int i = 0; i < n_lambdas; i++)
-         x_lambdas[i][0] += (omega * mols_charge_change / m_lambdas[i][0]);
-
-      x_lambda_buff += buff_charge_change * omega / m_lambda_buff;
-     
-
-      fix_constant_pH->reset_params(pH_state,1);
-      fix_constant_pH->reset_qs();
-
    } while (std::abs(q_total) > etol && ++cycle < maxCycles);
 
    if (comm->me == 0 && cycle >= maxCycles)
       error->warning(FLERR,"Charge constrain did not reach convergence after {} iterations: {}",maxCycles,q_total);
 
+   const int n_lambdas = pH_state->n_lambdas;
+   double** v_lambdas = pH_state->v_lambdas;
+   double** m_lambdas = pH_state->m_lambdas;
+   double v_lambda_buff = pH_state->v_lambda_buff;
+   double m_lambda_buff = pH_state->m_lambda_buff;
+   double dt = update->dt;
+
+   // v_lambdas constraining in the first half step of velocity verlet
+   for (int i = 0; i < n_lambdas; i++)
+      v_lambdas[i][0] += omega*mols_charge_change / (dt*m_lambdas[i][0]);
+   v_lambda_buff += omega*buff_charge_change / (dt*m_lambda_buff);
+   
+   fix_constant_pH->reset_params(pH_state,1);
+   fix_constant_pH->reset_qs();
+
+   // keeping the omega for the next step
+   omega = omegaPrev;
+}
+
+/* ---------------------------------------------------------------------
+
+   --------------------------------------------------------------------- */
+
+void FixNHConstantPH::constrain_v_lambdas()
+{
+   const int n_lambdas = pH_state->n_lambdas;
+   const double N_buff_double = static_cast<double>(pH_state->N_buff);
+   double** v_lambdas = pH_state->v_lambdas;
+   double** m_lambdas = pH_state->m_lambdas;
+   double v_lambda_buff = pH_state->v_lambda_buff;
+   double m_lambda_buff = pH_state->m_lambda_buff;
+
+   double mu = 0.0;
+
+   double nom = 0.0;
+   double denom = 0.0;
+
+   for (int i = 0; i < n_lambdas; i++) {
+      nom += -(mols_charge_change*v_lambdas[i][0]);
+      denom += mols_charge_change*mols_charge_change/ m_lambdas[i][0];
+   }
+
+   nom += N_buff_double*buff_charge_change*v_lambda_buff;
+   denom += N_buff_double*buff_charge_change*buff_charge_change/m_lambda_buff;
+
+   mu = nom/denom;
+
+   for (int i = 0; i < n_lambdas; i++)
+      v_lambdas[i][0] += mu*mols_charge_change / m_lambdas[i][0];
+   v_lambda_buff += mu*buff_charge_change / m_lambda_buff;
+
+   fix_constant_pH->reset_params(pH_state,1);
+   fix_constant_pH->reset_qs();
 }
 
 /* ----------------------------------------------------------------------
