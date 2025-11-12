@@ -663,10 +663,10 @@ void FixConstantPH::update_a_lambda()
   }
 
   if (flags & BUFFER) {
-    double f_lambda_buff = -(kj2kcal * dU_buff);
+    double f_lambda_buff = -(HA_buff - HB_buff + kj2kcal * dU_buff);
     a_lambda_buff =
         f_lambda_buff / m_lambda_buff;    // the fix_nh_constant_pH itself takes care of units
-    this->H_lambda_buff =
+    this->H_lambda_buff = lambda_buff*HA_buff + (1.0-lambda_buff)*HB_buff + 
         kj2kcal * U_buff + N_buff * (m_lambda_buff / 2.0) * (v_lambda_buff * v_lambda_buff) * mvv2e;
   }
 }
@@ -1493,7 +1493,8 @@ void FixConstantPH::calculate_Hs()
   }
    
 
-   
+  // backing up qs
+  backup_restore_qfev<1>();
   if (flags & INTERPOLATION) {
     /*The linear charge interpolation method in Aho et al JCTC 2022*/
     /*
@@ -1504,8 +1505,6 @@ void FixConstantPH::calculate_Hs()
     */
     for (int j = 0; j < n_lambdas; j++)
     {
-      // backing up qs
-      backup_restore_qfev<1>();
       double H_lambda = 0.0;
       for (int i = 0; i < nlocal; i++)
       {
@@ -1527,12 +1526,10 @@ void FixConstantPH::calculate_Hs()
       // saving
       HAs[j] = H_lambda;
       HBs[j] = 0.0;
-    }
+    }   
   }
   else if (!(flags & INTERPOLATION)) {
     for (int j = 0; j < n_lambdas; j++) {
-      // backing up qs
-      backup_restore_qfev<1>();
       // protonated
       double lambda_j = 1.0;
       // modifying the atom charges
@@ -1557,6 +1554,32 @@ void FixConstantPH::calculate_Hs()
       backup_restore_qfev<-1>();
     }
   }
+
+  // For the buffer
+  double H_lamda_buff = 0.0;
+  // protonated
+  double lambda_buff_temp = 1.0;
+  // modifying the atom charges
+  modify_q_buff(lambda_buff_temp);
+  // forward comm so that ghost atoms are consistent
+  comm->forward_comm();
+  // calculating the energies
+  update_lmp();
+  // getting the electrostatic energy + kspace energy
+  HA_buff = compute_epair();
+  // deprotonated
+  lambda_buff_temp = 0.0;
+  // modifying the atom charges
+  modify_q_buff(lambda_buff_temp);
+  // forward comm so that ghost atoms are consistent
+  comm->forward_comm();
+  // calculating the energies
+  update_lmp();
+  // getting the electrostatic energy + kspace energy
+  HB_buff = compute_epair();
+  // restore qs
+  backup_restore_qfev<-1>();
+
 
   HCalcNSteps++;
 }
@@ -1809,7 +1832,7 @@ double FixConstantPH::compute_epair()
 
   double one = 0.0;
   double energy;
-  if (force->pair) one += force->pair->eng_vdwl + force->pair->eng_coul;
+  if (force->pair) one += force->pair->eng_coul;
 
   /* As the bond, angle, dihedral and improper energies 
       do not change with the lambda, we do not need to 
