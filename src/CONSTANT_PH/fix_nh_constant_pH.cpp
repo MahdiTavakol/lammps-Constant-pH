@@ -128,28 +128,6 @@ void FixNHConstantPH::init()
   ranMars = std::make_unique<RanMars>(lmp,ranMarsSeed);
 }
 
-/* ---------------------------------------------------------------------
-   Adding the shake constraint to the 1st step of the velocity verlet 
-   --------------------------------------------------------------------- */
-
-void FixNHConstantPH::initial_integrate(int vflag)
-{
-   FixNH::initial_integrate(vflag);
-   if (lambda_integration_flags & CONSTRAIN)
-      constrain_lambdas();
-}
-
-/* ---------------------------------------------------------------------
-   Adding the shake constraint to the 2nd step of the velocity verlet
-   --------------------------------------------------------------------- */
-
-void FixNHConstantPH::final_integrate()
-{
-   FixNH::final_integrate();
-   if (lambda_integration_flags & CONSTRAIN)
-      constrain_v_lambdas();
-}
-
 /* ----------------------------------------------------------------------
    perform half-step update of velocities
    --------------------------------------------------------------------- */
@@ -180,6 +158,9 @@ void FixNHConstantPH::nve_v()
 
  // Returning the modified parameters to the fix_constant_pH.
  fix_constant_pH->reset_params(pH_state);
+
+ if (lambda_integration_flags & CONSTRAIN)
+   constrain_v_lambdas();
 }
 
 /* ----------------------------------------------------------------------
@@ -211,7 +192,10 @@ void FixNHConstantPH::nve_x()
   // Returning the modified parameters to the fix_constant_pH.
   fix_constant_pH->reset_params(pH_state);
   // This function sets the charges (qs) in the system based on the current value of x_lambdas and x_lambda_buffs
-  fix_constant_pH->reset_qs();   
+  fix_constant_pH->reset_qs();
+  
+  if (lambda_integration_flags & CONSTRAIN)
+   constrain_lambdas();
 }
 
 /* ----------------------------------------------------------------------
@@ -513,9 +497,9 @@ void FixNHConstantPH::constrain_lambdas()
    double dt = update->dt;
 
    // v_lambdas constraining in the first half step of velocity verlet
-   for (int i = 0; i < n_lambdas; i++)
-      v_lambdas[i][0] += omega*mols_charge_change / (dt*m_lambdas[i][0]);
-   v_lambda_buff += omega*buff_charge_change / (dt*m_lambda_buff);
+   //for (int i = 0; i < n_lambdas; i++)
+      //v_lambdas[i][0] += omega*mols_charge_change / (dt*m_lambdas[i][0]);
+   //v_lambda_buff += omega*buff_charge_change / (dt*m_lambda_buff);
    
    fix_constant_pH->reset_params(pH_state,1);
    fix_constant_pH->reset_qs();
@@ -552,9 +536,9 @@ void FixNHConstantPH::constrain_v_lambdas()
 
    mu = nom/denom;
 
-   for (int i = 0; i < n_lambdas; i++)
-      v_lambdas[i][0] += mu*mols_charge_change / m_lambdas[i][0];
-   v_lambda_buff += mu*buff_charge_change / m_lambda_buff;
+   //for (int i = 0; i < n_lambdas; i++)
+      //v_lambdas[i][0] += mu*mols_charge_change / m_lambdas[i][0];
+   //v_lambda_buff += mu*buff_charge_change / m_lambda_buff;
 
    fix_constant_pH->reset_params(pH_state,1);
    fix_constant_pH->reset_qs();

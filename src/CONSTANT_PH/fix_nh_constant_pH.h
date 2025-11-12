@@ -34,8 +34,6 @@ class FixNHConstantPH : public FixNH {
   FixNHConstantPH(class LAMMPS *, int, char **);
   void init() override;
   double memory_usage() override;
-  void initial_integrate(int) override;
-  void final_integrate() override;
 
  protected:
   // integration functions (x and lambdas)
