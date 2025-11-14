@@ -65,7 +65,9 @@ enum {
   V_LAMBDA_FP = 1 << 1,
   A_LAMBDA_FP = 1 << 2,
   H_LAMBDA_FP = 1 << 3,
-  LAMBDA_S_FP = 1 << 4
+  LAMBDA_S_FP = 1 << 4,
+  HA_LAMBDA_FP = 1 << 5,
+  HB_LAMBDA_FP = 1 << 6
 };
 
 static constexpr double tol = 1e-5;
@@ -189,6 +191,14 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
       fp_flags |= H_LAMBDA_FP;
       if (comm->me == 0) H_lambda_fp.open(arg[iarg + 1], std::ofstream::out);
       iarg += 2;
+    } else if (strcmp(arg[iarg],"HA_lambda_file") == 0) {
+      fp_flags |= HA_LAMBDA_FP;
+      if (comm->me == 0) HA_lambda_fp.open(arg[iarg + 1],std::ofstream::out);
+      iarg += 2;
+    } else if (strcmp(arg[iarg],"HB_lambda_file") == 0) {
+      fp_flags |= HB_LAMBDA_FP;
+      if (comm->me == 0) HB_lambda_fp.open(arg[iarg + 1],std::ofstream::out);
+      iarg += 2;
     } else if (strcmp(arg[iarg], "lambda_s_file") == 0) {
       if (narg < iarg + 3) utils::missing_cmd_args(FLERR, "fix constant_pH", error);
       fp_flags |= LAMBDA_S_FP;
@@ -232,13 +242,12 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
 
 
   array_flag = 1;
-  size_array_rows = 11;
+  size_array_rows = 13;
   size_array_cols = 3 * n_lambdas_input + ((flags & BUFFER) ? 1 : 0);
   peratom_flag = 1;
   size_peratom_cols = 0;
   peratom_freq = nevery;
   extarray = 0;
-
 
   atom->add_callback(Atom::GROW);
   //atom->add_callback(Atom::COPY);
@@ -1670,6 +1679,29 @@ void FixConstantPH::write_lambdas()
 
   if (comm->me != 0) return;    // Only rank 0 writes
 
+  const struct {
+    int flag;
+    std::ofstream *fp;
+    std::unique_ptr<double []>& content;
+    double buff_value;
+  } filesp [] = {{H_LAMBDA_FP, &H_lambda_fp, H_lambdas,H_lambda_buff},
+                 {HA_LAMBDA_FP,&HA_lambda_fp,HAs,HA_buff},
+                 {HB_LAMBDA_FP,&HB_lambda_fp,HBs,HB_buff}};
+
+  for (auto& file: filesp) {
+    if (fp_flags & file.flag && file.fp) {
+      for (int i = 0; i < n_lambdas - 1; i++)
+        *(file.fp) << file.content[i] << ",";
+      if (n_lambdas > 0)
+        *(file.fp) << file.content[n_lambdas - 1];
+      if (flags & BUFFER) {
+        if(n_lambdas > 0) *(file.fp) << ",";
+        *(file.fp) << file.buff_value;
+      }
+      *(file.fp) << std::endl;
+    }
+  }
+
   if (fp_flags & H_LAMBDA_FP && H_lambda_fp) {
     for (int i = 0; i < n_lambdas - 1; i++)
       H_lambda_fp << H_lambdas[i] << ",";
@@ -1856,7 +1888,7 @@ double FixConstantPH::compute_epair()
 
   double one = 0.0;
   double energy;
-  if (force->pair) one += force->pair->eng_coul;
+  if (force->pair) one += force->pair->eng_vdwl + force->pair->eng_coul;
 
   /* As the bond, angle, dihedral and improper energies 
       do not change with the lambda, we do not need to 
@@ -2000,13 +2032,13 @@ double FixConstantPH::compute_array(int i, int j)
       else
         return -1.0;
     case 7:
-      // 8
-      if (j < 3 * n_lambdas)
-        return a_lambdas[j % n_lambdas][j / n_lambdas];
-      else if ((j == 3 * n_lambdas) && (flags & BUFFER))
-        return a_lambda_buff;
-      else
-        return -1.0;
+        // 8
+        if (j < 3 * n_lambdas)
+          return a_lambdas[j % n_lambdas][j / n_lambdas];
+        else if ((j == 3 * n_lambdas) && (flags & BUFFER))
+          return a_lambda_buff;
+        else
+          return -1.0;
     case 8:
       // 9
       calculate_T_lambda();
@@ -2024,6 +2056,22 @@ double FixConstantPH::compute_array(int i, int j)
       // 11
       compute_q_total();
       return q_total;
+    case 11:
+      // 12
+      if (j < n_lambdas)
+        return HAs[j];
+      else if ((j == n_lambdas) && (flags && BUFFER))
+        return HA_buff;
+      else
+        return -1.0;
+    case 12:
+      // 13
+      if (j < n_lambdas)
+        return HBs[j];
+      else if ((j == n_lambdas) && (flags && BUFFER))
+        return HB_buff;
+      else
+        return -1.0;
   }
   return 0.0;
 }

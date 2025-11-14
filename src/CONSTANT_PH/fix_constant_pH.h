@@ -153,6 +153,7 @@ class FixConstantPH : public Fix {
   int fp_flags;
   int write_lambda_nevery;
   std::ofstream lambda_fp, lambda_1_fp, lambda_2_fp, v_lambda_fp, a_lambda_fp, H_lambda_fp;
+  std::ofstream HA_lambda_fp, HB_lambda_fp;
 
   // The name of the intermediate file written by the fix_adaptive_protonation
   std::string intermediate_file_name;
