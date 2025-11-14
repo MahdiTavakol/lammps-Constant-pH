@@ -21,6 +21,7 @@
 
 #include "atom.h"
 #include "comm.h"
+#include "domain.h"
 #include "error.h"
 #include "force.h"
 #include "input.h"
@@ -74,6 +75,7 @@ static constexpr double tol = 1e-5;
 static constexpr double max_lambda_buff_0 = 1.05;
 static constexpr double min_lambda = -0.1;
 static constexpr double max_lambda = 1.1;
+static constexpr double environment_coupling = 0.001;
 
 /* ---------------------------------------------------------------------- */
 
@@ -653,7 +655,7 @@ void FixConstantPH::update_a_lambda()
 
 
   for (int i = 0; i < n_lambdas; i++) {
-    double f_lambda_0 = -(HAs[i] - HBs[i] -dfs[i] * kT * log(10) * (pK - pH) + kj2kcal * dUs[i] - GFF_lambdas[i]);    
+    double f_lambda_0 = -(environment_coupling*(HAs[i] - HBs[i]) -dfs[i] * kT * log(10) * (pK - pH) + kj2kcal * dUs[i] - GFF_lambdas[i]);    
     // The df sign should be positive if the lambda = 0 is for the protonated state
     double f_lambda_1 = 2 * M_PI * nStructures1Barrier * pHnStructures1 *
         sin(2 * M_PI * pHnStructures1 * lambdas[i][1]);
@@ -665,7 +667,7 @@ void FixConstantPH::update_a_lambda()
     a_lambdas[i][2] = f_lambda_2 / m_lambdas[i][2];
 
     // I am not sure about the sign of the f*kT*log(10)*(pK-pH)
-    this->H_lambdas[i] = lambdas[i][0]*HAs[i] + (1.0-lambdas[i][0])*HBs[i] -fs[i] * kT * log(10) * (pK - pH) + kj2kcal * Us[i] +
+    this->H_lambdas[i] = environment_coupling*(lambdas[i][0]*HAs[i] + (1.0-lambdas[i][0])*HBs[i]) -fs[i] * kT * log(10) * (pK - pH) + kj2kcal * Us[i] +
         (m_lambdas[i][0] / 2.0) * (v_lambdas[i][0] * v_lambdas[i][0]) * mvv2e;    
       // This might not be needed. May be I need to tally this into energies.
     // I might need to use the leap-frog integrator and so this function might need to be in other functions than postforce()
@@ -1883,13 +1885,17 @@ double FixConstantPH::compute_q_total(const bool silent)
 
 double FixConstantPH::compute_epair()
 {
+  // As I am calling update_lmp() before the compute_epair
+  // the energies are tallied.
   //if (update->eflag_global != update->ntimestep)
   //   error->all(FLERR,"Energy was not tallied on the needed timestep");
 
 
   double one = 0.0;
   double energy;
-  if (force->pair) one += force->pair->eng_vdwl + force->pair->eng_coul;
+  if (force->pair) one += force->pair->eng_coul;
+  
+
 
   /* As the bond, angle, dihedral and improper energies 
       do not change with the lambda, we do not need to 
@@ -1908,7 +1914,12 @@ double FixConstantPH::compute_epair()
   if (force->kspace)
     energy += force->kspace->energy;
 
-  //if (modify->n_energy_global) energy += modify->energy_global();
+  if (force->pair && force->pair->tail_flag) {
+    double volume = domain->xprd * domain->yprd * domain->zprd;
+    energy += force->pair->etail/volume;
+  }
+
+  if (modify->n_energy_global) energy += modify->energy_global();
   
   
   /*
