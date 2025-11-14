@@ -1576,7 +1576,7 @@ void FixConstantPH::calculate_Hs()
   // getting the electrostatic energy + kspace energy
   HA_buff = compute_epair();
   // deprotonated
-  lambda_buff_temp = 0.0;s
+  lambda_buff_temp = 0.0;
   // just for debugging
   compute_q_total();
   // modifying the atom charges
