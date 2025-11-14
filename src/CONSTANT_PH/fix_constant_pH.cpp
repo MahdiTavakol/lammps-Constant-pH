@@ -663,10 +663,10 @@ void FixConstantPH::update_a_lambda()
   }
 
   if (flags & BUFFER) {
-    double f_lambda_buff = -(HA_buff - HB_buff + kj2kcal * dU_buff);
+    double f_lambda_buff = -(kj2kcal * dU_buff);
     a_lambda_buff =
         f_lambda_buff / m_lambda_buff;    // the fix_nh_constant_pH itself takes care of units
-    this->H_lambda_buff = lambda_buff*HA_buff + (1.0-lambda_buff)*HB_buff + 
+    this->H_lambda_buff = 
         kj2kcal * U_buff + N_buff * (m_lambda_buff / 2.0) * (v_lambda_buff * v_lambda_buff) * mvv2e;
   }
 }
@@ -1561,6 +1561,8 @@ void FixConstantPH::calculate_Hs()
     }
   }
 
+  // backing up qs
+  backup_restore_qfev<1>();
   // For the buffer
   double H_lamda_buff = 0.0;
   // protonated
@@ -1570,15 +1572,11 @@ void FixConstantPH::calculate_Hs()
   // forward comm so that ghost atoms are consistent
   comm->forward_comm();
   // calculating the energies
-  // just for debugging
-  compute_q_total();
   update_lmp();
   // getting the electrostatic energy + kspace energy
   HA_buff = compute_epair();
   // deprotonated
   lambda_buff_temp = 0.0;
-  // just for debugging
-  compute_q_total();
   // modifying the atom charges
   modify_q_buff(lambda_buff_temp);
   // forward comm so that ghost atoms are consistent
@@ -1589,6 +1587,8 @@ void FixConstantPH::calculate_Hs()
   HB_buff = compute_epair();
   // restore qs
   backup_restore_qfev<-1>();
+
+
 
 
   HCalcNSteps++;
@@ -1875,7 +1875,7 @@ double FixConstantPH::compute_epair()
   if (force->kspace)
     energy += force->kspace->energy;
 
-  if (modify->n_energy_global) energy += modify->energy_global();
+  //if (modify->n_energy_global) energy += modify->energy_global();
   
   
   /*
