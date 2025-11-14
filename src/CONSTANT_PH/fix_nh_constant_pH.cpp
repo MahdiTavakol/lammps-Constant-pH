@@ -317,12 +317,19 @@ void FixNHConstantPH::nh_v_temp()
     
     double t_lambda_new_1 = t_lambda_current[1];
     double t_lambda_new_2 = t_lambda_current[2];
-    t_lambda_new_1 +=  (1-zeta_bussi)*(t_lambda_target*(r11*r11+sum_r21)/n_lambdas-t_lambda_current[1]);
-    t_lambda_new_1 += 2*r11*std::sqrt((t_lambda_target*t_lambda_current[1]/n_lambdas)*(1-zeta_bussi)*zeta_bussi);
-    t_lambda_new_2 +=  (1-zeta_bussi)*(t_lambda_target*(r12*r12+sum_r22)/(2*n_lambdas)-t_lambda_current[2]);
-    t_lambda_new_2 += 2*r12*std::sqrt((t_lambda_target*t_lambda_current[2]/(2*n_lambdas))*(1-zeta_bussi)*zeta_bussi);
-    double alpha_bussi1 = std::sqrt(t_lambda_new_1 / t_lambda_current[1]);
-    double alpha_bussi2 = std::sqrt(t_lambda_new_2 / t_lambda_current[2]);
+    const int n_dof = n_lambdas + (lambda_integration_flags & BUFFER ? 1 : 0);
+    t_lambda_new_1 +=  (1-zeta_bussi)*(t_lambda_target*(r11*r11+sum_r21)/n_dof-t_lambda_current[1]);
+    double param1 = (t_lambda_target*t_lambda_current[1]/n_dof)*(1-zeta_bussi)*zeta_bussi;
+    param1 = std::max(eps,param1);
+    t_lambda_new_1 += 2*r11*std::sqrt(param1);
+    t_lambda_new_2 +=  (1-zeta_bussi)*(t_lambda_target*(r12*r12+sum_r22)/(2*n_dof)-t_lambda_current[2]);
+    double param2 = (t_lambda_target*t_lambda_current[2]/(2*n_dof))*(1-zeta_bussi)*zeta_bussi;
+    param2 = std::max(eps,param2);
+    t_lambda_new_2 += 2*r12*std::sqrt(param2);
+    double ratio1 = std::max(eps, t_lambda_current[1]);
+    double ratio2 = std::max(eps, t_lambda_current[2]);
+    double alpha_bussi1 = std::sqrt(ratio1);
+    double alpha_bussi2 = std::sqrt(ratio2);
 
 
     if (which == NOBIAS) {
@@ -390,6 +397,7 @@ void FixNHConstantPH::nh_v_temp()
      v_lambda_buff -= v_cm; 
   
   fix_constant_pH->reset_params(pH_state);
+  fix_constant_pH->calculate_T_lambda();
 }
 
 /* ---------------------------------------------------------------------
