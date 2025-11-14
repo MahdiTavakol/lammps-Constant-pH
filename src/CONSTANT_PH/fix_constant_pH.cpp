@@ -1570,11 +1570,15 @@ void FixConstantPH::calculate_Hs()
   // forward comm so that ghost atoms are consistent
   comm->forward_comm();
   // calculating the energies
+  // just for debugging
+  compute_q_total();
   update_lmp();
   // getting the electrostatic energy + kspace energy
   HA_buff = compute_epair();
   // deprotonated
-  lambda_buff_temp = 0.0;
+  lambda_buff_temp = 0.0;s
+  // just for debugging
+  compute_q_total();
   // modifying the atom charges
   modify_q_buff(lambda_buff_temp);
   // forward comm so that ghost atoms are consistent
@@ -1599,8 +1603,8 @@ void FixConstantPH::neutralize(bool buffer)
   if (buffer) {
     double q_total = compute_q_total(true);
     double N_buff_double = pH_state->N_buff;
-    double lambda_buff = -q_total / N_buff_double;
-    modify_q_buff(lambda_buff);
+    double lambda_buff_temp = -q_total / N_buff_double;
+    modify_q_buff(lambda_buff_temp);
   }
 }
 
