@@ -1637,7 +1637,7 @@ void FixConstantPH::write_lambdas_header()
   } files[] = {{LAMBDA_FP, &lambda_fp},     {V_LAMBDA_FP, &v_lambda_fp},
                {A_LAMBDA_FP, &a_lambda_fp}, {H_LAMBDA_FP, &H_lambda_fp},
                {LAMBDA_S_FP, &lambda_1_fp}, {LAMBDA_S_FP, &lambda_2_fp},
-               {HA_LAMBDA_FP,&HA_lambda_fp},{HB_LAMBDA_FP,&HB_LAMBDA_FP}};
+               {HA_LAMBDA_FP,&HA_lambda_fp},{HB_LAMBDA_FP,&HB_lambda_fp}};
 
   for (auto &file : files) {
     if (fp_flags & file.flag && file.fp) {
