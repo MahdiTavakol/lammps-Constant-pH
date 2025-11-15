@@ -274,6 +274,7 @@ FixConstantPH::~FixConstantPH()
 
   atom->delete_callback(id,Atom::GROW);
   //atom->delete_callback(id,Atom::COPY);
+   
   atom->delete_callback(id,Atom::BORDER);
 
 }
