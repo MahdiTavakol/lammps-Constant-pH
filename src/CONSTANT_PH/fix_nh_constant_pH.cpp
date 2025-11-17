@@ -110,6 +110,7 @@ FixNHConstantPH::FixNHConstantPH(LAMMPS *lmp, int narg, char **arg) :
   if ((lambda_integration_flags & (BUFFER | CONSTRAIN)) == CONSTRAIN)
    error->one(FLERR,"Constrain total charge in absence of a buffer is not supported yet!");
 
+   
 
 }
 
