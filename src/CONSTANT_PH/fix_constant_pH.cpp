@@ -75,7 +75,7 @@ static constexpr double tol = 1e-5;
 static constexpr double max_lambda_buff_0 = 1.05;
 static constexpr double min_lambda = -0.1;
 static constexpr double max_lambda = 1.1;
-static constexpr double environment_coupling = 0.01;
+static constexpr double environment_coupling = 1.0;
 
 /* ---------------------------------------------------------------------- */
 
@@ -1527,7 +1527,7 @@ void FixConstantPH::calculate_Hs()
           q[i] = lambdas[dist][0] * pH2qs[type[i]][0] + (1 - lambdas[dist][0]) * pH1qs[type[i]][0];
       }
       // Neutralizing the system 
-      neutralize();
+      //neutralize();
       // forward comm so that ghost atoms are consistent
       comm->forward_comm();
       // calculating the energies
@@ -1548,7 +1548,7 @@ void FixConstantPH::calculate_Hs()
       // modifying the atom charges
       modify_qs(lambda_j,j);
       // Neutralizing the system 
-      neutralize();
+      //neutralize();
       // forward comm so that ghost atoms are consistent
       comm->forward_comm();
       // calculating the energies
@@ -1560,7 +1560,7 @@ void FixConstantPH::calculate_Hs()
       // modifying the atom charges
       modify_qs(lambda_j,j);
       // Neutralizing the system 
-      neutralize();
+      //neutralize();
       // forward comm so that ghost atoms are consistent
       comm->forward_comm();
       // calculating the energies
@@ -1893,7 +1893,7 @@ double FixConstantPH::compute_epair()
 
   double one = 0.0;
   double energy;
-  if (force->pair) one += force->pair->eng_coul;
+  if (force->pair) one += force->pair->eng_vdwl + force->pair->eng_coul;
   
 
 
