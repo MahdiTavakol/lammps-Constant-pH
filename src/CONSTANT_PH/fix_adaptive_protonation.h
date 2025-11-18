@@ -156,7 +156,7 @@ private:
   // so we use the previous value.
   double neighBuildRatioPrev = 0.0;
   int nNeighBuildSteps = 0;
-  double neighBuildRatioCutoff = 30.0;
+  double neighBuildRatioCutoff = 50.0;
 
 };
 
