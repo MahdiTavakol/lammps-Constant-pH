@@ -543,14 +543,14 @@ void FixNHConstantPH::constrain_v_lambdas()
       denom += mols_charge_change*mols_charge_change/ m_lambdas[i][0];
    }
 
-   nom += N_buff_double*buff_charge_change*v_lambda_buff;
+   nom += -N_buff_double*buff_charge_change*v_lambda_buff;
    denom += N_buff_double*buff_charge_change*buff_charge_change/m_lambda_buff;
 
    mu = nom/denom;
 
-   //for (int i = 0; i < n_lambdas; i++)
-      //v_lambdas[i][0] += mu*mols_charge_change / m_lambdas[i][0];
-   //v_lambda_buff += mu*buff_charge_change / m_lambda_buff;
+   for (int i = 0; i < n_lambdas; i++)
+      v_lambdas[i][0] += mu*mols_charge_change / m_lambdas[i][0];
+   v_lambda_buff += mu*buff_charge_change / m_lambda_buff;
 
    fix_constant_pH->reset_params(pH_state,1);
    fix_constant_pH->reset_qs();
