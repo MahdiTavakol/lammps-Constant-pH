@@ -379,28 +379,16 @@ void FixNHConstantPH::nh_v_temp()
   if (n_lambdas == 0)
      return;
  
+
   // v_lambdas[0] is the location of the contigous memory allocated 
   // for the double ** v_lambdas
   MPI_Bcast(v_lambdas[0],n_lambdas*3,MPI_DOUBLE,0,world);
   if (lambda_integration_flags & BUFFER)
-     MPI_Bcast(&v_lambda_buff,1,MPI_DOUBLE,0,world);  
+     MPI_Bcast(&v_lambda_buff,1,MPI_DOUBLE,0,world);
    
-  for (int i = 0; i < n_lambdas; i++) {
-     v_cm += v_lambdas[i][0]*mols_charge_change;
-  }
-  
-  if (lambda_integration_flags & BUFFER) {
-     v_cm += N_buff * v_lambda_buff * buff_charge_change;
-     v_cm /= (static_cast<double>(n_lambdas)*mols_charge_change + static_cast<double>(N_buff)*buff_charge_change);
-  }
-  else
-     v_cm /= (static_cast<double>(n_lambdas)*mols_charge_change);
-     
-  for (int i = 0; i < n_lambdas; i++)
-     v_lambdas[i][0] -= v_cm;
-  if (lambda_integration_flags & BUFFER)
-     v_lambda_buff -= v_cm; 
-  
+  // constraining the v_lambdas
+  constrain_v_lambdas();
+   
   fix_constant_pH->reset_params(pH_state);
 }
 
