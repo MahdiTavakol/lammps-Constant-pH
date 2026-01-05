@@ -1706,15 +1706,6 @@ void FixConstantPH::write_lambdas()
     }
   }
 
-  if (fp_flags & H_LAMBDA_FP && H_lambda_fp) {
-    for (int i = 0; i < n_lambdas - 1; i++)
-      H_lambda_fp << H_lambdas[i] << ",";
-    if (n_lambdas > 0)
-      H_lambda_fp << H_lambdas[n_lambdas - 1];
-    if (flags & BUFFER) H_lambda_fp << "," << H_lambda_buff;
-    H_lambda_fp << std::endl;
-  }
-
   const struct {
     int flag;
     std::ofstream *fp;
