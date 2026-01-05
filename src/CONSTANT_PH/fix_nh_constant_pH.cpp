@@ -442,7 +442,7 @@ void FixNHConstantPH::constrain_lambdas()
        * Since there is a possibility that the n_lambdas change during the simulation by 
        * the fix_adaptive_protonation.cpp command, the check should be done here. 
        */
-      if (N_buff < mols_charge_change*n_lambdas)
+      if (buff_charge_change*N_buff < mols_charge_change*n_lambdas)
          error->one(FLERR,"The charge content of N_buff={} is not large enough for n_lambdas={}: Please increase the N_buff\n",N_buff,n_lambdas);
       for (int i =0; i < n_lambdas; i++)
          if (m_lambdas[i][0] == 0) error->all(FLERR,"m_lambdas({},0) is zero in fix_nh_constant_pH",i);
@@ -517,7 +517,7 @@ void FixNHConstantPH::constrain_lambdas()
    fix_constant_pH->reset_qs();
 
    // keeping the omega for the next step
-   omega = omegaPrev;
+   omegaPrev = omega;
 }
 
 /* ---------------------------------------------------------------------
