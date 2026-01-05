@@ -391,10 +391,7 @@ void FixNHConstantPH::nh_v_temp()
   
   if (lambda_integration_flags & BUFFER) {
      v_cm += N_buff * v_lambda_buff * buff_charge_change;
-     v_cm /= (static_cast<double>(n_lambdas)*mols_charge_change + static_cast<double>(N_buff)*buff_charge_change);
   }
-  else
-     v_cm /= (static_cast<double>(n_lambdas)*mols_charge_change);
      
   for (int i = 0; i < n_lambdas; i++)
      v_lambdas[i][0] -= v_cm;
