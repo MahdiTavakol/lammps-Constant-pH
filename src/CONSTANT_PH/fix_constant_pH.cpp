@@ -1773,6 +1773,7 @@ void FixConstantPH::initialize_v_lambda(const double _T_lambda, const int& to)
   double n_cm = static_cast<double>(n_lambdas);
 
   if (flags & BUFFER) n_cm += 1.0;
+  if (flags & CONSTRAIN) n_cm -= 1.0;
 
   v_cm /= n_cm;
 
@@ -1830,11 +1831,7 @@ void FixConstantPH::calculate_T_lambda(const int& to)
       KE_lambdas[2] += 0.5 * N_buff * m_lambda_buff * v_lambda_buff * v_lambda_buff * mvv2e;
     }
 
-    if (Nfs[0] == 0 || Nfs[1] == 0 || Nfs[2] == 0) {
-      T_lambdas[0] = 0.0;
-      T_lambdas[1] = 0.0;
-      T_lambdas[2] = 0.0;
-    }
+
     if (kB == 0) error->one(FLERR, "The k value is zero");
     if (Nfs[0])
       T_lambdas[0] = 2 * KE_lambdas[0] / (Nfs[0] * kB);
