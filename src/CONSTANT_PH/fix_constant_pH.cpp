@@ -1445,7 +1445,7 @@ void FixConstantPH::init_GFF()
   iss >> GFF_size;
 
   memory->create(GFF, GFF_size, 2, "constant_pH:GFF");
-  int i = -1;
+  int i = 0;
 
   while (std::getline(fp, line) && i < GFF_size) {    
     i++;
