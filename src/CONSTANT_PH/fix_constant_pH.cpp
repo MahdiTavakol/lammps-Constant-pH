@@ -1522,7 +1522,7 @@ void FixConstantPH::calculate_Hs()
       {
         if (!protonable[type[i]]) continue;
         int dist = distArray[i];
-        if (molecule[i] == molids[j])
+        if (dist == j)
           q[i] = pH2qs[type[i]][0] - pH1qs[type[i]][0];
         else if (dist != n_lambdas)
           q[i] = lambdas[dist][0] * pH2qs[type[i]][0] + (1 - lambdas[dist][0]) * pH1qs[type[i]][0];
