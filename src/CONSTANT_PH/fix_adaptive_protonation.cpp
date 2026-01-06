@@ -40,8 +40,8 @@ using namespace MathConst;
 enum { NEITHER = -1, SOLID = 0, SOLVENT = 1 };
 enum { F_NONE, RESET_MID = 1 << 1, INIT_MID = 1 << 2 };
 
-static constexpr double frac_low  = 0.3;
-static constexpr double frac_high = 0.7;
+static constexpr double frac_low  = 0.1;
+static constexpr double frac_high = 0.9;
 static constexpr int max_moleset_iter = 10;
 static constexpr double eps = 1e-2;
 
