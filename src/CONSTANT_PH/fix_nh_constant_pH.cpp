@@ -509,6 +509,9 @@ void FixNHConstantPH::constrain_lambdas()
 }
 
 /* ---------------------------------------------------------------------
+   sigma ( delta_q_i * (v_i + alpha * delta_q_i / M_i )) = 0
+   alpha = nom/denom
+   v_i += alpha*delta_q_i / M_i
 
    --------------------------------------------------------------------- */
 

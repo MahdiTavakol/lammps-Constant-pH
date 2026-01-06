@@ -79,7 +79,7 @@ class FixAdaptiveProtonation : public Fix {
 
   /* When a huge number of lambdas is added to the system the simulation becomes unstable.
          So, there might be a need to input the molids of the lambdas
-      */
+   */
   std::ifstream init_molid_file;
 
   // I need to detect water molecules
@@ -117,7 +117,6 @@ class FixAdaptiveProtonation : public Fix {
   // smoothing the mark
   int nSmoothingSteps = 10;
   void accumulate_mark_sum_running();
-  void reset_mark_sum_running();
 
   // Tracking the changes in the q_total
   double q_change;
@@ -145,8 +144,6 @@ class FixAdaptiveProtonation : public Fix {
   void mark_protonation_deprotonation();
   // Modifying the protonation state
   void modify_protonation_state();
-  // Setting the mark for the previous state
-  void set_mark_prev();
 
 
 private:

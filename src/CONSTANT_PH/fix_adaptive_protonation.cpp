@@ -232,7 +232,7 @@ void FixAdaptiveProtonation::setup(int /*vflag*/)
   neighbor->build_one(list);
 
   // Counting the number of water molecules surrounding the protonable molecules
-  rampStep = 1;
+  rampStep = 0;
   mark_protonation_deprotonation();
   backup_init_qs();
 }
@@ -280,8 +280,8 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
     
   // This is required since the fix_constant_pH.cpp does not deal with those molecules in the solid
   if (neighBuildRatioPrev <= neighBuildRatioCutoff) {
-    modify_protonation_state();
     rampStep++;
+    modify_protonation_state();
   } else {
     if (comm->me == 0)
       error->warning(FLERR,"The percentage of steps with neighbor build ({}) is higher than the cutoff ({}) - Skipping charge change",
@@ -291,12 +291,14 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
 
   
   // Resetting the mark_prev parameter to help us keep the track of which molecule moves from solid to solvent and vice versa
-  // If neighBuildRatio is higher than 50% neigher the mark is updated nor
+  // If neighBuildRatio is higher than 50% neither the mark is updated nor
   // the mark_prev is set and also the reset_mark_sum_running is not called
   // --->>> status quo
-  if (update->ntimestep%nevery == 0 && neighBuildRatioPrev <= neighBuildRatioCutoff) {
-    set_mark_prev();
-    reset_mark_sum_running();
+  if (rampStep == nRampStep) {
+    // Setting the mark_prev variable
+    std::copy_n(mark.get(),nmolecules+1,mark_prev.get());
+    // Resetting the mark_sum_running
+    std::fill_n(mark_sum_running.get(),nmolecules+1,0.0);
   } 
 }
 
@@ -338,7 +340,8 @@ void FixAdaptiveProtonation::post_force(int /*vflag*/)
   // If neighBuildRatio is higher than 50% neigher the mark is updated nor
   // the mark_prev nor is set and also the reset_mark_sum_running is not called
   // --->>> status quo
-  if ((update->ntimestep+1)%innernevery == 0 && neighBuildRatioPrev <= neighBuildRatioCutoff) 
+  if ((update->ntimestep+1)%innernevery == 0 &&
+       neighBuildRatioPrev <= neighBuildRatioCutoff) 
     mark_protonation_deprotonation();
   
   // th neighBuildRatioPrev is updated every nevery steps
@@ -348,8 +351,8 @@ void FixAdaptiveProtonation::post_force(int /*vflag*/)
         error->warning(FLERR,"Neighbor build ratio is higher than the cutoff skiping this step in the fix adaptive protonation: {}, {}",
                           neighBuildRatioPrev,neighBuildRatioCutoff);
 
-  if ((update->ntimestep+1)%nevery == 0) {
-    rampStep = 1;
+  if (rampStep == nevery) {
+    rampStep = 0;
     accumulate_mark_sum_running();
     backup_init_qs();
   }
@@ -444,6 +447,7 @@ void FixAdaptiveProtonation::deallocate_storage()
 void FixAdaptiveProtonation::allocate_storage()
 {
   using std::make_unique, std::fill_n;
+
   protonable_molids     = make_unique<int[]>(nmolecules);
   mark                  = make_unique<int[]>(nmolecules + 1);
   mark_prev             = make_unique<int[]>(nmolecules + 1);
@@ -454,12 +458,13 @@ void FixAdaptiveProtonation::allocate_storage()
   mark_sum_running      = make_unique<double[]>(nmolecules + 1);
   protonable_size       = make_unique<int[]>(nmolecules + 1);
   protonable_size_local = make_unique<int[]>(nmolecules + 1);
+
   fill_n(protonable_molids.get(), nmolecules, -1);
   fill_n(mark.get(), nmolecules + 1, 0);
   fill_n(mark_prev.get(), nmolecules + 1,NEITHER);
   fill_n(mark_local.get(), nmolecules + 1, 0);
   fill_n(mark_total.get(), nmolecules + 1, 0);
-  fill_n(mark_sum_running.get(),nmolecules + 1 , 0.0);
+  fill_n(mark_sum_running.get(),nmolecules + 1, 0.0);
   fill_n(protonable_size.get(), nmolecules + 1, 0);
   fill_n(protonable_size_local.get(), nmolecules + 1, 0);
   /* I put it on purpose so in the first step every molecule changes unless 
@@ -543,10 +548,8 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
                 world);
 
   for (int i = 1; i < nmolecules + 1; i++) {
-    if (!protonable_size[i]) {
-      continue;
-    }
-    mark_sum_running[i] += static_cast<double>(mark_total[i]) / static_cast<double>(protonable_size[i]);
+    if (protonable_size[i])
+      mark_sum_running[i] += static_cast<double>(mark_total[i]) / static_cast<double>(protonable_size[i]);
   }
 }
 
@@ -568,12 +571,6 @@ void FixAdaptiveProtonation::accumulate_mark_sum_running()
   }
 }
 
-/* ---------------------------------------------------------------------------------------- */
-
-void FixAdaptiveProtonation::reset_mark_sum_running()
-{
-  std::fill_n(mark_sum_running.get(),nmolecules+1,0.0);
-}
 
 /* ----------------------------------------------------------------------------------------
    Backup the initial charges
@@ -635,9 +632,9 @@ void FixAdaptiveProtonation::read_molids_file()
   using std::getline, std::string, std::stoi, std::fill;
   /*
     *  File format
+    *  n_molids 
     *  comment_1
     *  comment_2
-    *  n_molids 
     *  molid1
     *  molid2
     *  ...
@@ -672,7 +669,7 @@ void FixAdaptiveProtonation::read_molids_file()
   // Then broadcasting the individual molids
   MPI_Bcast(protonable_molids.get(), n_protonable, MPI_INT, 0, world);
 
-  // chaning the mark_prev from NEITHER to 0 does not matter
+  // changing the mark_prev from NEITHER to 0 does not matter
   // as in the modify_protonation_state we check if the atom 
   // type is protonable or not (NEITHER)
   fill(mark_prev.get(), mark_prev.get() + nmolecules + 1,SOLID);
@@ -763,7 +760,7 @@ void FixAdaptiveProtonation::modify_protonation_state()
 
       case SOLVENT:    // The molecule is in the water
         // The molecule was in the solid before or it is the first step
-        if (mark_prev[molecule[i]] == SOLID || mark_prev[molecule[i]]== NEITHER)
+        if (mark_prev[molecule[i]] == SOLID || mark_prev[molecule[i]] == NEITHER)
         {
           // The fix_constant_pH takes care of this one!
         }
@@ -773,7 +770,8 @@ void FixAdaptiveProtonation::modify_protonation_state()
           error->all(FLERR, "Unexpected value in mark_prev[molecule[i]] for SOLVENT case: {}",mark_prev[molecule[i]]);
         break;    //  Prevent fall-through
 
-      case SOLID:    // The molecule is in the solid
+      case SOLID:    
+        // The molecule is in the solid
         // It came from the water ----> deprotonate it
         // The charge distribution in the solid interior remains intact.
         // Even though the total system charge might change, the
@@ -810,20 +808,11 @@ void FixAdaptiveProtonation::modify_protonation_state()
   if (nchanges[0]) {
     int j = 0;
     for (int i = 1; i <= nmolecules; i++)
-      if (mark[i] == SOLVENT) protonable_molids[j++] = i;
+      if (mark[i] == SOLVENT)
+        protonable_molids[j++] = i;
 
     n_protonable = j;
   }
-}
-
-/* --------------------------------------------------------------------------
-   Set the mark_prev
-   -------------------------------------------------------------------------- */
-
-void FixAdaptiveProtonation::set_mark_prev()
-{
-  for (int i = 0; i < nmolecules + 1; i++)
-    mark_prev[i] = mark[i];
 }
 
 /* --------------------------------------------------------------------------
