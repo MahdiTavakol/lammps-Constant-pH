@@ -378,6 +378,9 @@ void FixConstantPH::setup(int /*vflag*/)
     fix_adaptive_protonation->get_protonable_molids(molids_input);
     // the molids_input does not have any info on its size.
     fix_adaptive_protonation->get_n_protonable(n_lambdas_input);
+    // Just testing the n_lambdas_input
+    if (comm->me == 0)
+      error->warning(FLERR,"The n_lambdas_input is equal to {}",n_lambdas_input);
   }
 
   if (flags & BUFFER) {
@@ -413,7 +416,9 @@ void FixConstantPH::initial_integrate(int /*vflag*/)
     if (!(update->ntimestep % nevery_fix_adaptive)) {
       int n_changes;
       fix_adaptive_protonation->get_n_changes(n_changes);
-      if (n_changes) {
+      fix_adaptive_protonation->get_n_protonable(n_lambdas_input);
+      int n_lambdas = pH_state->n_lambdas;
+      if (n_changes || n_lambdas_input != n_lambdas) {
         /* If there is a minimization command
              * , the update->endstep is set to zero
              * which causes the t_target to be inf.
