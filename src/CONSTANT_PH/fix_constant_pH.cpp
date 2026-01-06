@@ -1765,28 +1765,13 @@ void FixConstantPH::initialize_v_lambda(const double _T_lambda, const int& to)
   if (flags & BUFFER) v_lambda_buff *= scaling_factor;
 
 
-  double v_cm = 0.0;
-  for (int i = to; i < n_lambdas; i++) v_cm += v_lambdas[i][0];
-
-  if (flags & BUFFER) v_cm += N_buff * v_lambda_buff;
-
-  double n_cm = static_cast<double>(n_lambdas);
-
-  if (flags & BUFFER) n_cm += 1.0;
-  if (flags & CONSTRAIN) n_cm -= 1.0;
-
-  v_cm /= n_cm;
-
-  //for (int i = to; i < n_lambdas; i++) v_lambdas[i][0] -= v_cm;
-
-  //if (flags & BUFFER) v_lambda_buff -= v_cm;
-
   if (n_lambdas > 0)
     MPI_Bcast(v_lambdas[0], n_lambdas * 3, MPI_DOUBLE, 0, world);
   if (flags & BUFFER) MPI_Bcast(&v_lambda_buff,1,MPI_DOUBLE,0,world);
   
   // Updating the T_lambdas
   this->calculate_T_lambda();
+
 }
 
 /* --------------------------------------------------------------------- */
