@@ -40,8 +40,8 @@ using namespace MathConst;
 enum { NEITHER = -1, SOLID = 0, SOLVENT = 1 };
 enum { F_NONE, RESET_MID = 1 << 1, INIT_MID = 1 << 2 };
 
-static constexpr double frac_low  = 0.1;
-static constexpr double frac_high = 0.9;
+static constexpr double frac_low  = 0.4;
+static constexpr double frac_high = 0.6;
 static constexpr int max_moleset_iter = 10;
 static constexpr double eps = 1e-2;
 
@@ -295,6 +295,9 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
   // the mark_prev is set and also the reset_mark_sum_running is not called
   // --->>> status quo
   if (rampStep == nRampStep) {
+    if (comm->me == 0) {
+      error->warning(FLERR,"In the fix_adaptive_protonation n_lambdas == {}",n_protonable);
+    }
     // Setting the mark_prev variable
     std::copy_n(mark.get(),nmolecules+1,mark_prev.get());
     // Resetting the mark_sum_running
@@ -314,7 +317,7 @@ void FixAdaptiveProtonation::post_force(int /*vflag*/)
    * We do need to mark_protoation_deprotonation in the initial_integrate which is when
    * the fix_constant_pH needs that information. 
    */
-  if ((update->ntimestep+1)%nevery == 0) {
+  if (rampStep == nevery) {
     if (!list)
       error->all(FLERR, "Neighbor list not initialized for adaptive_protonation");
     neighbor->build_one(list);
@@ -351,7 +354,9 @@ void FixAdaptiveProtonation::post_force(int /*vflag*/)
         error->warning(FLERR,"Neighbor build ratio is higher than the cutoff skiping this step in the fix adaptive protonation: {}, {}",
                           neighBuildRatioPrev,neighBuildRatioCutoff);
 
-  if (rampStep == nevery) {
+  // Accumulating these for the net step since 
+  // the fix_Constant_pH accesses this fix in the initial_integrate step
+  if (rampStep == nRampStep - 1) {
     rampStep = 0;
     accumulate_mark_sum_running();
     backup_init_qs();

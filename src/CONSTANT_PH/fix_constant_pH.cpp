@@ -75,7 +75,7 @@ static constexpr double tol = 1e-5;
 static constexpr double max_lambda_buff_0 = 1.05;
 static constexpr double min_lambda = -0.1;
 static constexpr double max_lambda = 1.1;
-static constexpr double environment_coupling = 1.0;
+static constexpr double environment_coupling = 0.001;
 
 /* ---------------------------------------------------------------------- */
 
@@ -378,9 +378,6 @@ void FixConstantPH::setup(int /*vflag*/)
     fix_adaptive_protonation->get_protonable_molids(molids_input);
     // the molids_input does not have any info on its size.
     fix_adaptive_protonation->get_n_protonable(n_lambdas_input);
-    // Just testing the n_lambdas_input
-    if (comm->me == 0)
-      error->warning(FLERR,"The n_lambdas_input is equal to {}",n_lambdas_input);
   }
 
   if (flags & BUFFER) {
@@ -416,9 +413,7 @@ void FixConstantPH::initial_integrate(int /*vflag*/)
     if (!(update->ntimestep % nevery_fix_adaptive)) {
       int n_changes;
       fix_adaptive_protonation->get_n_changes(n_changes);
-      fix_adaptive_protonation->get_n_protonable(n_lambdas_input);
-      int n_lambdas = pH_state->n_lambdas;
-      if (n_changes || n_lambdas_input != n_lambdas) {
+      if (n_changes ) {
         /* If there is a minimization command
              * , the update->endstep is set to zero
              * which causes the t_target to be inf.
@@ -1782,9 +1777,9 @@ void FixConstantPH::initialize_v_lambda(const double _T_lambda, const int& to)
 
   v_cm /= n_cm;
 
-  for (int i = to; i < n_lambdas; i++) v_lambdas[i][0] -= v_cm;
+  //for (int i = to; i < n_lambdas; i++) v_lambdas[i][0] -= v_cm;
 
-  if (flags & BUFFER) v_lambda_buff -= v_cm;
+  //if (flags & BUFFER) v_lambda_buff -= v_cm;
 
   if (n_lambdas > 0)
     MPI_Bcast(v_lambdas[0], n_lambdas * 3, MPI_DOUBLE, 0, world);

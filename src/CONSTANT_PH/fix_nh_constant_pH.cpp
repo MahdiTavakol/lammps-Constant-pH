@@ -209,8 +209,6 @@ void FixNHConstantPH::nh_v_temp()
   // The timestep, the current step and the kT of course! 
   double dt = update->dt;
   double kT = force->boltz * t_target;
-  // remove the center of mass velocity
-  double v_cm = 0.0;
   // unit conversion
   double mvv2e = force->mvv2e;
 
