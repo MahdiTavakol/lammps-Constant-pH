@@ -51,6 +51,7 @@ enum {
 
 
 constexpr double eps = 1e-20;
+constexpr double Tmin = 1e-6;
 
 /* ----------------------------------------------------------------------
    NVT,NPH,NPT integrators for lambdas
@@ -324,10 +325,15 @@ void FixNHConstantPH::nh_v_temp()
     param2 = std::max(eps,param2);
     t_lambda_new_2 +=  (1-zeta_bussi)*(t_lambda_target*(r12*r12+sum_r22)/n_dof_2-t_lambda_current[2]);
     t_lambda_new_2 += 2*r12*std::sqrt(param2);
+
     double ratio1 = std::max(eps, t_lambda_new_1/t_lambda_current[1]);
     double ratio2 = std::max(eps, t_lambda_new_2/t_lambda_current[2]);
     double alpha_bussi1 = std::sqrt(ratio1);
     double alpha_bussi2 = std::sqrt(ratio2);
+    if (t_lambda_current[1] < eps )
+      alpha_bussi1 = 1.0;
+    if (t_lambda_current[2] < eps)
+      alpha_bussi2 = 1.0;
 
 
     if (which == NOBIAS) {
