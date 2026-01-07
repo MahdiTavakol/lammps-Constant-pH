@@ -224,13 +224,12 @@ void FixNHConstantPH::nh_v_temp()
   const int& N_buff = pH_state->N_buff; 
      
   // The number of degrees of freedom
+  double n_dof_1 = static_cast<double>(n_lambdas);
+  double n_dof_2 = static_cast<double>(2*n_lambdas);
+  n_dof_1 = (lambda_integration_flags & BUFFER) ? n_dof_1 + 1.0 : n_dof_1;
+  n_dof_1 = (lambda_integration_flags & CONSTRAIN) ? n_dof_1 - 1.0 : n_dof_1;
   double Nf_lambdas = static_cast<double>(3*n_lambdas);
 
-  if (lambda_integration_flags & BUFFER)
-     Nf_lambdas += 1.0;
-  
-  if (lambda_integration_flags & CONSTRAIN)
-     Nf_lambdas -= 1.0;
      
 
   // Temperature
@@ -304,15 +303,12 @@ void FixNHConstantPH::nh_v_temp()
     double sum_r21 = 0.0;
     double sum_r22 = 0.0;
 
-    for (int j = 1; j < n_lambdas; j++) {
+    for (int j = 1; j < n_dof_1; j++) {
        double r = ranMars->gaussian(0.0,1.0);
        sum_r21 += r*r;
     }
-    if (lambda_integration_flags & BUFFER) {
-      double r = ranMars->gaussian(0.0,1.0);
-      sum_r21 += r*r;
-    }
-    for (int j = 1; j < 2*n_lambdas; j++) {
+
+    for (int j = 1; j < n_dof_2; j++) {
        double r = ranMars->gaussian(0.0,1.0);
        sum_r22 += r*r;
     }
@@ -320,14 +316,13 @@ void FixNHConstantPH::nh_v_temp()
     
     double t_lambda_new_1 = t_lambda_current[1];
     double t_lambda_new_2 = t_lambda_current[2];
-    const int n_dof = n_lambdas + ((lambda_integration_flags & BUFFER) ? 1 : 0);
-    double param1 = (t_lambda_target*t_lambda_current[1]/n_dof)*(1-zeta_bussi)*zeta_bussi;
+    double param1 = (t_lambda_target*t_lambda_current[1]/n_dof_1)*(1-zeta_bussi)*zeta_bussi;
     param1 = std::max(eps,param1);
-    t_lambda_new_1 +=  (1-zeta_bussi)*(t_lambda_target*(r11*r11+sum_r21)/n_dof-t_lambda_current[1]);
+    t_lambda_new_1 +=  (1-zeta_bussi)*(t_lambda_target*(r11*r11+sum_r21)/n_dof_1-t_lambda_current[1]);
     t_lambda_new_1 += 2*r11*std::sqrt(param1);
-    double param2 = (t_lambda_target*t_lambda_current[2]/(2*n_lambdas))*(1-zeta_bussi)*zeta_bussi;
+    double param2 = (t_lambda_target*t_lambda_current[2]/n_dof_2)*(1-zeta_bussi)*zeta_bussi;
     param2 = std::max(eps,param2);
-    t_lambda_new_2 +=  (1-zeta_bussi)*(t_lambda_target*(r12*r12+sum_r22)/(2*n_lambdas)-t_lambda_current[2]);
+    t_lambda_new_2 +=  (1-zeta_bussi)*(t_lambda_target*(r12*r12+sum_r22)/n_dof_2-t_lambda_current[2]);
     t_lambda_new_2 += 2*r12*std::sqrt(param2);
     double ratio1 = std::max(eps, t_lambda_new_1/t_lambda_current[1]);
     double ratio2 = std::max(eps, t_lambda_new_2/t_lambda_current[2]);
