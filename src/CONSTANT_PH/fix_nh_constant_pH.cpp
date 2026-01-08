@@ -241,7 +241,7 @@ void FixNHConstantPH::nh_v_temp()
   // Temperature
   std::array<double,3> t_lambda_current;
   double t_lambda_target = t_target;
-  fix_constant_pH->return_T_lambda();
+  fix_constant_pH->calculate_T_lambda();
   fix_constant_pH->return_T_lambda(t_lambda_current[1],0);
   fix_constant_pH->return_T_lambda(t_lambda_current[2],1);
   fix_constant_pH->return_T_lambda(t_lambda_current[0],2);
