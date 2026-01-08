@@ -759,7 +759,7 @@ void FixConstantPH::return_H_lambdas(double *_H_lambdas) const
 void FixConstantPH::return_T_lambda(double &_T_lambda, int component)
 {
   if (component < 0 || component > 2) error->one(FLERR, "Illegal function input");
-  calculate_T_lambda();
+  // calculate_T_lambda();
   _T_lambda = this->T_lambdas[component];
 }
 
@@ -2027,7 +2027,7 @@ double FixConstantPH::compute_array(int i, int j)
           return -1.0;
     case 8:
       // 9
-      calculate_T_lambda();
+      // calculate_T_lambda();
       if (j >= 0 && j <= 2) return T_lambdas[j];
       return -1.0; 
     case 9:
