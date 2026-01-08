@@ -386,7 +386,7 @@ void FixNHConstantPH::nh_v_temp()
      MPI_Bcast(&v_lambda_buff,1,MPI_DOUBLE,0,world);
    
   // constraining the v_lambdas
-  // constrain_v_lambdas();
+  constrain_v_lambdas();
    
   fix_constant_pH->reset_params(pH_state);
 }
