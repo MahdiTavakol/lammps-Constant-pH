@@ -231,6 +231,11 @@ void FixNHConstantPH::nh_v_temp()
   n_dof_1 = (lambda_integration_flags & CONSTRAIN) ? n_dof_1 - 1.0 : n_dof_1;
   double Nf_lambdas = static_cast<double>(3*n_lambdas);
 
+   
+  // constraining the v_lambdas
+  if (comm->me == 0)
+    constrain_v_lambdas();
+
      
 
   // Temperature
@@ -385,8 +390,7 @@ void FixNHConstantPH::nh_v_temp()
   if (lambda_integration_flags & BUFFER)
      MPI_Bcast(&v_lambda_buff,1,MPI_DOUBLE,0,world);
    
-  // constraining the v_lambdas
-  constrain_v_lambdas();
+
    
   fix_constant_pH->reset_params(pH_state);
 }
