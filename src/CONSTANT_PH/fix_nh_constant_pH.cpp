@@ -223,13 +223,6 @@ void FixNHConstantPH::nh_v_temp()
   double** m_lambdas = pH_state->m_lambdas;
   const double& m_lambda_buff = pH_state->m_lambda_buff;
   const int& N_buff = pH_state->N_buff; 
-
-  // constraining the v_lambdas
-  if (comm->me == 0)
-   constrain_v_lambdas();
-
-  fix_constant_pH->calculate_T_lambda();
-
      
   // The number of degrees of freedom
   double n_dof_1 = static_cast<double>(n_lambdas);
@@ -392,11 +385,10 @@ void FixNHConstantPH::nh_v_temp()
   if (lambda_integration_flags & BUFFER)
      MPI_Bcast(&v_lambda_buff,1,MPI_DOUBLE,0,world);
    
-
+  // constraining the v_lambdas
+  constrain_v_lambdas();
+   
   fix_constant_pH->reset_params(pH_state);
-
-  // Updating the t_lambdas in the fix_constant_pH
-  fix_constant_pH->calculate_T_lambda();
 }
 
 /* ---------------------------------------------------------------------
