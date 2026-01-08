@@ -158,11 +158,11 @@ void FixNHConstantPH::nve_v()
   v_lambda_buff += dtf * a_lambda_buff;
  }
 
- // Returning the modified parameters to the fix_constant_pH.
- fix_constant_pH->reset_params(pH_state);
-
  if (lambda_integration_flags & CONSTRAIN)
    constrain_v_lambdas();
+
+  // Returning the modified parameters to the fix_constant_pH.
+  fix_constant_pH->reset_params(pH_state);
 }
 
 /* ----------------------------------------------------------------------
@@ -241,6 +241,7 @@ void FixNHConstantPH::nh_v_temp()
   // Temperature
   std::array<double,3> t_lambda_current;
   double t_lambda_target = t_target;
+  fix_constant_pH->return_T_lambda();
   fix_constant_pH->return_T_lambda(t_lambda_current[1],0);
   fix_constant_pH->return_T_lambda(t_lambda_current[2],1);
   fix_constant_pH->return_T_lambda(t_lambda_current[0],2);
@@ -524,8 +525,8 @@ void FixNHConstantPH::constrain_v_lambdas()
    const double N_buff_double = static_cast<double>(pH_state->N_buff);
    double** v_lambdas = pH_state->v_lambdas;
    double** m_lambdas = pH_state->m_lambdas;
-   double v_lambda_buff = pH_state->v_lambda_buff;
-   double m_lambda_buff = pH_state->m_lambda_buff;
+   double& v_lambda_buff = pH_state->v_lambda_buff;
+   const double& m_lambda_buff = pH_state->m_lambda_buff;
 
    double mu = 0.0;
 
