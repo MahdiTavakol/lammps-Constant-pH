@@ -84,7 +84,7 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
     flags{0}, 
     ncommands{0}, mu{0.0},
     random_number_seed{1152}, 
-    lambda_masses{{20.0,20.0}}, 
+    lambda_masses{{20.0*239005.736,20.0*239005.736}}, 
     GFF_flag{false}, GFF{nullptr},
     print_Udwp_flag{false},
     qHWs{0.278}, qOWs{-0.834}, 
