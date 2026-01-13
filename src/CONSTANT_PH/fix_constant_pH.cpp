@@ -75,7 +75,7 @@ static constexpr double tol = 1e-5;
 static constexpr double max_lambda_buff_0 = 1.05;
 static constexpr double min_lambda = -0.1;
 static constexpr double max_lambda = 1.1;
-static constexpr double environment_coupling = 0.0;
+static constexpr double environment_coupling = 1.0;
 
 /* ---------------------------------------------------------------------- */
 
@@ -1867,7 +1867,7 @@ double FixConstantPH::compute_epair()
 
   double one = 0.0;
   double energy;
-  if (force->pair) one += force->pair->eng_coul;
+  if (force->pair) one += force->pair + force->pair->eng_coul;
   
 
 
