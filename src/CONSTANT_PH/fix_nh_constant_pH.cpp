@@ -209,7 +209,7 @@ void FixNHConstantPH::nh_v_temp()
   FixNH::nh_v_temp();
   // The timestep, the current step and the kT of course! 
   double dt = update->dt;
-  double kT = force->boltz * t_target;
+  double kT = 0.008314*t_target; // force->boltz * t_target;
   // unit conversion
   double mvv2e = 1.0; // force->mvv2e;
 

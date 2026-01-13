@@ -638,7 +638,7 @@ void FixConstantPH::update_a_lambda()
   double mvv2e = 1.0; // force->mvv2e;
   double kj2kcal = 1.0; // 0.239006;
   double kcal2kj = 4.184;
-  double kT = force->boltz * T;
+  double kT = 0.008314*T; // force->boltz * T;
   double nStructures1Barrier = 0.5 * kT;
   double nStructures2Barrier = 0.5 * kT; 
 
@@ -1945,7 +1945,7 @@ int FixConstantPH::unpack_exchange(int nlocal, double *buf) {
 double FixConstantPH::compute_array(int i, int j)
 {
   double kj2kcal = 0.239006;
-  double kT = force->boltz * T;
+  double kT = 0.008314*T; //force->boltz * T;
   auto& N_buff = pH_state->N_buff;
   auto& n_lambdas = pH_state->n_lambdas;
   auto& lambdas = pH_state->lambdas;
