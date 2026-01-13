@@ -84,7 +84,7 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
     flags{0}, 
     ncommands{0}, mu{0.0},
     random_number_seed{1152}, 
-    lambda_masses{{20.0*239005.736,20.0*239005.736}}, 
+    lambda_masses{{20.0,20.0}}, 
     GFF_flag{false}, GFF{nullptr},
     print_Udwp_flag{false},
     qHWs{0.278}, qOWs{-0.834}, 
@@ -635,8 +635,9 @@ void FixConstantPH::initialize_lambda(const int& to)
 void FixConstantPH::update_a_lambda()
 {
   if (GFF_flag) calculate_GFFs();
-  double mvv2e = force->mvv2e;
-  double kj2kcal = 0.239006;
+  double mvv2e = 1.0; // force->mvv2e;
+  double kj2kcal = 1.0; // 0.239006;
+  double kcal2kj = 4.184;
   double kT = force->boltz * T;
   double nStructures1Barrier = 0.5 * kT;
   double nStructures2Barrier = 0.5 * kT; 
@@ -656,7 +657,7 @@ void FixConstantPH::update_a_lambda()
 
 
   for (int i = 0; i < n_lambdas; i++) {
-    double f_lambda_0 = -(environment_coupling*(HAs[i] - HBs[i]) -dfs[i] * kT * log(10) * (pK - pH) + kj2kcal * dUs[i] - GFF_lambdas[i]);    
+    double f_lambda_0 = -(environment_coupling*kcal2kj*(HAs[i] - HBs[i]) -dfs[i] * kT * log(10) * (pK - pH) + kj2kcal * dUs[i] - GFF_lambdas[i]);    
     // The df sign should be positive if the lambda = 0 is for the protonated state
     double f_lambda_1 = 2 * M_PI * nStructures1Barrier * pHnStructures1 *
         sin(2 * M_PI * pHnStructures1 * lambdas[i][1]);
@@ -668,7 +669,7 @@ void FixConstantPH::update_a_lambda()
     a_lambdas[i][2] = f_lambda_2 / m_lambdas[i][2];
 
     // I am not sure about the sign of the f*kT*log(10)*(pK-pH)
-    this->H_lambdas[i] = environment_coupling*(lambdas[i][0]*HAs[i] + (1.0-lambdas[i][0])*HBs[i]) -fs[i] * kT * log(10) * (pK - pH) + kj2kcal * Us[i] +
+    this->H_lambdas[i] = environment_coupling*kcal2kj*(lambdas[i][0]*HAs[i] + (1.0-lambdas[i][0])*HBs[i]) -fs[i] * kT * log(10) * (pK - pH) + kj2kcal * Us[i] +
         (m_lambdas[i][0] / 2.0) * (v_lambdas[i][0] * v_lambdas[i][0]) * mvv2e;    
       // This might not be needed. May be I need to tally this into energies.
     // I might need to use the leap-frog integrator and so this function might need to be in other functions than postforce()
@@ -1788,7 +1789,7 @@ void FixConstantPH::calculate_T_lambda(const int& to)
   double KE_lambdas[3] = {0.0, 0.0, 0.0};    // lambdas[0][;], lambdas[1:][;], lambdas[;][;]
   double Nfs[3];
   double kB = force->boltz;
-  double mvv2e = force->mvv2e;
+  double mvv2e = 1.0; //force->mvv2e;
 
   Nfs[0] = static_cast<double>(n_lambdas - to);
   Nfs[1] = static_cast<double>(2 * (n_lambdas - to));
