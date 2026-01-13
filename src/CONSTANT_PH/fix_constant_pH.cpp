@@ -1867,7 +1867,7 @@ double FixConstantPH::compute_epair()
 
   double one = 0.0;
   double energy;
-  if (force->pair) one += force->pair->eng_vdwl + force->pair->eng_coul;
+  if (force->pair) one += force->pair->eng_coul;
   
 
 
@@ -1888,12 +1888,6 @@ double FixConstantPH::compute_epair()
   if (force->kspace)
     energy += force->kspace->energy;
 
-  if (force->pair && force->pair->tail_flag) {
-    double volume = domain->xprd * domain->yprd * domain->zprd;
-    energy += force->pair->etail/volume;
-  }
-
-  if (modify->n_energy_global) energy += modify->energy_global();
   
   
   /*
