@@ -1867,7 +1867,7 @@ double FixConstantPH::compute_epair()
 
   double one = 0.0;
   double energy;
-  if (force->pair) one += force->pair->eng_vdwl + force->pair->eng_coul;
+  if (force->pair) one += force->pair->eng_coul; // + force->pair->eng_vdwl;
   
 
 
@@ -1885,8 +1885,8 @@ double FixConstantPH::compute_epair()
   // Adding the kspace component
   // the kspace energy is the value accumulated for all the ranks.
   // Look at src/compute_pe.cpp
-  if (force->kspace)
-    energy += force->kspace->energy;
+  //if (force->kspace)
+    //energy += force->kspace->energy;
 
   
   
