@@ -1867,7 +1867,7 @@ double FixConstantPH::compute_epair()
 
   double one = 0.0;
   double energy;
-  if (force->pair) one += force->pair + force->pair->eng_coul;
+  if (force->pair) one += force->pair->eng_vdwl + force->pair->eng_coul;
   
 
 
