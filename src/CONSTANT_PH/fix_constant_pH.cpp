@@ -1788,7 +1788,7 @@ void FixConstantPH::calculate_T_lambda(const int& to)
 
   double KE_lambdas[3] = {0.0, 0.0, 0.0};    // lambdas[0][;], lambdas[1:][;], lambdas[;][;]
   double Nfs[3];
-  double kB = force->boltz;
+  double kB = 0.008314; //force->boltz;
   double mvv2e = 1.0; //force->mvv2e;
 
   Nfs[0] = static_cast<double>(n_lambdas - to);
