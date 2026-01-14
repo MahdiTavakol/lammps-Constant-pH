@@ -10,5 +10,5 @@ export LD_LIBRARY_PATH=$CRAY_LD_LIBRARY_PATH:$LD_LIBRARY_PATH
 rm -rf build-archer2
 mkdir build-archer2
 cd build-archer2
-cmake -C ../cmake/presets/most.cmake -D BUILD_MPI=yes -DCMAKE_BUILD_TYPE=RELEASE ../cmake
+cmake -C ../cmake/presets/most.cmake -D BUILD_MPI=yes -D PKG_CONSTANT_PH=yes -DCMAKE_BUILD_TYPE=RELEASE ../cmake
 cmake --build . --parallel 
