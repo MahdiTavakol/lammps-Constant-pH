@@ -75,7 +75,7 @@ static constexpr double tol = 1e-5;
 static constexpr double max_lambda_buff_0 = 1.05;
 static constexpr double min_lambda = -0.1;
 static constexpr double max_lambda = 1.1;
-static constexpr double environment_coupling = 0.0;
+static constexpr double environment_coupling = 1.0;
 
 /* ---------------------------------------------------------------------- */
 
@@ -666,12 +666,12 @@ void FixConstantPH::update_a_lambda()
         sin(2 * M_PI * pHnStructures2 * lambdas[i][2]);
 
     a_lambdas[i][0] = aUnit * f_lambda_0 / m_lambdas[i][0]; 
-    a_lambdas[i][1] = aUnit * f_lambda_1 / m_lambdas[i][1];
-    a_lambdas[i][2] = aUnit * f_lambda_2 / m_lambdas[i][2];
+    a_lambdas[i][1] = f_lambda_1 / m_lambdas[i][1];
+    a_lambdas[i][2] = f_lambda_2 / m_lambdas[i][2];
 
     // I am not sure about the sign of the f*kT*log(10)*(pK-pH)
     this->H_lambdas[i] = environment_coupling*kcal2kj*(lambdas[i][0]*HAs[i] + (1.0-lambdas[i][0])*HBs[i]) -fs[i] * kT * log(10) * (pK - pH) + kj2kcal * Us[i] +
-        (m_lambdas[i][0] / 2.0) * (v_lambdas[i][0] * v_lambdas[i][0]) * mvv2e;    
+        (m_lambdas[i][0] / 2.0) * (v_lambdas[i][0] * v_lambdas[i][0]) * (force->mvv2e);    
       // This might not be needed. May be I need to tally this into energies.
     // I might need to use the leap-frog integrator and so this function might need to be in other functions than postforce()
   }
@@ -681,7 +681,7 @@ void FixConstantPH::update_a_lambda()
     a_lambda_buff = aUnit * 
         f_lambda_buff / m_lambda_buff;    // the fix_nh_constant_pH itself takes care of units
     this->H_lambda_buff = 
-        kj2kcal * U_buff + N_buff * (m_lambda_buff / 2.0) * (v_lambda_buff * v_lambda_buff) * mvv2e;
+        kj2kcal * U_buff + N_buff * (m_lambda_buff / 2.0) * (v_lambda_buff * v_lambda_buff) * (force->mvv2e);
   }
 }
 
