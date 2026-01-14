@@ -211,7 +211,7 @@ void FixNHConstantPH::nh_v_temp()
   double dt = update->dt;
   double kT = 0.008314*t_target; // force->boltz * t_target;
   // unit conversion
-  double mvv2e = 1.0; // force->mvv2e;
+  double mvv2e = 1e6; // force->mvv2e;
 
   // Getting the lambda_parameters from the fix_constant_pH.
   fix_constant_pH->return_params(pH_state);

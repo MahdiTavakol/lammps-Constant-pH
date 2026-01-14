@@ -639,6 +639,7 @@ void FixConstantPH::update_a_lambda()
   double kj2kcal = 1.0; // 0.239006;
   double kcal2kj = 4.184;
   double kT = 0.008314*T; // force->boltz * T;
+  double aUnit = 1e-6; // convert the acceleration form ps^-2 to fs^-2
   double nStructures1Barrier = 0.5 * kT;
   double nStructures2Barrier = 0.5 * kT; 
 
@@ -664,9 +665,9 @@ void FixConstantPH::update_a_lambda()
     double f_lambda_2 = 2 * M_PI * nStructures2Barrier * pHnStructures2 *
         sin(2 * M_PI * pHnStructures2 * lambdas[i][2]);
 
-    a_lambdas[i][0] = f_lambda_0 / m_lambdas[i][0]; 
-    a_lambdas[i][1] = f_lambda_1 / m_lambdas[i][1];
-    a_lambdas[i][2] = f_lambda_2 / m_lambdas[i][2];
+    a_lambdas[i][0] = aUnit * f_lambda_0 / m_lambdas[i][0]; 
+    a_lambdas[i][1] = aUnit * f_lambda_1 / m_lambdas[i][1];
+    a_lambdas[i][2] = aUnit * f_lambda_2 / m_lambdas[i][2];
 
     // I am not sure about the sign of the f*kT*log(10)*(pK-pH)
     this->H_lambdas[i] = environment_coupling*kcal2kj*(lambdas[i][0]*HAs[i] + (1.0-lambdas[i][0])*HBs[i]) -fs[i] * kT * log(10) * (pK - pH) + kj2kcal * Us[i] +
@@ -677,7 +678,7 @@ void FixConstantPH::update_a_lambda()
 
   if (flags & BUFFER) {
     double f_lambda_buff = -(kj2kcal * dU_buff);
-    a_lambda_buff =
+    a_lambda_buff = aUnit * 
         f_lambda_buff / m_lambda_buff;    // the fix_nh_constant_pH itself takes care of units
     this->H_lambda_buff = 
         kj2kcal * U_buff + N_buff * (m_lambda_buff / 2.0) * (v_lambda_buff * v_lambda_buff) * mvv2e;
@@ -1789,7 +1790,7 @@ void FixConstantPH::calculate_T_lambda(const int& to)
   double KE_lambdas[3] = {0.0, 0.0, 0.0};    // lambdas[0][;], lambdas[1:][;], lambdas[;][;]
   double Nfs[3];
   double kB = 0.008314; //force->boltz;
-  double mvv2e = 1.0; //force->mvv2e;
+  double mvv2e = 1e6; //force->mvv2e;
 
   Nfs[0] = static_cast<double>(n_lambdas - to);
   Nfs[1] = static_cast<double>(2 * (n_lambdas - to));
