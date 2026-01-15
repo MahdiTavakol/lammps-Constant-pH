@@ -149,13 +149,13 @@ void FixNHConstantPH::nve_v()
 
   for (int i = 0; i < n_lambdas; i++) 
    for (int j = 0; j < 3; j++)
-    v_lambdas[i][j] += 0.1 * dtf * a_lambdas[i][j];
+    v_lambdas[i][j] += 0.001 * dtf * a_lambdas[i][j];
 
 
  if (lambda_integration_flags & BUFFER) {
   double& v_lambda_buff = pH_state->v_lambda_buff;
   auto&   a_lambda_buff = pH_state->a_lambda_buff;
-  v_lambda_buff += 0.1 * dtf * a_lambda_buff;
+  v_lambda_buff += 0.001 * dtf * a_lambda_buff;
  }
 
  if (lambda_integration_flags & CONSTRAIN)
@@ -182,13 +182,13 @@ void FixNHConstantPH::nve_x()
 
   for (int i = 0; i < n_lambdas; i++)
    for (int j = 0; j < 3; j++)
-    x_lambdas[i][j] += 0.1 * dtv * v_lambdas[i][j];
+    x_lambdas[i][j] += 0.001 * dtv * v_lambdas[i][j];
   
      
   if (lambda_integration_flags & BUFFER) {
    auto& x_lambda_buff = pH_state->lambda_buff;
    auto& v_lambda_buff = pH_state->v_lambda_buff;
-   x_lambda_buff += 0.1 * dtv * v_lambda_buff;
+   x_lambda_buff += 0.001 * dtv * v_lambda_buff;
   }
 
   // Returning the modified parameters to the fix_constant_pH.
@@ -208,7 +208,7 @@ void FixNHConstantPH::nh_v_temp()
 {
   FixNH::nh_v_temp();
   // The timestep, the current step and the kT of course! 
-  double dt = 0.1 * update->dt;
+  double dt = 0.001 * update->dt;
   double kT = 0.008314*t_target; // force->boltz * t_target;
   // unit conversion
   double mvv2e = 1e6; // force->mvv2e;
