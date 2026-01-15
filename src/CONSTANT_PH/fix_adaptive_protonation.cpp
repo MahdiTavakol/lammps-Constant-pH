@@ -105,7 +105,7 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
 
   dynamic_group_allow = 0;
   scalar_flag = 1;
-  //vector_flag = 1;
+  vector_flag = 1;
   peratom_flag = 1;
   comm_forward = 0;
   maxexchange = 2;
