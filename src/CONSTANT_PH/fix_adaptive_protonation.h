@@ -44,7 +44,7 @@ class FixAdaptiveProtonation : public Fix {
   void initial_integrate(int) override;
   void post_force(int) override;
   double compute_scalar() override;
-  //double compute_vector(int) override;
+  double compute_vector(int) override;
   double memory_usage() override;
   void init_list(int, class NeighList *) override;
 

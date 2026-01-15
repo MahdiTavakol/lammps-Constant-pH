@@ -867,7 +867,7 @@ double FixAdaptiveProtonation::compute_scalar()
    Output the changes in the topology --> nbonds and nangles
    -------------------------------------------------------------------------- */
 
-/*double FixAdaptiveProtonation::compute_vector(int n)
+double FixAdaptiveProtonation::compute_vector(int n)
 {
   switch (n) {
     // 1
@@ -879,7 +879,7 @@ double FixAdaptiveProtonation::compute_scalar()
       return static_cast<double>(nchanges[2]);
   }
   return -1;
-}*/
+}
 
 /* --------------------------------------------------------------------------
     This part outputs the number and id of neighboring water molecules
