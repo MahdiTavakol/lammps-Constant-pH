@@ -114,6 +114,7 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
   peratom_freq = nevery;
   extscalar = 0;
   extvector = 0;
+  extarray = 0;
 
   // Just for Debugging --->>> Should be removed in the final version
   array_flag = 1;
