@@ -44,9 +44,13 @@ class FixAdaptiveProtonation : public Fix {
   void initial_integrate(int) override;
   void post_force(int) override;
   double compute_scalar() override;
-  double compute_vector(int) override;
+  //double compute_vector(int) override;
   double memory_usage() override;
   void init_list(int, class NeighList *) override;
+
+  // Just for debugging ---->>>> Should be removed in the final version
+  double compute_array(int, int) override;
+
 
   // functions to exchange q_init during atom exchange between ranks
   int pack_exchange(int, double *) override;
@@ -113,6 +117,9 @@ class FixAdaptiveProtonation : public Fix {
   std::unique_ptr<double []> q_orig;
   int rampStep;
   int nRampStep = 5000;
+
+  // The number of neighboring water molecules and id of n-1 of them
+  int nWaterOutput = 5;
   
   // smoothing the mark
   int nSmoothingSteps = 10;

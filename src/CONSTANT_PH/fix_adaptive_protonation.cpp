@@ -23,6 +23,7 @@
 #include "domain.h"
 #include "error.h"
 #include "math_const.h"
+#include "memory.h"
 #include "neighbor.h"
 #include "neigh_list.h"
 #include "update.h"
@@ -104,15 +105,19 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
 
   dynamic_group_allow = 0;
   scalar_flag = 1;
-  vector_flag = 1;
+  //vector_flag = 1;
   peratom_flag = 1;
   comm_forward = 0;
   maxexchange = 2;
   size_vector = 3;
-  size_peratom_cols = 0;
+  //size_peratom_cols = 0;
   peratom_freq = nevery;
   extscalar = 0;
   extvector = 0;
+
+  // Just for Debugging --->>> Should be removed in the final version
+  array_flag = 1;
+  size_peratom_cols = nWaterOutput + 1;
 
 
   /* This part used to be in the setup() function, 
@@ -122,7 +127,8 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
     */
 
   nmax = atom->nmax;
-  vector_atom = new double[nmax];
+  //vector_atom = new double[nmax];
+  memory->create(array_atom,nmax,size_peratom_cols,"fix_adaptive_protonation:array_atom");
 
   nmolecules = 0;
 
@@ -168,13 +174,14 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
 
 FixAdaptiveProtonation::~FixAdaptiveProtonation()
 {
-  if (vector_atom) delete[] vector_atom;
+  memory->destroy(array_atom);
+  //if (vector_atom) delete[] vector_atom;
 
   // this is not needed since I am using std::unique_ptr
   // In destructin it will be deallocated on its own.
   deallocate_storage();
 
-  vector_atom = nullptr;
+  //vector_atom = nullptr;
 
   atom->delete_callback(id,Atom::GROW);
   //atom->delete_callback(id,Atom::COPY);
@@ -370,8 +377,11 @@ void FixAdaptiveProtonation::post_force(int /*vflag*/)
 int FixAdaptiveProtonation::pack_exchange(int i, double* buf)
 {
   buf[0] = q_orig[i];
-  buf[1] = vector_atom[i];
-  return 2;
+  for (int m = 0; m < size_peratom_cols; m++)
+    buf[m+1] = array_atom[i][m];
+  //buf[1] = vector_atom[i];
+  //return 2;
+  return size_peratom_cols + 1;
 }
 
 /* --------------------------------------------------------------------------------------- */
@@ -379,8 +389,11 @@ int FixAdaptiveProtonation::pack_exchange(int i, double* buf)
 int FixAdaptiveProtonation::unpack_exchange(int nlocal, double* buf)
 {
   q_orig[nlocal] = buf[0];
-  vector_atom[nlocal] = buf[1];
-  return 2;
+  for (int m = 0; m < size_peratom_cols; m++)
+    array_atom[nlocal][m] = buf[m+1];
+  //vector_atom[nlocal] = buf[1];
+  //return 2;
+  return size_peratom_cols + 1;
 }
 
 /* --------------------------------------------------------------------------------------- */
@@ -393,11 +406,19 @@ void FixAdaptiveProtonation::grow_arrays(int nmax_new)
   if (keep < nmax_new) std::fill(q_new.get()+keep,q_new.get()+nmax_new,0.0);
   q_orig.swap(q_new);
 
-  double *new_vector_atom = new double[nmax_new];
-  if (keep > 0) std::copy_n(vector_atom,keep,new_vector_atom);
-  if (keep < nmax_new) std::fill(new_vector_atom+keep,new_vector_atom+nmax_new,0.0);
-  delete [] vector_atom;
-  vector_atom = new_vector_atom;
+  //double *new_vector_atom = new double[nmax_new];
+  //if (keep > 0) std::copy_n(vector_atom,keep,new_vector_atom);
+  //if (keep < nmax_new) std::fill(new_vector_atom+keep,new_vector_atom+nmax_new,0.0);
+  //delete [] vector_atom;
+  //vector_atom = new_vector_atom;
+
+  double** new_array_atom;
+  memory->create(new_array_atom,nmax_new,size_peratom_cols,"fix_adaptive_protonation:array_atoms");
+  std::fill_n(&new_array_atom[0][0],nmax_new*size_peratom_cols,0.0);
+  if (keep > 0) std::copy_n(&array_atom[0][0],keep*size_peratom_cols,&new_array_atom[0][0]);
+  memory->destroy(array_atom);
+  array_atom = new_array_atom;
+  
   nmax = nmax_new;
 }
 
@@ -406,7 +427,9 @@ void FixAdaptiveProtonation::grow_arrays(int nmax_new)
 void FixAdaptiveProtonation::copy_arrays(int i, int j , int /*deflag*/)
 {
   q_orig[j] = q_orig[i];
-  vector_atom[j] = vector_atom[i];
+  //vector_atom[j] = vector_atom[i];
+  for (int m = 0; m < size_peratom_cols; m++)
+    array_atom[j][m] = array_atom[i][m];
 }
 
 
@@ -488,13 +511,16 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
   int inum, jnum;
   int nlocal = atom->nlocal;
   double** x = atom->x;
+  // global atom id
+  int* gid = atom->tag;
 
   const int* protonable = pH_structure_storage->protonable.get();
 
   // resetting the mark_local and molecule_size_local before going through atoms
   std::fill_n(mark_local.get(),nmolecules+1,0);
   std::fill_n(protonable_size_local.get(),nmolecules+1,0);
-  std::fill_n(vector_atom,nmax,0.0);
+  std::fill_n(&array_atom[0][0],nmax*size_peratom_cols,0.0);
+  //std::fill_n(vector_atom,nmax,0.0);
 
 
   // I do not need ghost atoms for inum. however, I need them in jnum
@@ -509,12 +535,16 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
   for (int ii = 0; ii < inum; ii++) {
     int i = ilist[ii];
 
+
+    // number of neighboring water molecules
+    int nNeighboringWaters = 0;
+
     // Check if this atom is protonable --> if not do not bother with it.
     if (protonable[type[i]] == 0) {
       continue;
-    } else {
-      protonable_size_local[molecule[i]]++;
-    }
+    } 
+      
+    protonable_size_local[molecule[i]]++;
 
     jlist = firstneigh[i];
     jnum  = numneigh[i];
@@ -536,11 +566,14 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
       double dz = x[i][2]-x[j][2];
       domain->minimum_image(dx,dy,dz);
       double r = dx*dx+dy*dy+dz*dz;
-      if (r < rprobe*rprobe)
-        vector_atom[i] += 1.0;    
+      if (r < rprobe*rprobe) {
+        array_atom[i][0] += 1.0;
+        if (++nNeighboringWaters <= nWaterOutput)
+          array_atom[i][nNeighboringWaters] = gid[j];
+      }  
     }
 
-    if (vector_atom[i] >= threshold) {
+    if (array_atom[i][0] >= threshold) {
       mark_local[molecule[i]] += SOLVENT;
     } else {
       mark_local[molecule[i]] += SOLID;
@@ -833,7 +866,7 @@ double FixAdaptiveProtonation::compute_scalar()
    Output the changes in the topology --> nbonds and nangles
    -------------------------------------------------------------------------- */
 
-double FixAdaptiveProtonation::compute_vector(int n)
+/*double FixAdaptiveProtonation::compute_vector(int n)
 {
   switch (n) {
     // 1
@@ -845,6 +878,15 @@ double FixAdaptiveProtonation::compute_vector(int n)
       return static_cast<double>(nchanges[2]);
   }
   return -1;
+}*/
+
+/* --------------------------------------------------------------------------
+    This part outputs the number and id of neighboring water molecules
+   -------------------------------------------------------------------------- */
+
+double FixAdaptiveProtonation::compute_array(int i, int j)
+{
+  return array_atom[i][j];
 }
 
 /* --------------------------------------------------------------------------
