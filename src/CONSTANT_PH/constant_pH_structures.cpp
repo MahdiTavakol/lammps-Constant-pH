@@ -290,12 +290,7 @@ int constant_pH_state::reset_lambdas(const std::unique_ptr<constant_pH_state>& p
   // fast path
   if (!prev_pH_state_ || !prev_pH_state_->molids)
   {
-    if (n_lambdas) {
-      std::fill_n(lambdas[0],3*n_lambdas,0.0);
-      std::fill_n(v_lambdas[0],3*n_lambdas,0.0);
-      std::fill_n(a_lambdas[0],3*n_lambdas,0.0);
-      std::fill_n(m_lambdas[0],3*n_lambdas,mass_lambda);
-    }
+    allocate_lambdas(true);
     lambda_buff = 1.0;
     v_lambda_buff = 0.0;
     a_lambda_buff = 0.0;
@@ -326,7 +321,7 @@ int constant_pH_state::reset_lambdas(const std::unique_ptr<constant_pH_state>& p
     auto iter = idx.find(molids[i]);
     if (iter != idx.end()) {
       int from = iter->second;
-      molids_temp[front] = prev_pH_state_->molids[from];
+      molids_temp[front] = molids[i];
       std::copy_n(prev_pH_state_->lambdas[from]  ,3,x_temp.get()+3*front);
       std::copy_n(prev_pH_state_->v_lambdas[from],3,v_temp.get()+3*front);
       std::copy_n(prev_pH_state_->a_lambdas[from],3,a_temp.get()+3*front);

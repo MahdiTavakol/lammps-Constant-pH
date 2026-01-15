@@ -545,8 +545,8 @@ void FixConstantPH::set_lambdas()
     // Initializing lambdas based on the current charge of protonable molecules so there is no jump in the system total charge
     initialize_lambda(to);
     // This would not work in the initialize section as the m_lambda has not been set yet!
-    initialize_v_lambda(this->T,0);
-    //initialize_v_lambda(this->T,to);
+    // initialize_v_lambda(this->T,0);
+    initialize_v_lambda(this->T,to);
   }
 
   // Resetting the vector_atom to the default value
@@ -823,7 +823,6 @@ void FixConstantPH::read_commands_file()
 
     for (int i = 0; i < ncommands; i++) {
       if (!getline(commandsFile, line)) error->one(FLERR, "Error reading commands lines");
-
       commands[i] = line;
     }
   }
@@ -1751,25 +1750,30 @@ void FixConstantPH::initialize_v_lambda(const double _T_lambda, const int& to)
 
   std::unique_ptr<RanPark> random = std::make_unique<RanPark>(lmp, random_number_seed);
 
+  int length = n_lambdas - to;
   for (int i = to; i < n_lambdas; i++)
     for (int j = 0; j < 3; j++)
       v_lambdas[i][j] = random->gaussian() / std::sqrt(m_lambdas[i][j]);
 
-  if (flags & BUFFER) v_lambda_buff = random->gaussian() / std::sqrt(m_lambda_buff);
+  // if (flags & BUFFER) v_lambda_buff = random->gaussian() / std::sqrt(m_lambda_buff);
 
   this->calculate_T_lambda(to);
 
-  double scaling_factor = std::sqrt(_T_lambda / T_lambdas[2]);
+  double scaling_factor1 = std::sqrt(_T_lambda / T_lambdas[0]);
+  double scaling_factor2 = std::sqrt(_T_lambda / T_lambdas[1]);
 
-  for (int i = to; i < n_lambdas; i++)
-    for (int j = 0; j < 3; j++) v_lambdas[i][j] *= scaling_factor;
+  for (int i = to; i < n_lambdas; i++) {
+    v_lambdas[i][0] *= scaling_factor1;
+    for (int j = 1; j < 3; j++)
+      v_lambdas[i][j] *= scaling_factor2;
+  }
 
-  if (flags & BUFFER) v_lambda_buff *= scaling_factor;
+  //if (flags & BUFFER) v_lambda_buff *= scaling_factor;
 
 
   if (n_lambdas > 0)
-    MPI_Bcast(v_lambdas[0], n_lambdas * 3, MPI_DOUBLE, 0, world);
-  if (flags & BUFFER) MPI_Bcast(&v_lambda_buff,1,MPI_DOUBLE,0,world);
+    MPI_Bcast(v_lambdas[to], length * 3, MPI_DOUBLE, 0, world);
+  // if (flags & BUFFER) MPI_Bcast(&v_lambda_buff,1,MPI_DOUBLE,0,world);
   
   // Updating the T_lambdas
   this->calculate_T_lambda();
