@@ -630,7 +630,7 @@ void FixConstantPH::initialize_lambda(const int& to)
   }
 
   // Neutralizing the simulation box just in case. 
-  lambda_buff = neutralize();
+  //lambda_buff = neutralize();
 }
 
 /* ---------------------------------------------------------------------- */
