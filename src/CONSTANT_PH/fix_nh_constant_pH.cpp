@@ -249,9 +249,9 @@ void FixNHConstantPH::nh_v_temp()
   auto checkOutBounds = [&](void)
   {
     for (int i = 0; i < n_lambdas; i++) {
-      if (x_lambdas[i][0] < -0.1 || x_lambdas[i][0] > 1.1) {
+      if (x_lambdas[i][0] < -0.218 || x_lambdas[i][0] > 1.218) {
         v_lambdas[i][0] = std::abs(v_lambdas[i][0]);
-        if (x_lambdas[i][0] > 1.1)
+        if (x_lambdas[i][0] > 1.218)
           v_lambdas[i][0] = -v_lambdas[i][0];  
       }
 
@@ -265,9 +265,9 @@ void FixNHConstantPH::nh_v_temp()
     }
 
     if (lambda_integration_flags & BUFFER) {
-       if (x_lambda_buff < -0.1 || x_lambda_buff > 1.1) {
+       if (x_lambda_buff < -0.218 || x_lambda_buff > 1.218) {
          v_lambda_buff = std::abs(v_lambda_buff);
-         if (x_lambda_buff > 1.01)
+         if (x_lambda_buff > 1.218)
            v_lambda_buff = -v_lambda_buff;
        }
     }
@@ -298,7 +298,7 @@ void FixNHConstantPH::nh_v_temp()
            v_lambda_buff = ranMars->gaussian(mean,sigma);
         }
       }
-      //checkOutBounds();
+      checkOutBounds();
     } else if (which == BIAS) {
       // This needs to be implemented
       error->one(FLERR,"The bias keyword for the fix_nh_constant_pH has not been implemented yet!");
@@ -362,7 +362,7 @@ void FixNHConstantPH::nh_v_temp()
        if (lambda_integration_flags & BUFFER) {
           v_lambda_buff *= alpha_bussi1;
        }
-       //checkOutBounds();
+       checkOutBounds();
     } else if (which == BIAS) {
        // This needs to be implemented
        error->one(FLERR,"The bias keyword for the fix_nh_constant_pH has not been implemented yet!");
