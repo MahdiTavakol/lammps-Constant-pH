@@ -254,7 +254,7 @@ void FixNHConstantPH::nh_v_temp()
         if (x_lambdas[i][0] > 1.1)
           v_lambdas[i][0] = -v_lambdas[i][0];  
       }
-       v_lambdas[i][0] = -static_cast<int>((x_lambdas[i][0]>0)-(x_lambdas[i][0]<0))*std::abs(v_lambdas[i][0]);
+
 
       for (int j = 1; j < 3; j++) {
        if (x_lambdas[i][j] < 0.0 && v_lambdas[i][j] < 0.0)
@@ -265,9 +265,9 @@ void FixNHConstantPH::nh_v_temp()
     }
 
     if (lambda_integration_flags & BUFFER) {
-       if (x_lambda_buff < -0.05 || x_lambda_buff > 1.05) {
+       if (x_lambda_buff < -0.1 || x_lambda_buff > 1.1) {
          v_lambda_buff = std::abs(v_lambda_buff);
-         if (x_lambda_buff > 1.05)
+         if (x_lambda_buff > 1.01)
            v_lambda_buff = -v_lambda_buff;
        }
     }
