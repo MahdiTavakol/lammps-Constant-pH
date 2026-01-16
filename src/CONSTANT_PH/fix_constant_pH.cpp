@@ -298,7 +298,7 @@ int FixConstantPH::setmask()
 void FixConstantPH::init()
 {
   // default values from Donnini, Ullmann, J Chem Theory Comput 2016 - Table S2
-  w = 200; //200;
+  w = 1000; //200;
   s = 0.3;//0.3;
   h = 10; //7.0;
   k = 6.267; //4.417;       //2.553;

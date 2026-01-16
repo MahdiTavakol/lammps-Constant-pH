@@ -362,7 +362,7 @@ void FixNHConstantPH::nh_v_temp()
        if (lambda_integration_flags & BUFFER) {
           v_lambda_buff *= alpha_bussi1;
        }
-       checkOutBounds();
+       //checkOutBounds();
     } else if (which == BIAS) {
        // This needs to be implemented
        error->one(FLERR,"The bias keyword for the fix_nh_constant_pH has not been implemented yet!");
