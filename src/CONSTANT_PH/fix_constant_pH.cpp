@@ -75,7 +75,7 @@ static constexpr double tol = 1e-5;
 static constexpr double max_lambda_buff_0 = 1.05;
 static constexpr double min_lambda = -0.1;
 static constexpr double max_lambda = 1.1;
-static constexpr double environment_coupling = 0.0;
+static constexpr double environment_coupling = 1.0;
 
 /* ---------------------------------------------------------------------- */
 
@@ -298,7 +298,7 @@ int FixConstantPH::setmask()
 void FixConstantPH::init()
 {
   // default values from Donnini, Ullmann, J Chem Theory Comput 2016 - Table S2
-  w = 50; //200;
+  w = 200; //200;
   s = 0.3;//0.3;
   h = 10; //7.0;
   k = 6.267; //4.417;       //2.553;
