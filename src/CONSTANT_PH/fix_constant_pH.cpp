@@ -382,7 +382,10 @@ void FixConstantPH::setup(int /*vflag*/)
 
   if (flags & BUFFER) {
     lambda_buff = lambda_buff_0;
-    lambda_buff = neutralize();
+    modify_q_buff(lambda_buff);
+    double q_total = compute_q_total(true);
+    lambda_buff = lambda_buff_0 - q_total/static_cast<double>(N_buff);
+
     if (lambda_buff >= max_lambda_buff_0 ) {
       double dlambda_buff = lambda_buff - max_lambda_buff_0;
       lambda_buff = max_lambda_buff_0 ;
