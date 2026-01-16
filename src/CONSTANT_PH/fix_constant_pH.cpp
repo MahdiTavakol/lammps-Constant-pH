@@ -432,7 +432,7 @@ void FixConstantPH::initial_integrate(int /*vflag*/)
 
           // Since there is a possibly to having the fix_adaptive_protonation deleted in 
           // the commands we need to retrieve it again.
-          fix_adaptive_protonation = dynamic_cast<FixAdaptiveProtonation *>(modify->get_fix_by_id(fix_adaptive_protonation_id.c_str()));
+          fix_adaptive_protonation = dynamic_cast<FixAdaptiveProtonation*>(modify->get_fix_by_id(fix_adaptive_protonation_id.c_str()));
           if (!fix_adaptive_protonation)
             error->all(FLERR, "Wrong fix type in the adaptive keyword for the constant pH");
         }
@@ -626,8 +626,6 @@ void FixConstantPH::initialize_lambda(const int& to)
     else
       lambdas[to+j][0] = lambda_j;
   }
-
-
 }
 
 /* ---------------------------------------------------------------------- */
@@ -1768,12 +1766,13 @@ void FixConstantPH::initialize_v_lambda(const double _T_lambda, const int& to)
       v_lambdas[i][j] *= scaling_factor2;
   }
 
-  //if (flags & BUFFER) v_lambda_buff *= scaling_factor;
+  if (flags & BUFFER) v_lambda_buff *= scaling_factor1;
 
 
   if (n_lambdas > 0)
     MPI_Bcast(v_lambdas[to], length * 3, MPI_DOUBLE, 0, world);
-  // if (flags & BUFFER) MPI_Bcast(&v_lambda_buff,1,MPI_DOUBLE,0,world);
+  
+  if (flags & BUFFER) MPI_Bcast(&v_lambda_buff,1,MPI_DOUBLE,0,world);
   
   // Updating the T_lambdas
   this->calculate_T_lambda();
