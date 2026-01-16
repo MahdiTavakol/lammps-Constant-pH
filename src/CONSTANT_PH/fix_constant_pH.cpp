@@ -661,7 +661,7 @@ void FixConstantPH::update_a_lambda()
 
 
   for (int i = 0; i < n_lambdas; i++) {
-    double f_lambda_0 = -(environment_coupling*kcal2kj*(HAs[i] - HBs[i]) -dfs[i] * kT * log(10) * (pK - pH) + kj2kcal * dUs[i] - GFF_lambdas[i]);    
+    double f_lambda_0 = -(environment_coupling*kcal2kj*(HAs[i] - HBs[i])*0.0 -dfs[i] * kT * log(10) * (pK - pH) + kj2kcal * dUs[i] - GFF_lambdas[i]);    
     // The df sign should be positive if the lambda = 0 is for the protonated state
     double f_lambda_1 = 2 * M_PI * nStructures1Barrier * pHnStructures1 *
         sin(2 * M_PI * pHnStructures1 * lambdas[i][1]);
