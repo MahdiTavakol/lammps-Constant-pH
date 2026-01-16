@@ -249,9 +249,9 @@ void FixNHConstantPH::nh_v_temp()
   auto checkOutBounds = [&](void)
   {
     for (int i = 0; i < n_lambdas; i++) {
-      if (x_lambdas[i][0] < -0.05 || x_lambdas[i][0] > 1.05) {
+      if (x_lambdas[i][0] < -0.1 || x_lambdas[i][0] > 1.1) {
         v_lambdas[i][0] = std::abs(v_lambdas[i][0]);
-        if (x_lambdas[i][0] > 1.05)
+        if (x_lambdas[i][0] > 1.1)
           v_lambdas[i][0] = -v_lambdas[i][0];  
       }
        v_lambdas[i][0] = -static_cast<int>((x_lambdas[i][0]>0)-(x_lambdas[i][0]<0))*std::abs(v_lambdas[i][0]);
