@@ -309,7 +309,7 @@ void FixConstantPH::init()
   d = 5.0; //3.50;    //2.0; //The height of the barrier is 2*d
 
   // default values for the buffer potential with h = 0 from Donnin J Chem Theory Comput 2016 - Table S2
-  w_buff = 200;
+  w_buff = 1000;
   s_buff = 0.3;
   h_buff = 0.0;
   k_buff = 0.0;
@@ -661,7 +661,7 @@ void FixConstantPH::update_a_lambda()
 
 
   for (int i = 0; i < n_lambdas; i++) {
-    double f_lambda_0 = -(environment_coupling*kcal2kj*(HAs[i] - HBs[i])*0.0 -0.0*dfs[i] * kT * log(10) * (pK - pH) + 0.0*kj2kcal * dUs[i] - GFF_lambdas[i]);    
+    double f_lambda_0 = -(environment_coupling*kcal2kj*(HAs[i] - HBs[i])*0.0 -0.0*dfs[i] * kT * log(10) * (pK - pH) + kj2kcal * dUs[i] - GFF_lambdas[i]);    
     // The df sign should be positive if the lambda = 0 is for the protonated state
     double f_lambda_1 = 2 * M_PI * nStructures1Barrier * pHnStructures1 *
         sin(2 * M_PI * pHnStructures1 * lambdas[i][1]);
@@ -673,18 +673,18 @@ void FixConstantPH::update_a_lambda()
     a_lambdas[i][2] = f_lambda_2 / m_lambdas[i][2];
 
     // I am not sure about the sign of the f*kT*log(10)*(pK-pH)
-    this->H_lambdas[i] = 0.0*environment_coupling*kcal2kj*(lambdas[i][0]*HAs[i] + (1.0-lambdas[i][0])*HBs[i]) -0.0*fs[i] * kT * log(10) * (pK - pH) + 0.0*kj2kcal * Us[i]; 
+    this->H_lambdas[i] = 0.0*environment_coupling*kcal2kj*(lambdas[i][0]*HAs[i] + (1.0-lambdas[i][0])*HBs[i]) -0.0*fs[i] * kT * log(10) * (pK - pH) + kj2kcal * Us[i]; 
         // + (m_lambdas[i][0] / 2.0) * (v_lambdas[i][0] * v_lambdas[i][0]) * (force->mvv2e);    
       // This might not be needed. May be I need to tally this into energies.
     // I might need to use the leap-frog integrator and so this function might need to be in other functions than postforce()
   }
 
   if (flags & BUFFER) {
-    double f_lambda_buff = -0.0*(kj2kcal * dU_buff);
+    double f_lambda_buff = - kj2kcal * dU_buff;
     a_lambda_buff = aUnit * 
         f_lambda_buff / m_lambda_buff;    // the fix_nh_constant_pH itself takes care of units
     this->H_lambda_buff = 
-        0.0*kj2kcal * U_buff + 0.0*N_buff * (m_lambda_buff / 2.0) * (v_lambda_buff * v_lambda_buff) * (force->mvv2e);
+        kj2kcal * U_buff + 0.0*N_buff * (m_lambda_buff / 2.0) * (v_lambda_buff * v_lambda_buff) * (force->mvv2e);
   }
 }
 
@@ -936,7 +936,7 @@ void FixConstantPH::calculate_dUs()
     dU2 = -((lambdas[j][0] + mu + b) / (a * a)) * U2;
     dU3 = -((lambdas[j][0] - 0.5) / (s * s)) * U3;
     dU4 = -0.5 * w * r * 2 * std::exp(-r * r * (lambdas[j][0] + m) * (lambdas[j][0] + m)) / std::sqrt(M_PI);
-    dU5 = 0.5 * w * r * 2 * std::exp(-r * r * (lambdas[j][0] - 1 - m) * (lambdas[j][0] - 1.0 - m)) /
+    dU5 = 0.5 * w * r * 2 * std::exp(-r * r * (lambdas[j][0] - 1.0 - m) * (lambdas[j][0] - 1.0 - m)) /
         std::sqrt(M_PI);
 
     Us[j] = U1 + U2 + U3 + U4 + U5;
