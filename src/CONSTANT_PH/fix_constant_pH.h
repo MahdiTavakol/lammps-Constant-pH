@@ -205,7 +205,7 @@ class FixConstantPH : public Fix {
   // The function to calculate Hs
   void calculate_Hs();
   // Resetting the total charge (used in the calculate_Hs())
-  void neutralize(bool buffer = true);
+  double neutralize(bool buffer = true);
   // The function that checks that the ratio of OWs to HWs is 1.0 to 3.0
   void check_num_OWs_HWs();
   // Reading the structures at different pH values

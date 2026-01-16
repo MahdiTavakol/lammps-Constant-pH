@@ -382,9 +382,7 @@ void FixConstantPH::setup(int /*vflag*/)
 
   if (flags & BUFFER) {
     lambda_buff = lambda_buff_0;
-    modify_q_buff(lambda_buff);
-    double q_total = compute_q_total(true);
-    lambda_buff = lambda_buff_0 -q_total/static_cast<double>(N_buff);
+    lambda_buff = neutralize();
     if (lambda_buff >= max_lambda_buff_0 ) {
       double dlambda_buff = lambda_buff - max_lambda_buff_0;
       lambda_buff = max_lambda_buff_0 ;
@@ -581,6 +579,7 @@ void FixConstantPH::initialize_lambda(const int& to)
 
   double **lambdas = pH_state->lambdas;
   auto& molids     = pH_state->molids;
+  auto& lambda_buff = pH_state->lambda_buff;
 
 
   auto q_local     = std::make_unique<double []>(length);
@@ -626,6 +625,9 @@ void FixConstantPH::initialize_lambda(const int& to)
     else
       lambdas[to+j][0] = lambda_j;
   }
+
+  // Neutralizing the simulation box just in case. 
+  lambda_buff = neutralize();
 }
 
 /* ---------------------------------------------------------------------- */
@@ -1600,8 +1602,6 @@ void FixConstantPH::calculate_Hs()
   backup_restore_qfev<-1>();
 
 
-
-
   HCalcNSteps++;
 }
 
@@ -1609,14 +1609,16 @@ void FixConstantPH::calculate_Hs()
     Neutralizing the total charges in the calculate_Hs()
    --------------------------------------------------------------------- */
 
-void FixConstantPH::neutralize(bool buffer)
+double FixConstantPH::neutralize(bool buffer)
 {
   if (buffer) {
     double q_total = compute_q_total(true);
     double N_buff_double = static_cast<double>(pH_state->N_buff);
     double lambda_buff_temp = -q_total / N_buff_double;
     modify_q_buff(lambda_buff_temp);
+    return lambda_buff_temp;
   }
+  return 0.0;
 }
 
 /* --------------------------------------------------------------------- 
@@ -1753,7 +1755,7 @@ void FixConstantPH::initialize_v_lambda(const double _T_lambda, const int& to)
     for (int j = 0; j < 3; j++)
       v_lambdas[i][j] = random->gaussian() / std::sqrt(m_lambdas[i][j]);
 
-  // if (flags & BUFFER) v_lambda_buff = random->gaussian() / std::sqrt(m_lambda_buff);
+  if (flags & BUFFER) v_lambda_buff = random->gaussian() / std::sqrt(m_lambda_buff);
 
   this->calculate_T_lambda(to);
 
