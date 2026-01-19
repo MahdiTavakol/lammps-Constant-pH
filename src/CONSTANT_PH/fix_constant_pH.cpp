@@ -1762,6 +1762,8 @@ void FixConstantPH::initialize_v_lambda(const double _T_lambda, const int& to)
 
   double newT[2];
   this->calculate_T_lambda(to,newT);
+  if (comm->me == 0)
+    error->warning(FLERR,"newT={},{}",newT[0],newT[1]);
 
   double scaling_factor1 = std::sqrt(_T_lambda / newT[0]);
   double scaling_factor2 = std::sqrt(_T_lambda / newT[1]);
@@ -1842,8 +1844,7 @@ void FixConstantPH::calculate_T_lambda(const int& to, double* T_)
         T_lambdas[2] = 2 * KE_lambdas[2] / (Nfs[2] * kB);
       else
         T_lambdas[2] = 0.0;
-    }
-    else {
+    } else {
       if (Nfs[0] > 0.0)
         T_[0] = 2*KE_lambdas[0] / (Nfs[0] * kB);
       else
