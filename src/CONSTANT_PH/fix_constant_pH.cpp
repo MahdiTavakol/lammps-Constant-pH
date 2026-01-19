@@ -642,7 +642,7 @@ void FixConstantPH::update_a_lambda()
   double kj2kcal = 1.0; // 0.239006;
   double kcal2kj = 4.184;
   double kT = 0.008314*T; // force->boltz * T;
-  double aUnit = 1e-6; // convert the acceleration form ps^-2 to fs^-2
+  double aUnit = 0.0; //1e-6; // convert the acceleration form ps^-2 to fs^-2
   double nStructures1Barrier = 0.5 * kT;
   double nStructures2Barrier = 0.5 * kT; 
 
