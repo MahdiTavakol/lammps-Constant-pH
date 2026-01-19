@@ -430,9 +430,14 @@ void FixNHConstantPH::constrain_lambdas()
    constexpr double etol = 1e-6; 
    int cycle = 0;
 
+   n_lambdas = pH_state->n_lambdas;
+   if (n_lambdas != n_lambdas_prev) {
+      omegaPrev = 0.0;
+      n_lambdas_prev = n_lambdas;
+   }
+
    /* Some sanity checks */
    if (comm->me == 0) {
-      const int n_lambdas = pH_state->n_lambdas;
       int N_buff = pH_state->N_buff;
       double ** m_lambdas = pH_state->m_lambdas;
       double m_lambda_buff = pH_state->m_lambda_buff;
