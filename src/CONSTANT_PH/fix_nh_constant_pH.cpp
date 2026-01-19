@@ -196,8 +196,8 @@ void FixNHConstantPH::nve_x()
   // This function sets the charges (qs) in the system based on the current value of x_lambdas and x_lambda_buffs
   fix_constant_pH->reset_qs();
   
-  if (lambda_integration_flags & CONSTRAIN)
-   constrain_lambdas();
+  //if (lambda_integration_flags & CONSTRAIN)
+  // constrain_lambdas();
 }
 
 /* ----------------------------------------------------------------------
