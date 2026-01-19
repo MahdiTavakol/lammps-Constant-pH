@@ -448,7 +448,7 @@ void FixNHConstantPH::constrain_lambdas()
       if (m_lambda_buff == 0) error->all(FLERR,"Buffer mass is zero in fix_nh_constant_pH");
    }
    
-   double denom = (mols_charge_change*mols_charge_change*sigma_mass_inverse + (N_buff_double*buff_charge_change*buff_charge_change/m_lambda_buff));
+   
    
    /* The do while loop was used on purpose so that even when the loop termination condition
       is satisfied the q_total is calculated for the last time with final values of lambdas */
@@ -483,7 +483,7 @@ void FixNHConstantPH::constrain_lambdas()
    
       q_total = compute_q_total();
 
-   
+      double denom = (mols_charge_change*mols_charge_change*sigma_mass_inverse + (N_buff_double*buff_charge_change*buff_charge_change/m_lambda_buff));
 
       if (!std::isfinite(denom) || std::abs(denom) < eps)
          error->one(FLERR,"Denominator is invalid (non-finite or too small) in constrain_lambdas");
