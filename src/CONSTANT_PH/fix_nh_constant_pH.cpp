@@ -159,7 +159,7 @@ void FixNHConstantPH::nve_v()
  }
 
  //if (lambda_integration_flags & CONSTRAIN)
-  // constrain_v_lambdas();
+ //  constrain_v_lambdas();
 
   // Returning the modified parameters to the fix_constant_pH.
   fix_constant_pH->reset_params(pH_state);
@@ -196,8 +196,8 @@ void FixNHConstantPH::nve_x()
   // This function sets the charges (qs) in the system based on the current value of x_lambdas and x_lambda_buffs
   fix_constant_pH->reset_qs();
   
-  //if (lambda_integration_flags & CONSTRAIN)
-  // constrain_lambdas();
+  if (lambda_integration_flags & CONSTRAIN)
+   constrain_lambdas();
 }
 
 /* ----------------------------------------------------------------------
@@ -245,7 +245,6 @@ void FixNHConstantPH::nh_v_temp()
   fix_constant_pH->return_T_lambda(t_lambda_current[1],0);
   fix_constant_pH->return_T_lambda(t_lambda_current[2],1);
   fix_constant_pH->return_T_lambda(t_lambda_current[0],2);
-
 
   auto checkOutBounds = [&](void)
   {
