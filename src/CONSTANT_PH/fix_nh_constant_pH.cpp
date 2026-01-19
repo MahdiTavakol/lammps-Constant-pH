@@ -158,8 +158,8 @@ void FixNHConstantPH::nve_v()
   v_lambda_buff += dtf * a_lambda_buff;
  }
 
- //if (lambda_integration_flags & CONSTRAIN)
- //  constrain_v_lambdas();
+  if (lambda_integration_flags & CONSTRAIN)
+   constrain_v_lambdas();
 
   // Returning the modified parameters to the fix_constant_pH.
   fix_constant_pH->reset_params(pH_state);
@@ -448,14 +448,13 @@ void FixNHConstantPH::constrain_lambdas()
       if (m_lambda_buff == 0) error->all(FLERR,"Buffer mass is zero in fix_nh_constant_pH");
    }
    
-   
+   double denom = (mols_charge_change*mols_charge_change*sigma_mass_inverse + (N_buff_double*buff_charge_change*buff_charge_change/m_lambda_buff));
    
    /* The do while loop was used on purpose so that even when the loop termination condition
       is satisfied the q_total is calculated for the last time with final values of lambdas */
    do {
       // Just doing this on the root and then broadcasting the results
-      sigma_lambda = 0.0;
-      sigma_mass_inverse = 0.0;
+
 
       fix_constant_pH->return_params(pH_state);
       const int n_lambdas = pH_state->n_lambdas;
@@ -479,16 +478,12 @@ void FixNHConstantPH::constrain_lambdas()
       fix_constant_pH->reset_qs();
       
       
-      for (int i = 0; i < n_lambdas; i++) {
-         sigma_lambda += x_lambdas[i][0];
-         sigma_mass_inverse += (1.0/m_lambdas[i][0]);
-      }
+
 
    
       q_total = compute_q_total();
 
-      
-      double denom = (mols_charge_change*mols_charge_change*sigma_mass_inverse + (N_buff_double*buff_charge_change*buff_charge_change/m_lambda_buff));
+   
 
       if (!std::isfinite(denom) || std::abs(denom) < eps)
          error->one(FLERR,"Denominator is invalid (non-finite or too small) in constrain_lambdas");
@@ -503,7 +498,7 @@ void FixNHConstantPH::constrain_lambdas()
    const int n_lambdas = pH_state->n_lambdas;
    double** v_lambdas = pH_state->v_lambdas;
    double** m_lambdas = pH_state->m_lambdas;
-   double v_lambda_buff = pH_state->v_lambda_buff;
+   double& v_lambda_buff = pH_state->v_lambda_buff;
    double m_lambda_buff = pH_state->m_lambda_buff;
    double dt = update->dt;
 
