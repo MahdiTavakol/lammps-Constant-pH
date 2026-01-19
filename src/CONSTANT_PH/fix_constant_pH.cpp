@@ -1787,7 +1787,7 @@ void FixConstantPH::initialize_v_lambda(const double _T_lambda, const int& to)
 
 /* --------------------------------------------------------------------- */
 
-void FixConstantPH::calculate_T_lambda(const int& to, double& T_[2])
+void FixConstantPH::calculate_T_lambda(const int& to, double T_[2])
 {
   auto& n_lambdas = pH_state->n_lambdas;
   auto& v_lambdas = pH_state->v_lambdas;
