@@ -82,6 +82,9 @@ class FixNHConstantPH : public FixNH {
  private:
   std::unique_ptr<RanMars> ranMars;
   int ranMarsSeed;
+
+  // checking if the number of lambdas has changed.
+  int n_lambdas_prev = 0, n_lambdas;
   // previous step shake coefficient
   double omegaPrev = 0.0;
 };
