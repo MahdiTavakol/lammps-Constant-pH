@@ -223,7 +223,7 @@ class FixConstantPH : public Fix {
   void calculate_dfs();
   void calculate_dUs();
   void calculate_dU(const double &_lambda, double &_U, double &_dU);
-  void calculate_T_lambda(const int& to=0, double T_[2]={0.0,0.0});
+  void calculate_T_lambda(const int& to=0, double* T_ = nullptr);
   void initialize_v_lambda(const double _T_lambda, const int& to=0);
   void integrate_lambda();
   void allocate_storage();
