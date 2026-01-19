@@ -414,7 +414,7 @@ void FixConstantPH::initial_integrate(int /*vflag*/)
     if (!(update->ntimestep % nevery_fix_adaptive)) {
       int n_changes;
       fix_adaptive_protonation->get_n_changes(n_changes);
-      if (n_changes ) {
+      if (n_changes) {
         /* If there is a minimization command
              * , the update->endstep is set to zero
              * which causes the t_target to be inf.
@@ -1760,10 +1760,11 @@ void FixConstantPH::initialize_v_lambda(const double _T_lambda, const int& to)
 
   if (flags & BUFFER) v_lambda_buff = random->gaussian() / std::sqrt(m_lambda_buff);
 
-  this->calculate_T_lambda(to);
+  double newT[2];
+  this->calculate_T_lambda(to,newT);
 
-  double scaling_factor1 = std::sqrt(_T_lambda / T_lambdas[0]);
-  double scaling_factor2 = std::sqrt(_T_lambda / T_lambdas[1]);
+  double scaling_factor1 = std::sqrt(_T_lambda / newT[0]);
+  double scaling_factor2 = std::sqrt(_T_lambda / newT[1]);
 
   for (int i = to; i < n_lambdas; i++) {
     v_lambdas[i][0] *= scaling_factor1;
@@ -1786,7 +1787,7 @@ void FixConstantPH::initialize_v_lambda(const double _T_lambda, const int& to)
 
 /* --------------------------------------------------------------------- */
 
-void FixConstantPH::calculate_T_lambda(const int& to)
+void FixConstantPH::calculate_T_lambda(const int& to, double& T_[2])
 {
   auto& n_lambdas = pH_state->n_lambdas;
   auto& v_lambdas = pH_state->v_lambdas;
@@ -1828,21 +1829,36 @@ void FixConstantPH::calculate_T_lambda(const int& to)
 
 
     if (kB == 0) error->one(FLERR, "The k value is zero");
-    if (Nfs[0] > 0.0)
-      T_lambdas[0] = 2 * KE_lambdas[0] / (Nfs[0] * kB);
-    else
-      T_lambdas[0] = 0.0;
-    if (Nfs[1] > 0.0)
-      T_lambdas[1] = 2 * KE_lambdas[1] / (Nfs[1] * kB);
-    else
-      T_lambdas[1] = 0.0;
-    if (Nfs[2] > 0.0)
-      T_lambdas[2] = 2 * KE_lambdas[2] / (Nfs[2] * kB);
-    else
-      T_lambdas[2] = 0.0;
+    if (to == 0) {
+      if (Nfs[0] > 0.0)
+        T_lambdas[0] = 2 * KE_lambdas[0] / (Nfs[0] * kB);
+      else
+        T_lambdas[0] = 0.0;
+      if (Nfs[1] > 0.0)
+        T_lambdas[1] = 2 * KE_lambdas[1] / (Nfs[1] * kB);
+      else
+        T_lambdas[1] = 0.0;
+      if (Nfs[2] > 0.0)
+        T_lambdas[2] = 2 * KE_lambdas[2] / (Nfs[2] * kB);
+      else
+        T_lambdas[2] = 0.0;
+    }
+    else {
+      if (Nfs[0] > 0.0)
+        T_[0] = 2*KE_lambdas[0] / (Nfs[0] * kB);
+      else
+        T_[0] = 0.0;
+      if (Nfs[1] > 0.0)
+        T_[1] = 2*KE_lambdas[1] / (Nfs[1] * kB);
+      else
+        T_[1] = 0.0;
+      return;
+    }
   }
 
-  MPI_Bcast(T_lambdas, 3, MPI_DOUBLE, 0, world);
+
+  if (to == 0)
+    MPI_Bcast(T_lambdas, 3, MPI_DOUBLE, 0, world);
 }
 
 /* --------------------------------------------------------------------- */
