@@ -1831,7 +1831,7 @@ void FixConstantPH::calculate_T_lambda(const int& to, double* T_)
 
 
     if (kB == 0) error->one(FLERR, "The k value is zero");
-    if (to == 0) {
+    if (T_ == nullptr) {
       if (Nfs[0] > 0.0)
         T_lambdas[0] = 2 * KE_lambdas[0] / (Nfs[0] * kB);
       else
@@ -1853,13 +1853,13 @@ void FixConstantPH::calculate_T_lambda(const int& to, double* T_)
         T_[1] = 2*KE_lambdas[1] / (Nfs[1] * kB);
       else
         T_[1] = 0.0;
-      return;
     }
   }
 
-
-  if (to == 0)
+  if (T_ == nullptr)
     MPI_Bcast(T_lambdas, 3, MPI_DOUBLE, 0, world);
+  else
+    MPI_Bcast(T_,2,MPI_DOUBLE,0,world);
 }
 
 /* --------------------------------------------------------------------- */
