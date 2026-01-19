@@ -1756,17 +1756,16 @@ void FixConstantPH::initialize_v_lambda(const double _T_lambda, const int& to)
   int length = n_lambdas - to;
   for (int i = to; i < n_lambdas; i++)
     for (int j = 0; j < 3; j++)
-      v_lambdas[i][j] = random->gaussian() / std::sqrt(m_lambdas[i][j]);
+      v_lambdas[i][j] = 1e-3 * random->gaussian() / std::sqrt(m_lambdas[i][j]);
 
-  if (flags & BUFFER) v_lambda_buff = random->gaussian() / std::sqrt(m_lambda_buff);
+  if (flags & BUFFER) v_lambda_buff = 1e-3 * random->gaussian() / std::sqrt(m_lambda_buff);
 
-  double newT[2];
-  this->calculate_T_lambda(to,newT);
-  if (comm->me == 0)
-    error->warning(FLERR,"newT={},{}",newT[0],newT[1]);
+  double T_current[2];
+  this->calculate_T_lambda(to,T_current);
 
-  double scaling_factor1 = std::sqrt(_T_lambda / newT[0]);
-  double scaling_factor2 = std::sqrt(_T_lambda / newT[1]);
+
+  double scaling_factor1 = std::sqrt(_T_lambda / T_current[0]);
+  double scaling_factor2 = std::sqrt(_T_lambda / T_current[1]);
 
   for (int i = to; i < n_lambdas; i++) {
     v_lambdas[i][0] *= scaling_factor1;
@@ -1782,8 +1781,11 @@ void FixConstantPH::initialize_v_lambda(const double _T_lambda, const int& to)
   
   if (flags & BUFFER) MPI_Bcast(&v_lambda_buff,1,MPI_DOUBLE,0,world);
   
+
+
   // Updating the T_lambdas
   this->calculate_T_lambda();
+
 
 }
 
@@ -1801,7 +1803,7 @@ void FixConstantPH::calculate_T_lambda(const int& to, double* T_)
   double KE_lambdas[3] = {0.0, 0.0, 0.0};    // lambdas[0][;], lambdas[1:][;], lambdas[;][;]
   double Nfs[3];
   double kB = 0.008314; //force->boltz;
-  double mvv2e = 1e6; //force->mvv2e;
+  double mvv2e = 1e4; //force->mvv2e;
 
   Nfs[0] = static_cast<double>(n_lambdas - to);
   Nfs[1] = static_cast<double>(2 * (n_lambdas - to));
@@ -1845,12 +1847,14 @@ void FixConstantPH::calculate_T_lambda(const int& to, double* T_)
       else
         T_lambdas[2] = 0.0;
     } else {
-      if (Nfs[0] > 0.0)
+      if (Nfs[0] > 0.0) {
         T_[0] = 2*KE_lambdas[0] / (Nfs[0] * kB);
+      }
       else
         T_[0] = 0.0;
-      if (Nfs[1] > 0.0)
+      if (Nfs[1] > 0.0) {
         T_[1] = 2*KE_lambdas[1] / (Nfs[1] * kB);
+      }
       else
         T_[1] = 0.0;
     }
@@ -1858,8 +1862,9 @@ void FixConstantPH::calculate_T_lambda(const int& to, double* T_)
 
   if (T_ == nullptr)
     MPI_Bcast(T_lambdas, 3, MPI_DOUBLE, 0, world);
-  else
+  else {
     MPI_Bcast(T_,2,MPI_DOUBLE,0,world);
+  }
 }
 
 /* --------------------------------------------------------------------- */
@@ -2069,7 +2074,7 @@ double FixConstantPH::compute_array(int i, int j)
       // 12
       if (j < n_lambdas)
         return HAs[j];
-      else if ((j == n_lambdas) && (flags && BUFFER))
+      else if ((j == n_lambdas) && (flags & BUFFER))
         return HA_buff;
       else
         return -1.0;
@@ -2077,7 +2082,7 @@ double FixConstantPH::compute_array(int i, int j)
       // 13
       if (j < n_lambdas)
         return HBs[j];
-      else if ((j == n_lambdas) && (flags && BUFFER))
+      else if ((j == n_lambdas) && (flags & BUFFER))
         return HB_buff;
       else
         return -1.0;
