@@ -547,7 +547,7 @@ void FixConstantPH::set_lambdas()
     initialize_lambda(to);
     // This would not work in the initialize section as the m_lambda has not been set yet!
     // initialize_v_lambda(this->T,0);
-    initialize_v_lambda(this->T,to);
+    // initialize_v_lambda(this->T,to);
   }
 
   // Resetting the vector_atom to the default value
