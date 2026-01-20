@@ -546,8 +546,8 @@ void FixConstantPH::set_lambdas()
     // Initializing lambdas based on the current charge of protonable molecules so there is no jump in the system total charge
     initialize_lambda(to);
     // This would not work in the initialize section as the m_lambda has not been set yet!
-    initialize_v_lambda(this->T,0);
-    // initialize_v_lambda(this->T,to);
+    // initialize_v_lambda(this->T,0);
+    initialize_v_lambda(this->T,to);
   }
 
   // Resetting the vector_atom to the default value
@@ -680,7 +680,7 @@ void FixConstantPH::update_a_lambda()
   }
 
   if (flags & BUFFER) {
-    double f_lambda_buff = - kj2kcal * dU_buff / static_cast<double>(N_buff*N_buff*N_buff);
+    double f_lambda_buff = - kj2kcal * dU_buff ; // static_cast<double>(N_buff*N_buff*N_buff);
     a_lambda_buff = 0.0*aUnit * 
         f_lambda_buff / m_lambda_buff;    // the fix_nh_constant_pH itself takes care of units
     this->H_lambda_buff =  
