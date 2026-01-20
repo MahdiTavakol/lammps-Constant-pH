@@ -353,14 +353,14 @@ void FixNHConstantPH::nh_v_temp()
 
        // first, the lambdas
        for (int i = 0; i < n_lambdas; i++) {
-          v_lambdas[i][0] *= alpha_bussi1;
+          //v_lambdas[i][0] *= alpha_bussi1;
           for (int j = 1; j < 3; j++) {
-            v_lambdas[i][j] *= alpha_bussi2;
+            //v_lambdas[i][j] *= alpha_bussi2;
           }
        }
        // and then the buffer 
        if (lambda_integration_flags & BUFFER) {
-          v_lambda_buff *= alpha_bussi1;
+          //v_lambda_buff *= alpha_bussi1;
        }
        //checkOutBounds();
     } else if (which == BIAS) {
