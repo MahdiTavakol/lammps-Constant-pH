@@ -233,8 +233,8 @@ void FixNHConstantPH::nh_v_temp()
 
    
   // constraining the v_lambdas
-  if (comm->me == 0)
-    constrain_v_lambdas();
+  //if (comm->me == 0)
+  //  constrain_v_lambdas();
 
      
 
