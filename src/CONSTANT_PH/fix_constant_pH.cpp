@@ -1552,7 +1552,7 @@ void FixConstantPH::calculate_Hs()
       // modifying the atom charges
       modify_qs(lambda_j,j);
       // Neutralizing the system 
-      //neutralize();
+      neutralize();
       // forward comm so that ghost atoms are consistent
       comm->forward_comm();
       // calculating the energies
@@ -1564,7 +1564,7 @@ void FixConstantPH::calculate_Hs()
       // modifying the atom charges
       modify_qs(lambda_j,j);
       // Neutralizing the system 
-      //neutralize();
+      neutralize();
       // forward comm so that ghost atoms are consistent
       comm->forward_comm();
       // calculating the energies
