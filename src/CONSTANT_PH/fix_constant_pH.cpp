@@ -1838,25 +1838,25 @@ void FixConstantPH::calculate_T_lambda(const int& to, double* T_)
     if (kB == 0) error->one(FLERR, "The k value is zero");
     if (T_ == nullptr) {
       if (Nfs[0] > 0.0)
-        T_lambdas[0] = 2 * KE_lambdas[0] / (Nfs[0] * kB);
+        T_lambdas[0] = 2.0 * KE_lambdas[0] / (Nfs[0] * kB);
       else
         T_lambdas[0] = 0.0;
       if (Nfs[1] > 0.0)
-        T_lambdas[1] = 2 * KE_lambdas[1] / (Nfs[1] * kB);
+        T_lambdas[1] = 2.0 * KE_lambdas[1] / (Nfs[1] * kB);
       else
         T_lambdas[1] = 0.0;
       if (Nfs[2] > 0.0)
-        T_lambdas[2] = 2 * KE_lambdas[2] / (Nfs[2] * kB);
+        T_lambdas[2] = 2.0 * KE_lambdas[2] / (Nfs[2] * kB);
       else
         T_lambdas[2] = 0.0;
     } else {
       if (Nfs[0] > 0.0) {
-        T_[0] = 2*KE_lambdas[0] / (Nfs[0] * kB);
+        T_[0] = 2.0*KE_lambdas[0] / (Nfs[0] * kB);
       }
       else
         T_[0] = 0.0;
       if (Nfs[1] > 0.0) {
-        T_[1] = 2*KE_lambdas[1] / (Nfs[1] * kB);
+        T_[1] = 2.0*KE_lambdas[1] / (Nfs[1] * kB);
       }
       else
         T_[1] = 0.0;
