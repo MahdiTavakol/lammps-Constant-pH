@@ -1616,7 +1616,8 @@ double FixConstantPH::neutralize(bool buffer)
   if (buffer) {
     double q_total = compute_q_total(true);
     double N_buff_double = static_cast<double>(pH_state->N_buff);
-    double lambda_buff_temp = -q_total / N_buff_double;
+    double dlambda_buff = -q_total/ N_buff_double;
+    double lambda_buff_temp = pH_state->lambda_buff + dlambda_buff;
     modify_q_buff(lambda_buff_temp);
     return lambda_buff_temp;
   }
