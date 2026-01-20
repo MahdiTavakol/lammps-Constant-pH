@@ -1754,14 +1754,17 @@ void FixConstantPH::initialize_v_lambda(const double _T_lambda, const int& to)
   std::unique_ptr<RanPark> random = std::make_unique<RanPark>(lmp, random_number_seed);
 
   int length = n_lambdas - to;
-  for (int i = to; i < n_lambdas; i++)
-    for (int j = 0; j < 3; j++)
-      v_lambdas[i][j] = 1e-6 * random->gaussian() / std::sqrt(m_lambdas[i][j]);
 
-  if (flags & BUFFER) v_lambda_buff = 1e-6 * random->gaussian() / std::sqrt(m_lambda_buff);
+  double T_current[2] = {0.0,0.0};
+  while (std::abs(T_current[0]) < tol || std::abs(T_current[1]) < tol ) {
+    for (int i = to; i < n_lambdas; i++)
+      for (int j = 0; j < 3; j++)
+        v_lambdas[i][j] = 1e-6 * random->gaussian() / std::sqrt(m_lambdas[i][j]);
 
-  double T_current[2];
-  this->calculate_T_lambda(to,T_current);
+    if (flags & BUFFER) v_lambda_buff = 1e-6 * random->gaussian() / std::sqrt(m_lambda_buff);
+
+    this->calculate_T_lambda(to,T_current);
+  }
 
 
   double scaling_factor1 = std::sqrt(_T_lambda / T_current[0]);
