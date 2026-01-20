@@ -316,7 +316,7 @@ void FixConstantPH::init()
   a_buff = 0.04764;
   b_buff = -0.09706;
   r_buff = 16.458;
-  m_buff = 0.1507;
+  m_buff = 0.25; //0.1507; Increased the m so that there is no force on the lambda buff at 1.0
   d_buff = 0.0;
 
   // Reading the pH structure files
@@ -681,7 +681,7 @@ void FixConstantPH::update_a_lambda()
 
   if (flags & BUFFER) {
     double f_lambda_buff = - kj2kcal * dU_buff;
-    a_lambda_buff = 0.0* aUnit * 
+    a_lambda_buff = aUnit * 
         f_lambda_buff / m_lambda_buff;    // the fix_nh_constant_pH itself takes care of units
     this->H_lambda_buff =  
         kj2kcal * U_buff + 0.0*N_buff * (m_lambda_buff / 2.0) * (v_lambda_buff * v_lambda_buff) * (force->mvv2e);
