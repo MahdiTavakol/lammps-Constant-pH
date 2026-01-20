@@ -146,16 +146,21 @@ void FixNHConstantPH::nve_v()
   double** v_lambdas   = pH_state->v_lambdas;
   const int& n_lambdas = pH_state->n_lambdas;
   double** a_lambdas   = pH_state->a_lambdas;
+  double dt = update->dt;
 
   for (int i = 0; i < n_lambdas; i++) 
-   for (int j = 0; j < 3; j++)
-    v_lambdas[i][j] += dtf * a_lambdas[i][j];
+   for (int j = 0; j < 3; j++) {
+    /* The unit of the a_lambdas calculated by the 
+       constant_pH class is nm/fs^2 so there is
+       no need for dtf */
+    v_lambdas[i][j] += dt * a_lambdas[i][j];
+   }
 
 
  if (lambda_integration_flags & BUFFER) {
   double& v_lambda_buff = pH_state->v_lambda_buff;
   auto&   a_lambda_buff = pH_state->a_lambda_buff;
-  v_lambda_buff += dtf * a_lambda_buff;
+  v_lambda_buff += dt * a_lambda_buff;
  }
 
  //if (lambda_integration_flags & CONSTRAIN)
@@ -178,17 +183,21 @@ void FixNHConstantPH::nve_x()
   double** x_lambdas = pH_state->lambdas;
   double** const v_lambdas = pH_state->v_lambdas;
   const int& n_lambdas = pH_state->n_lambdas;
+  double dt = update->dt;
 
 
   for (int i = 0; i < n_lambdas; i++)
-   for (int j = 0; j < 3; j++)
-    x_lambdas[i][j] +=  dtv * v_lambdas[i][j];
+   for (int j = 0; j < 3; j++) {
+    /* The velocity calculated by the nve_v is already 
+       in the nm/fs units */
+    x_lambdas[i][j] +=  dt * v_lambdas[i][j];
+   }
   
      
   if (lambda_integration_flags & BUFFER) {
    auto& x_lambda_buff = pH_state->lambda_buff;
    auto& v_lambda_buff = pH_state->v_lambda_buff;
-   x_lambda_buff += dtv * v_lambda_buff;
+   x_lambda_buff += dt * v_lambda_buff;
   }
 
   // Returning the modified parameters to the fix_constant_pH.
