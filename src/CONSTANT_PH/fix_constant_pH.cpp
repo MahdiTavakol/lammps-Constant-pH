@@ -546,8 +546,8 @@ void FixConstantPH::set_lambdas()
     // Initializing lambdas based on the current charge of protonable molecules so there is no jump in the system total charge
     initialize_lambda(to);
     // This would not work in the initialize section as the m_lambda has not been set yet!
-    // initialize_v_lambda(this->T,0);
-    initialize_v_lambda(this->T,to);
+    initialize_v_lambda(this->T,0);
+    // initialize_v_lambda(this->T,to);
   }
 
   // Resetting the vector_atom to the default value
