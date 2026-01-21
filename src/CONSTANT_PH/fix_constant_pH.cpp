@@ -885,7 +885,7 @@ void FixConstantPH::calculate_dfs()
   double** lambdas = pH_state->lambdas;
 
   // If pH == pK, everything is zero; skip work.
-  if (std::abs(pH -pK) < 1e-12) {
+  if (std::abs(pH -pK) < tol) {
       std::fill(fs.get(),fs.get()+n_lambdas,0.0);
       std::fill(dfs.get(),dfs.get()+n_lambdas,0.0);
       return;
@@ -946,7 +946,7 @@ void FixConstantPH::calculate_dUs()
     U1 = -k_buff *
         std::exp(-(lambda_buff - 1.0 - b_buff) * (lambda_buff - 1.0 - b_buff) / (2.0 * a_buff * a_buff));
     U2 = -k_buff * std::exp(-(lambda_buff + b_buff) * (lambda_buff + b_buff) / (2.0 * a_buff * a_buff));
-    U3 = d_buff * std::exp(-(lambda_buff - 0.5) * (lambda_buff - 0.5) / (2 * s_buff * s_buff));
+    U3 = d_buff * std::exp(-(lambda_buff - 0.5) * (lambda_buff - 0.5) / (2.0 * s_buff * s_buff));
     U4 = 0.5 * w_buff * (1.0 - std::erf(r_buff * (lambda_buff + m_buff)));
     U5 = 0.5 * w_buff * (1.0 + std::erf(r_buff * (lambda_buff - 1.0 - m_buff)));
     dU1 = -((lambda_buff - 1.0 - b_buff) / (a_buff * a_buff)) * U1;
@@ -1502,7 +1502,7 @@ void FixConstantPH::calculate_Hs()
     return;
    
    
-  // you could have also used a map which seems more natural.
+  // I could have also used a map which seems more natural.
   auto distArray = std::make_unique<int[]>(nlocal);
   for (int i = 0; i < nlocal; i++)
   {
@@ -1557,7 +1557,7 @@ void FixConstantPH::calculate_Hs()
       // modifying the atom charges
       modify_qs(lambda_j,j);
       // Neutralizing the system 
-      neutralize();
+      // neutralize();
       // forward comm so that ghost atoms are consistent
       comm->forward_comm();
       // calculating the energies
@@ -1569,7 +1569,7 @@ void FixConstantPH::calculate_Hs()
       // modifying the atom charges
       modify_qs(lambda_j,j);
       // Neutralizing the system 
-      neutralize();
+      // neutralize();
       // forward comm so that ghost atoms are consistent
       comm->forward_comm();
       // calculating the energies
