@@ -30,9 +30,6 @@ FixStyle(constant_pH,FixConstantPH);
 
 #include "fix.h"
 #include "fix_adaptive_protonation.h"
-#include "neigh_list.h"
-#include "neighbor.h"
-#include "neigh_request.h"
 #include "pair.h"
 
 namespace LAMMPS_NS {
@@ -57,8 +54,6 @@ class FixConstantPH : public Fix {
   void copy_arrays(int, int, int) override;
   int pack_exchange(int i, double *buf) override;
   int unpack_exchange(int nlocal, double *buf) override;
-
-  void init_list(int, class NeighList *) override;
 
  protected:
   int flags;
@@ -113,9 +108,6 @@ class FixConstantPH : public Fix {
   std::unique_ptr<double []> H_lambdas;
   double H_lambda_buff;
   double H_lambda_prev;
-
-  // Neighbour list (used to calculate the interpolation)
-  class NeighList* list;
   
 
   // lambda temperature
