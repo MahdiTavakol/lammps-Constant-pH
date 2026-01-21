@@ -1641,7 +1641,7 @@ double FixConstantPH::neutralize(bool buffer)
       modify_qs(lambdas);
       double q_total_2 = compute_q_total(true);
       double dq = q_total_2  -  q_total;
-      dlambda  = -q_total * dlambda / dq;
+      dlambda  = -q_total_2 * dlambda / dq;
       for (int i = 0; i < n_lambdas; i++)
         lambdas[i][0] += dlambda;
       modify_qs(lambdas);
