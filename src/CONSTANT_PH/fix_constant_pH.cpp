@@ -338,6 +338,20 @@ void FixConstantPH::init()
 
    // forcefield variables for lambdas
   set_lambdas();
+
+
+  // Request a full neighbor list
+  int list_flags = NeighConst::REQ_OCCASIONAL | NeighConst::REQ_FULL;
+
+  // request for a neighbor list
+  neighbor->add_request(this, list_flags);
+}
+
+/* ---------------------------------------------------------------------- */
+
+void FixConstantPH::init_list(int id, class NeighList *ptr) 
+{
+  list = ptr;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -400,6 +414,10 @@ void FixConstantPH::setup(int /*vflag*/)
   }
 
   if (fp_flags != NONE_FP) write_lambdas_header();
+
+  if (!list)
+    error->all(FLERR, "Neighbor list not initialized for adaptive_protonation");
+  neighbor->build_one(list);
 }
 
 /* ----------------------------------------------------------------------
@@ -1479,6 +1497,7 @@ void FixConstantPH::init_GFF()
 
 void FixConstantPH::calculate_Hs()
 {
+  flags &= INTERPOLATION;
   if (neighbor->ago && update->ntimestep)
     return ;
   
@@ -1523,14 +1542,17 @@ void FixConstantPH::calculate_Hs()
      * the rest we put the charge as lambda*qProt + (1-lambda)*qDeprot
      * My lambda = 1 - their lambda;
     */
-    for (int j = 0; j < n_lambdas; j++)
+
+    double** x = atom->x;
+
+    std::unique_ptr<double []> HAs_local = std::make_unique<double []>(n_lambdas);
+    for (int k = 0; k < n_lambdas; k++)
     {
-      double H_lambda = 0.0;
       for (int i = 0; i < nlocal; i++)
       {
         if (!protonable[type[i]]) continue;
         int dist = distArray[i];
-        if (dist == j)
+        if (dist == k)
           q[i] = pH2qs[type[i]][0] - pH1qs[type[i]][0];
         else if (dist != n_lambdas)
           q[i] = lambdas[dist][0] * pH2qs[type[i]][0] + (1 - lambdas[dist][0]) * pH1qs[type[i]][0];
@@ -1540,15 +1562,48 @@ void FixConstantPH::calculate_Hs()
       // forward comm so that ghost atoms are consistent
       comm->forward_comm();
       // calculating the energies
-      update_lmp();
+      // update_lmp();
       // getting the electrostatic energy + kspace energy
-      H_lambda = compute_epair();
-      // restore qs
-      backup_restore_qfev<-1>();
-      // saving
-      HAs[j] = H_lambda;
-      HBs[j] = 0.0;
-    }   
+      // H_lambda = compute_epair();
+      int   inum       = list->inum;    
+      int*  ilist      = list->ilist;
+      int*  numneigh   = list->numneigh;
+      int** firstneigh = list->firstneigh;
+
+      // Resetting the HAs
+      HAs_local[k] = 0.0;
+
+      for (int ii = 0; ii < inum; ii++) {
+        int i = ilist[ii];
+
+        if (!protonable[type[i]]) continue;
+        int dist = distArray[i];
+        if (dist != k) continue;
+
+        int* jlist = firstneigh[i];
+        int jnum  = numneigh[i];
+        
+
+        for (int jj = 0; jj < jnum; jj++) {
+          int j = jlist[jj];
+          j &= NEIGHMASK;
+          if (molecule[j] == molids[k]) continue;
+
+          double dx = x[i][0]-x[j][0];
+          double dy = x[i][1]-x[j][1];
+          double dz = x[i][2]-x[j][2];
+          domain->minimum_image(dx,dy,dz);
+          double rsq = dx*dx+dy*dy+dz*dz;
+
+          double fforce;
+          HAs_local[k] += force->pair->single(i,j,type[i],type[j],rsq,1.0,0.0,fforce);
+          
+        }
+      }
+    }
+    MPI_Allreduce(HAs_local.get(),HAs.get(),n_lambdas,MPI_DOUBLE,MPI_SUM,world); 
+    // restore qs
+    backup_restore_qfev<-1>();  
   }
   else if (!(flags & INTERPOLATION)) {
     for (int j = 0; j < n_lambdas; j++) {
