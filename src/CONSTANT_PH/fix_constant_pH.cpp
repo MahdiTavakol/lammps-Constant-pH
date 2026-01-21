@@ -1481,6 +1481,7 @@ void FixConstantPH::calculate_Hs()
 {
   if (neighbor->ago && update->ntimestep)
     return ;
+  
   int nlocal = atom->nlocal;
   int* molecule = atom->molecule;
   int* type = atom->type;
@@ -1495,6 +1496,10 @@ void FixConstantPH::calculate_Hs()
   double** lambdas = pH_state->lambdas;
   auto& molids = pH_state->molids;
   auto& n_lambdas = pH_state->n_lambdas;
+
+  // if n_lambdas == 0 there is nothing to do
+  if (n_lambdas == 0)
+    return;
    
    
   // you could have also used a map which seems more natural.
