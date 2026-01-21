@@ -349,7 +349,7 @@ void FixConstantPH::init()
 
 /* ---------------------------------------------------------------------- */
 
-void FixConstantPH::init_list(int id, class NeighList *ptr) 
+void FixConstantPH::init_list(int /*id*/, NeighList *ptr) 
 {
   list = ptr;
 }

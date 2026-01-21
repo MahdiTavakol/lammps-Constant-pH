@@ -115,7 +115,7 @@ class FixConstantPH : public Fix {
   double H_lambda_prev;
 
   // Neighbour list (used to calculate the interpolation)
-  NeighList* list;
+  class NeighList* list;
   
 
   // lambda temperature
