@@ -630,7 +630,7 @@ void FixConstantPH::initialize_lambda(const int& to)
   }
 
   // Neutralizing the simulation box just in case. 
-  //lambda_buff = neutralize();
+  lambda_buff = neutralize();
 }
 
 /* ---------------------------------------------------------------------- */
@@ -679,11 +679,11 @@ void FixConstantPH::update_a_lambda()
   }
 
   if (flags & BUFFER) {
-    double f_lambda_buff = - dU_buff / static_cast<double>(N_buff);
+    double f_lambda_buff = - (environment_coupling*kcal2kj*(HA_buff-HB_buff) + dU_buff / static_cast<double>(N_buff));
     a_lambda_buff = aUnit * 
         f_lambda_buff / m_lambda_buff;    // the fix_nh_constant_pH itself takes care of units
-    this->H_lambda_buff =  
-         U_buff + 0.0*N_buff * (m_lambda_buff / 2.0) * (v_lambda_buff * v_lambda_buff) * (force->mvv2e);
+    this->H_lambda_buff = N_buff * ( environment_coupling*kcal2kj*(lambda_buff*HA_buff+(1-lambda_buff)*HB_buff) + 
+         U_buff + 0.0*N_buff * (m_lambda_buff / 2.0) * (v_lambda_buff * v_lambda_buff) * (force->mvv2e));
   }
 }
 
@@ -1584,6 +1584,8 @@ void FixConstantPH::calculate_Hs()
   double lambda_buff_temp = 1.0;
   // modifying the atom charges
   modify_q_buff(lambda_buff_temp);
+  // Neutralizing the system 
+  neutralize(false);
   // forward comm so that ghost atoms are consistent
   comm->forward_comm();
   // calculating the energies
@@ -1594,6 +1596,8 @@ void FixConstantPH::calculate_Hs()
   lambda_buff_temp = 0.0;
   // modifying the atom charges
   modify_q_buff(lambda_buff_temp);
+  // Neutralizing the system 
+  neutralize(false);
   // forward comm so that ghost atoms are consistent
   comm->forward_comm();
   // calculating the energies
@@ -1613,13 +1617,31 @@ void FixConstantPH::calculate_Hs()
 
 double FixConstantPH::neutralize(bool buffer)
 {
+  double q_total = compute_q_total(true);
   if (buffer) {
-    double q_total = compute_q_total(true);
     double N_buff_double = static_cast<double>(pH_state->N_buff);
     double dlambda_buff = -q_total/ N_buff_double;
     double lambda_buff_temp = pH_state->lambda_buff + dlambda_buff;
     modify_q_buff(lambda_buff_temp);
     return lambda_buff_temp;
+  } else {
+    while (std::abs(q_total) > tol) {
+      double dlambda = 0.05;
+      std::unique_ptr<constant_pH_state> new_pH_state =
+        std::make_unique<constant_pH_state>(*pH_state);
+      double ** lambdas = new_pH_state->lambdas;
+      int n_lambdas = new_pH_state->n_lambdas;
+      for (int i = 0; i < n_lambdas; i++)
+        lambdas[i][0] += dlambda;
+      modify_qs(lambdas);
+      double q_total_2 = compute_q_total(true);
+      double dq = q_total_2  -  q_total;
+      dlambda  = -q_total * dlambda / dq;
+      for (int i = 0; i < n_lambdas; i++)
+        lambdas[i][0] += dlambda;
+      modify_qs(lambdas);
+      q_total = q_total_2;
+    }
   }
   return 0.0;
 }
