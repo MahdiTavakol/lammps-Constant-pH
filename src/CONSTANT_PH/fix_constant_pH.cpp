@@ -1497,7 +1497,7 @@ void FixConstantPH::init_GFF()
 
 void FixConstantPH::calculate_Hs()
 {
-  //flags &= INTERPOLATION;
+  flags &= INTERPOLATION;
   if (neighbor->ago && update->ntimestep)
     return ;
   
@@ -1595,8 +1595,8 @@ void FixConstantPH::calculate_Hs()
           domain->minimum_image(dx,dy,dz);
           double rsq = dx*dx+dy*dy+dz*dz;
 
-          double fforce;
-          HAs_local[k] += force->pair->single(i,j,type[i],type[j],rsq,1.0,0.0,fforce);
+          //double fforce;
+          //HAs_local[k] += force->pair->single(i,j,type[i],type[j],rsq,1.0,0.0,fforce);
           
         }
       }
