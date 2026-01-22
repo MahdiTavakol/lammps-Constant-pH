@@ -1601,7 +1601,7 @@ void FixConstantPH::calculate_Hs()
         }
       }
     }
-    MPI_Allreduce(HAs_local.get(),HAs.get(),n_lambdas,MPI_DOUBLE,MPI_SUM,world); 
+    //MPI_Allreduce(HAs_local.get(),HAs.get(),n_lambdas,MPI_DOUBLE,MPI_SUM,world); 
     // restore qs
     backup_restore_qfev<-1>();  
   }
