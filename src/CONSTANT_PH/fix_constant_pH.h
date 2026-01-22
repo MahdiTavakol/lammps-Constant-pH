@@ -83,6 +83,7 @@ class FixConstantPH : public Fix {
   double a_buff, b_buff, s_buff, m_buff, w_buff, r_buff, d_buff, k_buff, h_buff;
 
   // Environment correlation parameters
+  std::unique_ptr<double[]> HAs_local;
   std::unique_ptr<double[]> HAs;
   std::unique_ptr<double[]> HBs;
   double HA_buff, HB_buff;
