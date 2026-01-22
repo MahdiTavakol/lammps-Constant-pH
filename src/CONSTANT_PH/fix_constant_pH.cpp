@@ -1595,11 +1595,13 @@ void FixConstantPH::calculate_Hs()
           domain->minimum_image(dx,dy,dz);
           double rsq = dx*dx+dy*dy+dz*dz;
 
-          //double fforce;
+          double fforce;
           //HAs_local[k] += force->pair->single(i,j,type[i],type[j],rsq,1.0,0.0,fforce);
           
         }
       }
+
+      backup_restore_qfev<-1>();
     }
     //MPI_Allreduce(HAs_local.get(),HAs.get(),n_lambdas,MPI_DOUBLE,MPI_SUM,world); 
     // restore qs
