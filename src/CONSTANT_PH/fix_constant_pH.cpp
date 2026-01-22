@@ -1548,15 +1548,15 @@ void FixConstantPH::calculate_Hs()
     // std::unique_ptr<double []> HAs_local = std::make_unique<double []>(n_lambdas);
     for (int k = 0; k < n_lambdas; k++)
     {
-      for (int i = 0; i < nlocal; i++)
-      {
-        if (!protonable[type[i]]) continue;
+      //for (int i = 0; i < nlocal; i++)
+      //{
+      //  if (!protonable[type[i]]) continue;
         //int dist = distArray[i];
         //if (dist == k)
         //  {} //q[i] = pH2qs[type[i]][0] - pH1qs[type[i]][0];
         //else if (dist != n_lambdas)
         //  {} //q[i] = lambdas[dist][0] * pH2qs[type[i]][0] + (1 - lambdas[dist][0]) * pH1qs[type[i]][0];
-      }
+      //}
       // Neutralizing the system 
       //neutralize();
       // forward comm so that ghost atoms are consistent
@@ -1601,7 +1601,7 @@ void FixConstantPH::calculate_Hs()
         //}
       //}
 
-      backup_restore_qfev<-1>();
+      //backup_restore_qfev<-1>();
     }
     //MPI_Allreduce(HAs_local.get(),HAs.get(),n_lambdas,MPI_DOUBLE,MPI_SUM,world); 
     // restore qs
