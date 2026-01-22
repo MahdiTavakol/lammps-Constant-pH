@@ -1550,7 +1550,7 @@ void FixConstantPH::calculate_Hs()
     {
       for (int i = 0; i < nlocal; i++)
       {
-        if (!protonable[type[i]]) continue;
+        //if (!protonable[type[i]]) continue;
         //int dist = distArray[i];
         //if (dist == k)
         //  {} //q[i] = pH2qs[type[i]][0] - pH1qs[type[i]][0];
@@ -1560,15 +1560,15 @@ void FixConstantPH::calculate_Hs()
       // Neutralizing the system 
       //neutralize();
       // forward comm so that ghost atoms are consistent
-      comm->forward_comm();
+      //comm->forward_comm();
       // calculating the energies
       // update_lmp();
       // getting the electrostatic energy + kspace energy
       // H_lambda = compute_epair();
-      int   inum       = list->inum;    
-      int*  ilist      = list->ilist;
-      int*  numneigh   = list->numneigh;
-      int** firstneigh = list->firstneigh;
+      //int   inum       = list->inum;    
+      //int*  ilist      = list->ilist;
+      //int*  numneigh   = list->numneigh;
+      //int** firstneigh = list->firstneigh;
 
       // Resetting the HAs
       // HAs_local[k] = 0.0;
