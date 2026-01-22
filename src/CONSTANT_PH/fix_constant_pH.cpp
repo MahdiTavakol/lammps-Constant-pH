@@ -1573,18 +1573,18 @@ void FixConstantPH::calculate_Hs()
       // Resetting the HAs
       // HAs_local[k] = 0.0;
 
-      //for (int ii = 0; ii < inum; ii++) {
-        //int i = ilist[ii];
+      for (int ii = 0; ii < inum; ii++) {
+        int i = ilist[ii];
 
-        //if (!protonable[type[i]]) continue;
+        if (!protonable[type[i]]) continue;
         //int dist = distArray[i];
         //if (dist != k) continue;
 
-        //int* jlist = firstneigh[i];
-        //int jnum  = numneigh[i];
+        int* jlist = firstneigh[i];
+        int jnum  = numneigh[i];
         
 
-        //for (int jj = 0; jj < jnum; jj++) {
+        for (int jj = 0; jj < jnum; jj++) {
           //int j = jlist[jj];
           //j &= NEIGHMASK;
           //if (molecule[j] == molids[k]) continue;
@@ -1598,7 +1598,7 @@ void FixConstantPH::calculate_Hs()
           //double fforce;
           //HAs_local[k] += force->pair->single(i,j,type[i],type[j],rsq,1.0,0.0,fforce);
           
-        //}
+        }
       }
 
       backup_restore_qfev<-1>();
