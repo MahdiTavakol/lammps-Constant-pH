@@ -1479,6 +1479,7 @@ void FixConstantPH::init_GFF()
 
 void FixConstantPH::calculate_Hs()
 {
+  flags &= INTERPOLATION;
   if (neighbor->ago && update->ntimestep)
     return ;
   
