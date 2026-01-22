@@ -1497,7 +1497,7 @@ void FixConstantPH::init_GFF()
 
 void FixConstantPH::calculate_Hs()
 {
-  flags &= INTERPOLATION;
+  //flags &= INTERPOLATION;
   if (neighbor->ago && update->ntimestep)
     return ;
   
@@ -1543,7 +1543,7 @@ void FixConstantPH::calculate_Hs()
      * My lambda = 1 - their lambda;
     */
 
-    double** x = atom->x;
+    //double** x = atom->x;
 
     // std::unique_ptr<double []> HAs_local = std::make_unique<double []>(n_lambdas);
     for (int k = 0; k < n_lambdas; k++)
