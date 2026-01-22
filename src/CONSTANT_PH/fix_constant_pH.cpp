@@ -1565,10 +1565,10 @@ void FixConstantPH::calculate_Hs()
       // update_lmp();
       // getting the electrostatic energy + kspace energy
       // H_lambda = compute_epair();
-      int   inum       = list->inum;    
-      int*  ilist      = list->ilist;
-      int*  numneigh   = list->numneigh;
-      int** firstneigh = list->firstneigh;
+      //int   inum       = list->inum;    
+      //int*  ilist      = list->ilist;
+      //int*  numneigh   = list->numneigh;
+      //int** firstneigh = list->firstneigh;
 
       // Resetting the HAs
       // HAs_local[k] = 0.0;
