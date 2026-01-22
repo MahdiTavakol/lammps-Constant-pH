@@ -415,9 +415,9 @@ void FixConstantPH::setup(int /*vflag*/)
 
   if (fp_flags != NONE_FP) write_lambdas_header();
 
-  //if (!list)
-    //error->all(FLERR, "Neighbor list not initialized for adaptive_protonation");
-  //neighbor->build_one(list);
+  if (!list)
+    error->all(FLERR, "Neighbor list not initialized for adaptive_protonation");
+  neighbor->build_one(list);
 }
 
 /* ----------------------------------------------------------------------
