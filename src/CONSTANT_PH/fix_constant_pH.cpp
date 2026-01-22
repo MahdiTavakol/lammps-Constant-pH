@@ -1602,7 +1602,7 @@ void FixConstantPH::calculate_Hs()
 
       backup_restore_qfev<-1>();
     }
-    //MPI_Allreduce(HAs_local.get(),HAs.get(),n_lambdas,MPI_DOUBLE,MPI_SUM,world); 
+    MPI_Allreduce(HAs_local.get(),HAs.get(),n_lambdas,MPI_DOUBLE,MPI_SUM,world); 
     // restore qs
     backup_restore_qfev<-1>();  
   }
