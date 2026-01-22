@@ -1577,8 +1577,8 @@ void FixConstantPH::calculate_Hs()
         int i = ilist[ii];
 
         if (!protonable[type[i]]) continue;
-        int dist = distArray[i];
-        if (dist != k) continue;
+        //int dist = distArray[i];
+        //if (dist != k) continue;
 
         int* jlist = firstneigh[i];
         int jnum  = numneigh[i];
@@ -1592,7 +1592,7 @@ void FixConstantPH::calculate_Hs()
           double dx = x[i][0]-x[j][0];
           double dy = x[i][1]-x[j][1];
           double dz = x[i][2]-x[j][2];
-          domain->minimum_image(dx,dy,dz);
+          //domain->minimum_image(dx,dy,dz);
           double rsq = dx*dx+dy*dy+dz*dz;
 
           double fforce;
