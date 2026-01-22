@@ -1551,11 +1551,11 @@ void FixConstantPH::calculate_Hs()
       for (int i = 0; i < nlocal; i++)
       {
         if (!protonable[type[i]]) continue;
-        int dist = distArray[i];
-        if (dist == k)
-          {} //q[i] = pH2qs[type[i]][0] - pH1qs[type[i]][0];
-        else if (dist != n_lambdas)
-          {} //q[i] = lambdas[dist][0] * pH2qs[type[i]][0] + (1 - lambdas[dist][0]) * pH1qs[type[i]][0];
+        //int dist = distArray[i];
+        //if (dist == k)
+        //  {} //q[i] = pH2qs[type[i]][0] - pH1qs[type[i]][0];
+        //else if (dist != n_lambdas)
+        //  {} //q[i] = lambdas[dist][0] * pH2qs[type[i]][0] + (1 - lambdas[dist][0]) * pH1qs[type[i]][0];
       }
       // Neutralizing the system 
       //neutralize();
@@ -1571,7 +1571,7 @@ void FixConstantPH::calculate_Hs()
       int** firstneigh = list->firstneigh;
 
       // Resetting the HAs
-      HAs_local[k] = 0.0;
+      // HAs_local[k] = 0.0;
 
       for (int ii = 0; ii < inum; ii++) {
         int i = ilist[ii];
