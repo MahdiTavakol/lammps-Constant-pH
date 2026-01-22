@@ -75,7 +75,7 @@ static constexpr double tol = 1e-5;
 static constexpr double max_lambda_buff_0 = 1.05;
 static constexpr double min_lambda = -0.1;
 static constexpr double max_lambda = 1.1;
-static constexpr double environment_coupling = 0.1;
+static constexpr double environment_coupling = 1.0;
 
 /* ---------------------------------------------------------------------- */
 
@@ -1552,10 +1552,8 @@ void FixConstantPH::calculate_Hs()
       {
         if (!protonable[type[i]]) continue;
           int dist = distArray[i];
-          if (dist == k)
+          if (molecule[i] == molids[k])
             q[i] = pH2qs[type[i]][0] - pH1qs[type[i]][0];
-          else if (dist != n_lambdas)
-            q[i] = lambdas[dist][0] * pH2qs[type[i]][0] + (1 - lambdas[dist][0]) * pH1qs[type[i]][0];
       }
       // Neutralizing the system 
       //neutralize();
@@ -1564,7 +1562,6 @@ void FixConstantPH::calculate_Hs()
       // calculating the energies
       // update_lmp();
       // getting the electrostatic energy + kspace energy
-      // H_lambda = compute_epair();
       int   inum       = list->inum;    
       int*  ilist      = list->ilist;
       int*  numneigh   = list->numneigh;
@@ -1578,7 +1575,7 @@ void FixConstantPH::calculate_Hs()
 
         if (!protonable[type[i]]) continue;
         int dist = distArray[i];
-        if (dist != k) continue;
+        if (molecule[i] != molids[k]) continue;
 
         int* jlist = firstneigh[i];
         int jnum  = numneigh[i];
