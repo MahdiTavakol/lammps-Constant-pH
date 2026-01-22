@@ -1599,7 +1599,7 @@ void FixConstantPH::calculate_Hs()
           //HAs_local[k] += force->pair->single(i,j,type[i],type[j],rsq,1.0,0.0,fforce);
           
         //}
-      }
+      //}
 
       backup_restore_qfev<-1>();
     }
