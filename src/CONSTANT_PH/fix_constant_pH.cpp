@@ -1585,17 +1585,17 @@ void FixConstantPH::calculate_Hs()
         
 
         for (int jj = 0; jj < jnum; jj++) {
-          int j = jlist[jj];
-          j &= NEIGHMASK;
-          if (molecule[j] == molids[k]) continue;
+          //int j = jlist[jj];
+          //j &= NEIGHMASK;
+          //if (molecule[j] == molids[k]) continue;
 
-          double dx = x[i][0]-x[j][0];
-          double dy = x[i][1]-x[j][1];
-          double dz = x[i][2]-x[j][2];
+          //double dx = x[i][0]-x[j][0];
+          //double dy = x[i][1]-x[j][1];
+          //double dz = x[i][2]-x[j][2];
           //domain->minimum_image(dx,dy,dz);
-          double rsq = dx*dx+dy*dy+dz*dz;
+          //double rsq = dx*dx+dy*dy+dz*dz;
 
-          double fforce;
+          //double fforce;
           //HAs_local[k] += force->pair->single(i,j,type[i],type[j],rsq,1.0,0.0,fforce);
           
         }
