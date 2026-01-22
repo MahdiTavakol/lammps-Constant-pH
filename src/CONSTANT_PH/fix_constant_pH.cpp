@@ -1545,7 +1545,7 @@ void FixConstantPH::calculate_Hs()
 
     double** x = atom->x;
 
-    std::unique_ptr<double []> HAs_local = std::make_unique<double []>(n_lambdas);
+    // std::unique_ptr<double []> HAs_local = std::make_unique<double []>(n_lambdas);
     for (int k = 0; k < n_lambdas; k++)
     {
       for (int i = 0; i < nlocal; i++)
@@ -1560,7 +1560,7 @@ void FixConstantPH::calculate_Hs()
       // Neutralizing the system 
       //neutralize();
       // forward comm so that ghost atoms are consistent
-      comm->forward_comm();
+      // comm->forward_comm();
       // calculating the energies
       // update_lmp();
       // getting the electrostatic energy + kspace energy
