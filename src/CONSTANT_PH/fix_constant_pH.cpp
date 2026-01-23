@@ -1816,8 +1816,9 @@ void FixConstantPH::initialize_v_lambda(const double _T_lambda, const int& to)
 
   double T_current[2] = {0.0,0.0};
 
-  while (length > 0 && 
-    (std::abs(T_current[0]) < tol || std::abs(T_current[1]) < tol )) {
+  if (length <= 0) return;
+
+  while ( std::abs(T_current[0]) < tol || std::abs(T_current[1]) < tol ) {
     for (int i = to; i < n_lambdas; i++)
       for (int j = 0; j < 3; j++)
         v_lambdas[i][j] = 1e-6 * random->gaussian() / std::sqrt(m_lambdas[i][j]);
