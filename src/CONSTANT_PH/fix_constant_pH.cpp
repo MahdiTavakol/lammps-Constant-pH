@@ -494,7 +494,7 @@ void FixConstantPH::initial_integrate(int /*vflag*/)
 
   calculate_dfs();
   calculate_dUs();
-  //calculate_Hs();
+  calculate_Hs();
   update_a_lambda();
 
   // priting the precent of steps where the HA and HB values have ben calculated
