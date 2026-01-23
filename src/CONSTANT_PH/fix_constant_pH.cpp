@@ -41,6 +41,7 @@
 #include <array>
 #include <cstring>
 #include <iomanip>
+#include <map>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -1545,15 +1546,26 @@ void FixConstantPH::calculate_Hs()
 
     double** x = atom->x;
 
+    // molids to atomids mapping
+    std::map<int,std::vector<int>> molid_atomids_map;
+
+    for (int i = 0; i < nlocal; i++)
+    {
+      int molid_i = molecule[i];
+      auto itr = std::find(molids.get(), molids.get() + n_lambdas, molid_i);
+      if (itr == molids.get() + n_lambdas) continue;
+      else molid_atomids_map[molid_i].push_back(i);
+    }
+
     HAs_local = std::make_unique<double []>(n_lambdas);
     for (int k = 0; k < n_lambdas; k++)
     {
-      for (int i = 0; i < nlocal; i++)
+      std::vector<int>& atomids = molid_atomids_map[molids[k]];
+
+      for (int i: atomids)
       {
         if (!protonable[type[i]]) continue;
-          int dist = distArray[i];
-          if (molecule[i] == molids[k])
-            q[i] = pH2qs[type[i]][0] - pH1qs[type[i]][0];
+        q[i] = pH2qs[type[i]][0] - pH1qs[type[i]][0];
       }
       // Neutralizing the system 
       //neutralize();
