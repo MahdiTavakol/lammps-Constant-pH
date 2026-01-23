@@ -1522,16 +1522,6 @@ void FixConstantPH::calculate_Hs()
     return;
    
    
-  // I could have also used a map which seems more natural.
-  auto distArray = std::make_unique<int[]>(nlocal);
-  for (int i = 0; i < nlocal; i++)
-  {
-    int mol = molecule[i];
-    auto itr = std::find(molids.get(), molids.get() + n_lambdas, mol);
-    int dist = static_cast<int>(std::distance(molids.get(), itr));
-    distArray[i] = dist;
-  }
-   
 
   // backing up qs
   backup_restore_qfev<1>();
@@ -1586,7 +1576,6 @@ void FixConstantPH::calculate_Hs()
         int i = ilist[ii];
 
         if (!protonable[type[i]]) continue;
-        int dist = distArray[i];
         if (molecule[i] != molids[k]) continue;
 
         int* jlist = firstneigh[i];
@@ -1826,7 +1815,9 @@ void FixConstantPH::initialize_v_lambda(const double _T_lambda, const int& to)
   int length = n_lambdas - to;
 
   double T_current[2] = {0.0,0.0};
-  while (std::abs(T_current[0]) < tol || std::abs(T_current[1]) < tol ) {
+
+  while (length > 0 && 
+    (std::abs(T_current[0]) < tol || std::abs(T_current[1]) < tol )) {
     for (int i = to; i < n_lambdas; i++)
       for (int j = 0; j < 3; j++)
         v_lambdas[i][j] = 1e-6 * random->gaussian() / std::sqrt(m_lambdas[i][j]);
