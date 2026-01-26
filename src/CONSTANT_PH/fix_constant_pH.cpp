@@ -77,7 +77,7 @@ static constexpr double tol = 1e-5;
 static constexpr double max_lambda_buff_0 = 1.05;
 static constexpr double min_lambda = -0.1;
 static constexpr double max_lambda = 1.1;
-static constexpr double environment_coupling = 0.0; // Coupling coefficient for the environment term
+static constexpr double environment_coupling = 0.1; // Coupling coefficient for the environment term
 
 /* ---------------------------------------------------------------------- */
 
@@ -303,12 +303,12 @@ void FixConstantPH::init()
   w = 1000; // 1000; //200;
   s = 0.3;  // 0.3;//0.3;
   h = 7.0;  // 10; //7.0;
-  k = 4.417; // 6.267; //4.417;       //2.553;
-  a = 0.04208; //0.05130; //0.04208;     //0.03401;
+  k = 2.553; //4.417; // 6.267; //4.417;       //2.553;
+  a = 0.03401; // 0.04208; //0.05130; //0.04208;     //0.03401;
   b = 0.002957; // 0.001411; //0.002957;    //0.005238;
   r = 16.458; // 21.428;//16.458;
   m = 0.1507; // 0.1078;//0.1507;
-  d = 3.5; // 5.0; //3.50;    //2.0; //The height of the barrier is 2*d
+  d = 2.0; //3.5; // 5.0; //3.50;    //2.0; //The height of the barrier is 2*d
 
   // default values for the buffer potential with h = 0 from Donnin J Chem Theory Comput 2016 - Table S2
   w_buff = 1000;
