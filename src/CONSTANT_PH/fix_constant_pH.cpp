@@ -1284,6 +1284,26 @@ void FixConstantPH::modify_qs(double **scales)
 
   std::fill_n(vector_atom,nmax,-1);
 
+  // molid to lambda index map
+  std::unordered_map<int, int> molid_to_lambda_index;
+  molid_to_lambda_index.reserve(n_lambdas);
+  for (int j = 0; j < n_lambdas; j++) {
+    molid_to_lambda_index[molids[j]] = j;
+  }
+
+  // map from lambda index to atom index vector
+  std::vector<std::vector<int>> lambda_id_to_atom_ids;
+  lambda_id_to_atom_ids.resize(n_lambdas); 
+
+
+  for (int i = 0; i < nlocal; i++) {
+    int molid_i = atom->molecule[i];
+    auto it = molid_to_lambda_index.find(molid_i);
+    if (it != molid_to_lambda_index.end()) {
+      lambda_id_to_atom_ids[it->second].push_back(i);
+    }
+  }
+
 
   // update the charges
   for (int j = 0; j < n_lambdas; j++) {
@@ -1312,9 +1332,27 @@ void FixConstantPH::modify_qs(double **scales)
     double scale2 = (denom2 == 0) ? 0.0: 
       (lambdas[j][2] * pHnStructures2 - 0.5 - static_cast<double>(indx21)) /static_cast<double>(denom2);
 
+    for (const auto& i : lambda_id_to_atom_ids[j]) {
+      if (protonable[type[i]] == 1) {
+        double q_init = q_orig[i];
+        double pH1q =
+            pH1qs[type[i]][indx11] + scale1 * (pH1qs[type[i]][indx12] - pH1qs[type[i]][indx11]);
+        double pH2q =
+            pH2qs[type[i]][indx21] + scale2 * (pH2qs[type[i]][indx22] - pH2qs[type[i]][indx21]);
+        q[i] = pH1q + scale0 * (pH2q - pH1q);    // scale == 1 should be for the protonated state
+        q_changes_local[0]++;
+        q_changes_local[1] += (q[i] - q_init);
+        //q_changes_local[1] += pH1q;
+        q_changes_local[2] += pH2q;
+        q_changes_local[3] += (q[i] - pH1q);
+        q_changes_local[4] += q_init;
 
+        vector_atom[i] = scale0;
+      }
 
-    for (int i = 0; i < nlocal; i++) {
+    }
+
+    /*for (int i = 0; i < nlocal; i++) {
       int molid_i = atom->molecule[i];
 
       if ((protonable[type[i]] == 1) && (molid_i == molids[j])) {
@@ -1333,7 +1371,8 @@ void FixConstantPH::modify_qs(double **scales)
 
         vector_atom[i] = scale0;
       }
-    }
+    }*/
+
   }
 
   //MPI_Allreduce(q_changes_local.get(), q_changes.get(), 5, MPI_DOUBLE, MPI_SUM, world);
