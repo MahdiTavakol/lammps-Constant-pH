@@ -42,6 +42,7 @@
 #include <cstring>
 #include <iomanip>
 #include <map>
+#include <unordered_map>
 #include <sstream>
 #include <string>
 #include <vector>
