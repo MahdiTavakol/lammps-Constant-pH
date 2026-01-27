@@ -1280,9 +1280,6 @@ void FixConstantPH::modify_qs(double **scales)
   auto& n_lambdas = pH_state->n_lambdas;
   
 
-  std::unique_ptr<double []> q_changes_local = std::make_unique<double []>(5);
-  std::unique_ptr<double []> q_changes       = std::make_unique<double []>(5);
-  std::fill_n(q_changes_local.get(),5,0.0);
 
 
   std::fill_n(vector_atom,nmax,-1);
@@ -1295,15 +1292,15 @@ void FixConstantPH::modify_qs(double **scales)
   }
 
   // map from lambda index to atom index vector
-  std::vector<std::vector<int>> lambda_id_to_atom_ids;
-  lambda_id_to_atom_ids.resize(n_lambdas); 
+  std::vector<std::vector<int>> lambda_index_to_atom_ids;
+  lambda_index_to_atom_ids.resize(n_lambdas); 
 
 
   for (int i = 0; i < nlocal; i++) {
     int molid_i = atom->molecule[i];
     auto it = molid_to_lambda_index.find(molid_i);
     if (it != molid_to_lambda_index.end()) {
-      lambda_id_to_atom_ids[it->second].push_back(i);
+      lambda_index_to_atom_ids[it->second].push_back(i);
     }
   }
 
@@ -1335,7 +1332,7 @@ void FixConstantPH::modify_qs(double **scales)
     double scale2 = (denom2 == 0) ? 0.0: 
       (lambdas[j][2] * pHnStructures2 - 0.5 - static_cast<double>(indx21)) /static_cast<double>(denom2);
 
-    for (const auto& i : lambda_id_to_atom_ids[j]) {
+    for (const auto& i : lambda_index_to_atom_ids[j]) {
       if (protonable[type[i]] == 1) {
         double q_init = q_orig[i];
         double pH1q =
@@ -1343,64 +1340,13 @@ void FixConstantPH::modify_qs(double **scales)
         double pH2q =
             pH2qs[type[i]][indx21] + scale2 * (pH2qs[type[i]][indx22] - pH2qs[type[i]][indx21]);
         q[i] = pH1q + scale0 * (pH2q - pH1q);    // scale == 1 should be for the protonated state
-        q_changes_local[0]++;
-        q_changes_local[1] += (q[i] - q_init);
-        //q_changes_local[1] += pH1q;
-        q_changes_local[2] += pH2q;
-        q_changes_local[3] += (q[i] - pH1q);
-        q_changes_local[4] += q_init;
 
         vector_atom[i] = scale0;
       }
 
     }
-
-    /*for (int i = 0; i < nlocal; i++) {
-      int molid_i = atom->molecule[i];
-
-      if ((protonable[type[i]] == 1) && (molid_i == molids[j])) {
-        double q_init = q_orig[i];
-        double pH1q =
-            pH1qs[type[i]][indx11] + scale1 * (pH1qs[type[i]][indx12] - pH1qs[type[i]][indx11]);
-        double pH2q =
-            pH2qs[type[i]][indx21] + scale2 * (pH2qs[type[i]][indx22] - pH2qs[type[i]][indx21]);
-        q[i] = pH1q + scale0 * (pH2q - pH1q);    // scale == 1 should be for the protonated state
-        q_changes_local[0]++;
-        q_changes_local[1] += (q[i] - q_init);
-        //q_changes_local[1] += pH1q;
-        q_changes_local[2] += pH2q;
-        q_changes_local[3] += (q[i] - pH1q);
-        q_changes_local[4] += q_init;
-
-        vector_atom[i] = scale0;
-      }
-    }*/
-
   }
 
-  //MPI_Allreduce(q_changes_local.get(), q_changes.get(), 5, MPI_DOUBLE, MPI_SUM, world);
-
-  if (comm->me == 0 && false) {
-    double sigma_scale = 0.0;
-    for (int i = 0; i < n_lambdas; i++) sigma_scale += scales[i][0];
-  }
-
-  /* If the buffer is set the modify_q_buffer modifies the charge of the buffer 
-       and the constraint in the fix_nh_constant_pH would constrain the total charge.
-       So, nothing lefts to do here! */
-  if (!(flags & BUFFER) || (flags & ZEROCHARGE)) {
-    MPI_Allreduce(q_changes_local.get(), q_changes.get(), 4, MPI_DOUBLE, MPI_SUM, world);
-    double HW_q_change = -q_changes[1] / static_cast<double>(num_HWs);
-
-    for (int i = 0; i < nlocal; i++) {
-      if (type[i] == typeHWs) {
-        double q_init = q_orig[i];
-        q[i] = q_init + HW_q_change;    //The total charge should be neutral
-        q_changes_local[2]++;
-        q_changes_local[3] += (q[i] - q_init);
-      }
-    }
-  }
 
 }
 
