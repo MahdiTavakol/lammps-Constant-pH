@@ -916,8 +916,10 @@ void FixConstantPH::calculate_dfs()
   const double x0_step  = 2.0 * a;
 
   auto step = [&](double &x) {
-      if (pH < pK)      x = 1.0 / (1.0 + std::exp(-k_step  * (x + x0_step  - 1.0)));
-      else /* pH > pK */x = 1.0 / (1.0 + std::exp(-k_step  * (x - x0_step )));
+    double arg = 0.0;
+    if (pH < pK) arg = std::exp(k_step  * (x + x0_step  - 1.0));
+    else /* pH > pK */ arg = std::exp(k_step  * (x - x0_step ));
+    x  = arg / (1.0 + arg);
   };
 
   auto dstep = [&](double s) {
