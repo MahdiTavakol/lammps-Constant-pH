@@ -692,10 +692,9 @@ void FixConstantPH::update_a_lambda()
     a_lambdas[i][2] = f_lambda_2 / m_lambdas[i][2];
 
     // I am not sure about the sign of the f*kT*log(10)*(pK-pH)
-    this->H_lambdas[i] = environment_coupling*kcal2kj*(lambdas[i][0]*HAs[i] + (1.0-lambdas[i][0])*HBs[i]) - fs[i] * kT * log(10) * (pK - pH) + Us[i]; 
+    this->H_lambdas[i] = environment_coupling*kcal2kj*(lambdas[i][0]*HAs[i] + (1.0-lambdas[i][0])*HBs[i]) - fs[i] * kT * log(10) * (pK - pH) + Us[i] 
          + (m_lambdas[i][0] / 2.0) * (v_lambdas[i][0] * v_lambdas[i][0]) * (mvv2e);    
       // This might not be needed. May be I need to tally this into energies.
-    // I might need to use the leap-frog integrator and so this function might need to be in other functions than postforce()
   }
 
   if (flags & BUFFER) {
