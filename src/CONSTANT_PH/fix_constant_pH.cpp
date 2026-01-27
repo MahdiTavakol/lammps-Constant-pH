@@ -1547,7 +1547,7 @@ void FixConstantPH::calculate_Hs()
     HAs_local = std::make_unique<double []>(n_lambdas);
     for (int k = 0; k < n_lambdas; k++)
     {
-      std::vector<int>& atomids = molid_atomids_map[molids[k]];
+      std::vector<int>& atomids = lambda_index_to_atom_ids[k];
 
       for (int i: atomids)
       {
@@ -1569,7 +1569,7 @@ void FixConstantPH::calculate_Hs()
       // Resetting the HAs
       HAs_local[k] = 0.0;
 
-      for (const auto& i: lambda_index_to_atom_ids[k]) {
+      for (const auto& i: atomids) {
 
         if (!protonable[type[i]]) continue;
 
