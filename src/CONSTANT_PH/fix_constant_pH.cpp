@@ -1524,16 +1524,25 @@ void FixConstantPH::calculate_Hs()
 
     double** x = atom->x;
 
-    // molids to atomids mapping
-    std::map<int,std::vector<int>> molid_atomids_map;
-
-    for (int i = 0; i < nlocal; i++)
-    {
-      int molid_i = molecule[i];
-      auto itr = std::find(molids.get(), molids.get() + n_lambdas, molid_i);
-      if (itr == molids.get() + n_lambdas) continue;
-      else molid_atomids_map[molid_i].push_back(i);
+    // molid to lambda index map
+    std::unordered_map<int, int> molid_to_lambda_index;
+    molid_to_lambda_index.reserve(n_lambdas);
+    for (int j = 0; j < n_lambdas; j++) {
+      molid_to_lambda_index[molids[j]] = j;
     }
+
+    // map from lambda index to atom index vector
+    std::vector<std::vector<int>> lambda_index_to_atom_ids;
+    lambda_index_to_atom_ids.resize(n_lambdas);
+
+    for (int i = 0; i < nlocal; i++) {
+      int molid_i = atom->molecule[i];
+      auto it = molid_to_lambda_index.find(molid_i);
+      if (it != molid_to_lambda_index.end()){
+        lambda_index_to_atom_ids[it->second].push_back(i);
+      }
+    }
+
 
     HAs_local = std::make_unique<double []>(n_lambdas);
     for (int k = 0; k < n_lambdas; k++)
@@ -1560,11 +1569,9 @@ void FixConstantPH::calculate_Hs()
       // Resetting the HAs
       HAs_local[k] = 0.0;
 
-      for (int ii = 0; ii < inum; ii++) {
-        int i = ilist[ii];
+      for (const auto& i: lambda_index_to_atom_ids[k]) {
 
         if (!protonable[type[i]]) continue;
-        if (molecule[i] != molids[k]) continue;
 
         int* jlist = firstneigh[i];
         int jnum  = numneigh[i];
