@@ -175,13 +175,14 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
 
 FixAdaptiveProtonation::~FixAdaptiveProtonation()
 {
-  memory->destroy(array_atom);
+  if (array_atom) memory->destroy(array_atom);
   //if (vector_atom) delete[] vector_atom;
 
   // this is not needed since I am using std::unique_ptr
   // In destructin it will be deallocated on its own.
   deallocate_storage();
 
+  array_atom = nullptr;
   //vector_atom = nullptr;
 
   atom->delete_callback(id,Atom::GROW);
@@ -224,7 +225,7 @@ void FixAdaptiveProtonation::init()
 
   if (flags & RESET_MID) set_molecule_id();
 
-  //
+  // backing up the original charges needed for gradual changing of charges
   q_orig = std::make_unique<double []>(nmax);
 
 }
@@ -277,7 +278,7 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
   }
     
   MPI_Allreduce(&nmolecules_local, &nmolecules_total, 1, MPI_INT, MPI_MAX, world);
-  nmolecules_total++;
+
     
   if (nmolecules_total > nmolecules) {
     nmolecules = nmolecules_total;
@@ -303,9 +304,8 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
   // the mark_prev is set and also the reset_mark_sum_running is not called
   // --->>> status quo
   if (rampStep == nRampStep) {
-    if (comm->me == 0) {
-      error->warning(FLERR,"In the fix_adaptive_protonation n_lambdas == {}",n_protonable);
-    }
+    // Resetting the rampStep
+    rampStep = 0;
     // Setting the mark_prev variable
     std::copy_n(mark.get(),nmolecules+1,mark_prev.get());
     // Resetting the mark_sum_running
@@ -325,7 +325,7 @@ void FixAdaptiveProtonation::post_force(int /*vflag*/)
    * We do need to mark_protoation_deprotonation in the initial_integrate which is when
    * the fix_constant_pH needs that information. 
    */
-  if (rampStep == nevery) {
+  if (update->ntimestep%nevery == 0) {
     if (!list)
       error->all(FLERR, "Neighbor list not initialized for adaptive_protonation");
     neighbor->build_one(list);
@@ -351,21 +351,13 @@ void FixAdaptiveProtonation::post_force(int /*vflag*/)
   // If neighBuildRatio is higher than 50% neigher the mark is updated nor
   // the mark_prev nor is set and also the reset_mark_sum_running is not called
   // --->>> status quo
-  if ((update->ntimestep+1)%innernevery == 0 &&
-       neighBuildRatioPrev <= neighBuildRatioCutoff) 
+  if ((update->ntimestep+1)%innernevery == 0 ) 
     mark_protonation_deprotonation();
   
-  // th neighBuildRatioPrev is updated every nevery steps
-  if (comm->me == 0 && 
-      (update->ntimestep+1)%nevery == 0 && 
-       neighBuildRatioPrev > neighBuildRatioCutoff)
-        error->warning(FLERR,"Neighbor build ratio is higher than the cutoff skiping this step in the fix adaptive protonation: {}, {}",
-                          neighBuildRatioPrev,neighBuildRatioCutoff);
 
   // Accumulating these for the net step since 
   // the fix_Constant_pH accesses this fix in the initial_integrate step
   if (rampStep == nRampStep - 1) {
-    rampStep = 0;
     accumulate_mark_sum_running();
     backup_init_qs();
   }
@@ -699,7 +691,11 @@ void FixAdaptiveProtonation::read_molids_file()
     for (int i = 0; i < n_protonable; i++) {
       if (!getline(init_molid_file, line))
         error->one(FLERR, "Error in reading the init_molid_file");
-      protonable_molids[i] = stoi(line);
+      try {
+        protonable_molids[i] = stoi(line);
+      } catch (std::invalid_argument &) {
+        error->one(FLERR, "Error in reading the init_molid_file");
+      }
     }
   }
 
@@ -839,7 +835,7 @@ void FixAdaptiveProtonation::modify_protonation_state()
 
   // Check if we need to change n_protonable and protonable_molids
   /*
-    * It is possible that nchanges_local[1] and nchanges_local[2] cancel each other,
+   * It is possible that nchanges_local[1] and nchanges_local[2] cancel each other,
     * however, since different molecules are protonable, I would prefer to deallocate
     * and reallocate the protonable_molids so that fix_constant_pH is informed of the change
     * and it reinitializes the v_lambdas.
