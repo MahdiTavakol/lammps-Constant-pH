@@ -268,7 +268,6 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
   }
 
 
-  // If I do not put this to zero, it will have a very large value making the if statement false.
   int nmolecules_local = 0;
   int nmolecules_total;
     
@@ -281,9 +280,9 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
 
     
   if (nmolecules_total > nmolecules) {
-    nmolecules = nmolecules_total;
-    deallocate_storage();
-    allocate_storage();
+    if (comm->me == 0)
+      error->warning(FLERR,"The number of molecules have increased from {} to {} - Growing the storage",nmolecules,nmolecules_total);
+    grow_storage(nmolecules_total);
   }
     
     
@@ -300,16 +299,13 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
 
   
   // Resetting the mark_prev parameter to help us keep the track of which molecule moves from solid to solvent and vice versa
-  // If neighBuildRatio is higher than 50% neither the mark is updated nor
-  // the mark_prev is set and also the reset_mark_sum_running is not called
-  // --->>> status quo
   if (rampStep == nRampStep) {
     // Resetting the rampStep
     rampStep = 0;
     // Setting the mark_prev variable
     std::copy_n(mark.get(),nmolecules+1,mark_prev.get());
-    // Resetting the mark_sum_running
-    std::fill_n(mark_sum_running.get(),nmolecules+1,0.0);
+    // backing up the initial qs
+    backup_init_qs();
   } 
 }
 
@@ -325,7 +321,7 @@ void FixAdaptiveProtonation::post_force(int /*vflag*/)
    * We do need to mark_protoation_deprotonation in the initial_integrate which is when
    * the fix_constant_pH needs that information. 
    */
-  if (update->ntimestep%nevery == 0) {
+  if ((update->ntimestep+1)%nevery == 0) {
     if (!list)
       error->all(FLERR, "Neighbor list not initialized for adaptive_protonation");
     neighbor->build_one(list);
@@ -351,15 +347,15 @@ void FixAdaptiveProtonation::post_force(int /*vflag*/)
   // If neighBuildRatio is higher than 50% neigher the mark is updated nor
   // the mark_prev nor is set and also the reset_mark_sum_running is not called
   // --->>> status quo
-  if ((update->ntimestep+1)%innernevery == 0 ) 
+  if ((update->ntimestep+1)%innernevery == 0) 
     mark_protonation_deprotonation();
   
 
-  // Accumulating these for the net step since 
-  // the fix_Constant_pH accesses this fix in the initial_integrate step
-  if (rampStep == nRampStep - 1) {
+  if ((update->ntimestep+1)%nevery == 0) {
+    // Accumulating the mark_sum_running into the mark. 
     accumulate_mark_sum_running();
-    backup_init_qs();
+    // Resetting the mark_sum_running 
+    std::fill_n(mark_sum_running.get(),nmolecules+1,0.0);
   }
 }
 
@@ -491,6 +487,61 @@ void FixAdaptiveProtonation::allocate_storage()
   /* I put it on purpose so in the first step every molecule changes unless 
     * INIT_MIDS is set in which case the read_init_mids() function rewrites this.
     */
+}
+
+/* ----------------------------------------------------------------------------------------
+    Growting the storage when the number of molecules increases
+   ---------------------------------------------------------------------------------------- */
+
+void FixAdaptiveProtonation::grow_storage(const int& nmolecules_new)
+{
+  using std::make_unique, std::unique_ptr, std::fill_n, std::copy_n;
+  int nmolecules_old = nmolecules;
+
+  int keep = std::min(nmolecules_old, nmolecules_new);
+
+  auto protonable_molids_new     = make_unique<int[]>(nmolecules_new);
+  auto mark_new                  = make_unique<int[]>(nmolecules_new + 1);
+  auto mark_prev_new             = make_unique<int[]>(nmolecules_new + 1);
+  auto mark_local_new            = make_unique<int[]>(nmolecules_new + 1);
+  auto mark_total_new            = make_unique<int[]>(nmolecules_new + 1);
+  auto mark_sum_running_new      = make_unique<double[]>(nmolecules_new + 1);
+  auto protonable_size_new       = make_unique<int[]>(nmolecules_new + 1);
+  auto protonable_size_local_new = make_unique<int[]>(nmolecules_new + 1);
+
+  if (keep > 0) {
+    copy_n(protonable_molids.get(), keep, protonable_molids_new.get());
+    copy_n(mark.get(), keep + 1, mark_new.get());
+    copy_n(mark_prev.get(), keep + 1, mark_prev_new.get());
+    copy_n(mark_local.get(), keep + 1, mark_local_new.get());
+    copy_n(mark_total.get(), keep + 1, mark_total_new.get());
+    copy_n(mark_sum_running.get(), keep + 1, mark_sum_running_new.get());
+    copy_n(protonable_size.get(), keep + 1, protonable_size_new.get());
+    copy_n(protonable_size_local.get(), keep + 1, protonable_size_local_new.get());
+  }
+
+  if (nmolecules_new > nmolecules_old) {
+    fill_n(protonable_molids_new.get() + keep, nmolecules_new - keep, -1);
+    fill_n(mark_new.get() + keep + 1, nmolecules_new - keep, 0);
+    fill_n(mark_prev_new.get() + keep + 1, nmolecules_new - keep, NEITHER);
+    fill_n(mark_local_new.get() + keep + 1, nmolecules_new - keep, 0);
+    fill_n(mark_total_new.get() + keep + 1, nmolecules_new - keep, 0);
+    fill_n(mark_sum_running_new.get() + keep + 1, nmolecules_new - keep, 0.0);
+    fill_n(protonable_size_new.get() + keep + 1, nmolecules_new - keep, 0);
+    fill_n(protonable_size_local_new.get() + keep + 1, nmolecules_new - keep, 0);
+  }
+
+  protonable_molids_new.swap(protonable_molids);
+  mark_new.swap(mark);
+  mark_prev_new.swap(mark_prev);
+  mark_local_new.swap(mark_local);
+  mark_total_new.swap(mark_total);
+  mark_sum_running_new.swap(mark_sum_running);
+  protonable_size_new.swap(protonable_size);
+  protonable_size_local_new.swap(protonable_size_local);
+
+  nmolecules = nmolecules_new;
+
 }
 
 /* ----------------------------------------------------------------------------------------
@@ -791,18 +842,9 @@ void FixAdaptiveProtonation::modify_protonation_state()
     if (!protonable[type[i]]) continue;
     switch (mark[molecule[i]]) {
       case NEITHER:    // Not protonable ----> nothing to do here
-        break;
-
+      [[fallthrough]];
       case SOLVENT:    // The molecule is in the water
-        // The molecule was in the solid before or it is the first step
-        if (mark_prev[molecule[i]] == SOLID || mark_prev[molecule[i]] == NEITHER)
-        {
           // The fix_constant_pH takes care of this one!
-        }
-        else if (mark_prev[molecule[i]] == SOLVENT)
-          break;
-        else
-          error->all(FLERR, "Unexpected value in mark_prev[molecule[i]] for SOLVENT case: {}",mark_prev[molecule[i]]);
         break;    //  Prevent fall-through
 
       case SOLID:    

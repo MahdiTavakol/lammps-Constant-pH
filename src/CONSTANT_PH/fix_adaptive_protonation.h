@@ -143,6 +143,8 @@ class FixAdaptiveProtonation : public Fix {
   void deallocate_storage();
   // Allocating nmolecules related storage
   void allocate_storage();
+  // Growing the nmolecules related storage
+  void grow_storage(int);
   // Reseting all the molids
   void set_molecule_id();
   // backing up the initial qs
