@@ -1976,6 +1976,9 @@ void FixConstantPH::build_mappings()
 {
   auto& n_lambdas = pH_state->n_lambdas;
 
+  // if just nlocal changes without 
+  // changing the molids
+  // we do not need to rebuild molid_to_lambda_index
   if constexpr (mode == 0) {
     auto& molids = pH_state->molids;
     
@@ -1985,19 +1988,21 @@ void FixConstantPH::build_mappings()
     for (int j = 0; j < n_lambdas; j++) {
       molid_to_lambda_index[molids[j]] = j;
     }
-  } else if constexpr (mode == 1) {
-    int nlocal = atom->nlocal;
-    int* molecule = atom->molecule;
+  }
+  
+  // If molids_to_lambda_index is rebuilt we need to 
+  // rebuild the lambda_index_to_atom_ids as well
+  int nlocal = atom->nlocal;
+  int* molecule = atom->molecule;
 
-    // lambda index to atom id map
-    lambda_index_to_atom_ids.clear();
-    lambda_index_to_atom_ids.resize(n_lambdas);
-    for (int i = 0; i < nlocal; i++) {
-      int molid_i = atom->molecule[i];
-      auto it = molid_to_lambda_index.find(molid_i);
-      if (it != molid_to_lambda_index.end()) {
-        lambda_index_to_atom_ids[it->second].push_back(i);
-      }
+  // lambda index to atom id map
+  lambda_index_to_atom_ids.clear();
+  lambda_index_to_atom_ids.resize(n_lambdas);
+  for (int i = 0; i < nlocal; i++) {
+    int molid_i = atom->molecule[i];
+    auto it = molid_to_lambda_index.find(molid_i);
+    if (it != molid_to_lambda_index.end()) {
+      lambda_index_to_atom_ids[it->second].push_back(i);
     }
   }
 
