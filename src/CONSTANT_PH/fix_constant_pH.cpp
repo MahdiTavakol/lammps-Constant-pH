@@ -1319,17 +1319,13 @@ void FixConstantPH::modify_qs(double **scales)
       (lambdas[j][2] * pHnStructures2 - 0.5 - static_cast<double>(indx21)) /static_cast<double>(denom2);
 
     for (const auto& i : lambda_index_to_atom_ids[j]) {
-      if (protonable[type[i]] == 1) {
-        double q_init = q_orig[i];
-        double pH1q =
+      double q_init = q_orig[i];
+      double pH1q =
             pH1qs[type[i]][indx11] + scale1 * (pH1qs[type[i]][indx12] - pH1qs[type[i]][indx11]);
-        double pH2q =
+      double pH2q =
             pH2qs[type[i]][indx21] + scale2 * (pH2qs[type[i]][indx22] - pH2qs[type[i]][indx21]);
-        q[i] = pH1q + scale0 * (pH2q - pH1q);    // scale == 1 should be for the protonated state
-
-        vector_atom[i] = scale0;
-      }
-
+      q[i] = pH1q + scale0 * (pH2q - pH1q);    // scale == 1 should be for the protonated state
+      vector_atom[i] = scale0;
     }
   }
 
@@ -1993,12 +1989,14 @@ void FixConstantPH::build_mappings()
   // If molids_to_lambda_index is rebuilt we need to 
   // rebuild the lambda_index_to_atom_ids as well
   int nlocal = atom->nlocal;
+  int *type = atom->type;
   int* molecule = atom->molecule;
 
   // lambda index to atom id map
   lambda_index_to_atom_ids.clear();
   lambda_index_to_atom_ids.resize(n_lambdas);
   for (int i = 0; i < nlocal; i++) {
+    if (!protonable[type[i]]) continue;
     int molid_i = atom->molecule[i];
     auto it = molid_to_lambda_index.find(molid_i);
     if (it != molid_to_lambda_index.end()) {
