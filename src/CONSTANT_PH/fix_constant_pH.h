@@ -27,6 +27,7 @@ FixStyle(constant_pH,FixConstantPH);
 #define LMP_FIX_CONSTANTPH_H
 
 #include <fstream>
+#include <unordered_map>
 
 #include "fix.h"
 #include "fix_adaptive_protonation.h"
@@ -97,6 +98,15 @@ class FixConstantPH : public Fix {
   // The smoothing function
   std::unique_ptr<double[]> fs;
   std::unique_ptr<double[]> dfs;
+
+  // mapping functions for the modify_qs() function 
+  // molids to lambda_index mapping
+  std::unordered_map<int,int> molid_to_lambda_index;
+  // lambda_index to molids mapping
+  std::vector<std::vector<int>> lambda_index_to_atom_ids;
+  // building the mapping functions
+  template <int mode>
+  void build_mappings();
 
   // parameter for shifting the minima of the potential near lambda = 0 and lambda = 1
   double mu;

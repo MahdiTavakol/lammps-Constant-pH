@@ -41,8 +41,6 @@
 #include <array>
 #include <cstring>
 #include <iomanip>
-#include <map>
-#include <unordered_map>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -338,6 +336,9 @@ void FixConstantPH::init()
   // dynamic states for lambdas
   pH_state = std::make_unique<constant_pH_state>(lmp,molids_input,n_lambdas_input,lambda_masses,N_buff);
 
+  // Creating the molids to lambda indexs mapping
+  build_mappings<0>();
+
    // forcefield variables for lambdas
   set_lambdas();
 
@@ -485,6 +486,9 @@ void FixConstantPH::initial_integrate(int /*vflag*/)
         // This part used the pH_state_prev to keep the lambdas available in the previous step.
         set_lambdas(); 
 
+        // mapping the molids to the lambda indices
+        build_mappings<0>();
+
         modify->clearstep_compute();
         modify->addstep_compute(update->ntimestep);
 
@@ -522,6 +526,9 @@ void FixConstantPH::post_force(int /*vflag*/)
   //calculate_Hs();
   update_a_lambda();
   if (!(update->ntimestep % write_lambda_nevery)) write_lambdas();
+
+  if (neighbor->ago == 0)
+    build_mappings<1>();
 }
 
 /* ----------------------------------------------------------------------
@@ -1274,34 +1281,14 @@ void FixConstantPH::modify_qs(double **scales)
   double **pH2qs = pH_structure_storage->pH2qs;
   int pHnStructures1 = pH_structure_storage->pHnStructures1;
   int pHnStructures2 = pH_structure_storage->pHnStructures2;
+
+
   double** lambdas = pH_state->lambdas;
-  auto& molids = pH_state->molids;
   auto& n_lambdas = pH_state->n_lambdas;
   
 
-
-
   std::fill_n(vector_atom,nmax,-1);
 
-  // molid to lambda index map
-  std::unordered_map<int, int> molid_to_lambda_index;
-  molid_to_lambda_index.reserve(n_lambdas);
-  for (int j = 0; j < n_lambdas; j++) {
-    molid_to_lambda_index[molids[j]] = j;
-  }
-
-  // map from lambda index to atom index vector
-  std::vector<std::vector<int>> lambda_index_to_atom_ids;
-  lambda_index_to_atom_ids.resize(n_lambdas); 
-
-
-  for (int i = 0; i < nlocal; i++) {
-    int molid_i = atom->molecule[i];
-    auto it = molid_to_lambda_index.find(molid_i);
-    if (it != molid_to_lambda_index.end()) {
-      lambda_index_to_atom_ids[it->second].push_back(i);
-    }
-  }
 
 
   // update the charges
@@ -1523,24 +1510,6 @@ void FixConstantPH::calculate_Hs()
 
     double** x = atom->x;
 
-    // molid to lambda index map
-    std::unordered_map<int, int> molid_to_lambda_index;
-    molid_to_lambda_index.reserve(n_lambdas);
-    for (int j = 0; j < n_lambdas; j++) {
-      molid_to_lambda_index[molids[j]] = j;
-    }
-
-    // map from lambda index to atom index vector
-    std::vector<std::vector<int>> lambda_index_to_atom_ids;
-    lambda_index_to_atom_ids.resize(n_lambdas);
-
-    for (int i = 0; i < nlocal; i++) {
-      int molid_i = atom->molecule[i];
-      auto it = molid_to_lambda_index.find(molid_i);
-      if (it != molid_to_lambda_index.end()){
-        lambda_index_to_atom_ids[it->second].push_back(i);
-      }
-    }
 
 
     HAs_local = std::make_unique<double []>(n_lambdas);
@@ -1995,6 +1964,45 @@ double FixConstantPH::compute_epair()
   return energy;
 }
 
+/* --------------------------------------------------------------------------------------- 
+    Rebuilding the maps when the either of the following happens:
+    (1) The number of lambdas change (mode == 0)
+    (2) The number of local atoms change 
+        (grow_arrays, copy_arrays, unpack_exchange, pack_exchange, neighbor->build) (mode == 1) 
+   --------------------------------------------------------------------------------------- */
+
+template<int mode>
+void FixConstantPH::build_mappings()
+{
+  auto& n_lambdas = pH_state->n_lambdas;
+
+  if constexpr (mode == 0) {
+    auto& molids = pH_state->molids;
+    
+    // molid to lambda index map
+    molid_to_lambda_index.clear();
+    molid_to_lambda_index.reserve(n_lambdas);
+    for (int j = 0; j < n_lambdas; j++) {
+      molid_to_lambda_index[molids[j]] = j;
+    }
+  } else if constexpr (mode == 1) {
+    int nlocal = atom->nlocal;
+    int* molecule = atom->molecule;
+
+    // lambda index to atom id map
+    lambda_index_to_atom_ids.clear();
+    lambda_index_to_atom_ids.resize(n_lambdas);
+    for (int i = 0; i < nlocal; i++) {
+      int molid_i = atom->molecule[i];
+      auto it = molid_to_lambda_index.find(molid_i);
+      if (it != molid_to_lambda_index.end()) {
+        lambda_index_to_atom_ids[it->second].push_back(i);
+      }
+    }
+  }
+
+}
+
 /* --------------------------------------------------------------------------------------- */
 
 void FixConstantPH::grow_arrays(int nmax_new)
@@ -2006,6 +2014,8 @@ void FixConstantPH::grow_arrays(int nmax_new)
   delete [] vector_atom;
   vector_atom = new_vector_atom;
   nmax = nmax_new;
+
+  build_mappings<1>();
 }
 
 /* --------------------------------------------------------------------------------------- */
@@ -2013,6 +2023,7 @@ void FixConstantPH::grow_arrays(int nmax_new)
 void FixConstantPH::copy_arrays(int i, int j , int /*deflag*/)
 {
   vector_atom[j] = vector_atom[i];
+  build_mappings<1>();
 }
 
 /* --------------------------------------------------------------------------------------- */
@@ -2026,6 +2037,7 @@ int FixConstantPH::pack_exchange(int i, double *buf) {
 
 int FixConstantPH::unpack_exchange(int nlocal, double *buf) {
   vector_atom[nlocal] = buf[0];
+  build_mappings<1>();
   return 1;
 }
 
