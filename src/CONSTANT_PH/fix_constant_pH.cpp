@@ -316,7 +316,7 @@ void FixConstantPH::init()
   a_buff = 0.04764;
   b_buff = -0.09706;
   r_buff = 16.458;
-  m_buff = 0.20; //0.1507; Increased the m so that there is no force on the lambda buff at 1.0
+  m_buff = 0.1507; 
   d_buff = 0.0;
 
   // Reading the pH structure files
