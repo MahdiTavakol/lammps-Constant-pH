@@ -88,6 +88,8 @@ class FixConstantPH : public Fix {
   std::unique_ptr<double[]> HAs;
   std::unique_ptr<double[]> HBs;
   double HA_buff, HB_buff;
+  // The environment coupling factor
+  double environment_coupling = 0.0;
 
 
   // The step function 
@@ -144,8 +146,7 @@ class FixConstantPH : public Fix {
   // Temporary values to be used by the fix_nh_constant_pH constraint
   std::unique_ptr<double[]> pH1qs_temp, pH2qs_temp;
 
-  // The environment coupling factor
-  double environment_coupling;
+  
 
   // Parameters for the forcefield modification term
   bool GFF_flag;
