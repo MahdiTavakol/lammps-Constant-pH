@@ -141,6 +141,12 @@ class FixConstantPH : public Fix {
   // Temporary array to change lambdas in order to get HAs and HBs
   std::unique_ptr<double[]> lambdas_j;
 
+  // Temporary values to be used by the fix_nh_constant_pH constraint
+  std::unique_ptr<double[]> pH1qs_temp, pH2qs_temp;
+
+  // The environment coupling factor
+  double environment_coupling;
+
   // Parameters for the forcefield modification term
   bool GFF_flag;
   std::ifstream fp;
@@ -218,8 +224,10 @@ class FixConstantPH : public Fix {
   void return_T_lambda(double &_T_lambda, int component = 2);
 
 
+
   // Function to set the charges based on the lambdas and lambda_buff values
   void reset_qs();
+  void reset_qs_1();
 
   // The function to calculate Hs
   void calculate_Hs();
@@ -254,6 +262,7 @@ class FixConstantPH : public Fix {
   void init_GFF();
   void calculate_GFFs();
   void modify_qs(double scale, int j);
+  template<int mode=0>
   void modify_qs(double **scales);
   void modify_q_buff(const double scale);
   void update_lmp();

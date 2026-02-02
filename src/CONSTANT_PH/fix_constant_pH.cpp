@@ -75,7 +75,6 @@ static constexpr double tol = 1e-5;
 static constexpr double max_lambda_buff_0 = 1.05;
 static constexpr double min_lambda = -0.1;
 static constexpr double max_lambda = 1.1;
-static constexpr double environment_coupling = 0.1; // Coupling coefficient for the environment term
 
 /* ---------------------------------------------------------------------- */
 
@@ -231,6 +230,9 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
     } else if (strcmp(arg[iarg],"interpolation") == 0) {
       flags |= INTERPOLATION;
       iarg += 1;
+    } else if (strcmp(arg[iarg],"environment") == 0) {
+      environment_coupling = utils::numeric(FLERR,arg[iarg+1],false,lmp);
+      iarg += 2;
     } else {
       error->all(FLERR, "Unknown fix constant_pH keyword: {}", arg[iarg]);
     }
@@ -322,6 +324,11 @@ void FixConstantPH::init()
   // Reading the pH structure files
   pH_structure_storage = std::make_unique<constant_pH_structures>(lmp, fileName1, fileName2);
   pH_structure_storage->read_pH_structure_files();
+
+  // Allocating the pH1qs_temp and pH2qs_temp arrays
+  int ntypes = atom->ntypes; // since the type array is 1 based
+  pH1qs_temp = std::make_unique<double []>(ntypes + 1);
+  pH2qs_temp = std::make_unique<double []>(ntypes + 1);
 
   /*
    * Allocating the storage so that the copy_arrays called
@@ -567,6 +574,7 @@ void FixConstantPH::set_lambdas()
   GFF_lambdas = std::make_unique<double[]>(n_lambdas);
   H_lambdas   = std::make_unique<double[]>(n_lambdas);
 
+
   int to = pH_state->reset_lambdas(pH_state_prev);
 
   if (n_lambdas) {
@@ -754,22 +762,18 @@ void FixConstantPH::return_params(std::unique_ptr<constant_pH_state>& pH_state_)
 
 void FixConstantPH::reset_qs()
 {
-  double** lambdas = pH_state->lambdas;
+  double **lambdas = pH_state->lambdas;
   auto& lambda_buff = pH_state->lambda_buff;
-  modify_qs(lambdas);
-
+  modify_qs<0>(lambdas);
   if (flags & BUFFER) modify_q_buff(lambda_buff);
+}
 
-  /* This should be here just for debugging
-       since it used MPI_Allreduce to calculate
-       the total charge it has some overhead not 
-       advised in the production run
-    */
-  /*
-       There is no need for this anymore 
-       since the q_total = sigma_lambdas * mol_charge_change + N_buff* lambda_buff*buff_charge_change
-    */
-  if (0) { compute_q_total(); }
+void FixConstantPH::reset_qs_1()
+{
+  double **lambdas = pH_state->lambdas;
+  auto& lambda_buff = pH_state->lambda_buff;
+  modify_qs<1>(lambdas);
+  if (flags & BUFFER) modify_q_buff(lambda_buff);
 }
 
 /* ---------------------------------------------------------------------
@@ -1267,8 +1271,11 @@ void FixConstantPH::modify_qs(double scale, int j)
 
 /* --------------------------------------------------------------
    modify the q of the lambdas
+   mode == 1 is the fast path for the constrain_lambdas function 
+   of the fix_nh_constant_pH.
    -------------------------------------------------------------- */
 
+template <int mode>
 void FixConstantPH::modify_qs(double **scales)
 {
   int nlocal = atom->nlocal;
@@ -1294,38 +1301,48 @@ void FixConstantPH::modify_qs(double **scales)
   // update the charges
   for (int j = 0; j < n_lambdas; j++) {
     double scale0 = scales[j][0];
-    int indx11 = std::floor(lambdas[j][1] * pHnStructures1 - 0.5);
-    int indx12 = std::ceil(lambdas[j][1]  * pHnStructures1 - 0.5);
-    int indx21 = std::floor(lambdas[j][2] * pHnStructures2 - 0.5);
-    int indx22 = std::ceil(lambdas[j][2]  * pHnStructures2 - 0.5);
 
 
-    // Wrapping around 
-    while (indx11 < 0) indx11 += pHnStructures1;
-    while (indx12 < 0) indx12 += pHnStructures1;
-    while (indx21 < 0) indx21 += pHnStructures2;
-    while (indx22 < 0) indx22 += pHnStructures2;
-    while (indx11 > pHnStructures1 - 1) indx11 -= pHnStructures1;
-    while (indx12 > pHnStructures1 - 1) indx12 -= pHnStructures1;
-    while (indx21 > pHnStructures2 - 1) indx21 -= pHnStructures2;
-    while (indx22 > pHnStructures2 - 1) indx22 -= pHnStructures2;
 
-    int denom1 = indx12 - indx11;
-    int denom2 = indx22 - indx21;
+    if constexpr (mode == 0) {
+      int indx11 = std::floor(lambdas[j][1] * pHnStructures1 - 0.5);
+      int indx12 = std::ceil(lambdas[j][1]  * pHnStructures1 - 0.5);
+      int indx21 = std::floor(lambdas[j][2] * pHnStructures2 - 0.5);
+      int indx22 = std::ceil(lambdas[j][2]  * pHnStructures2 - 0.5);
+  
+  
+      // Wrapping around 
+      while (indx11 < 0) indx11 += pHnStructures1;
+      while (indx12 < 0) indx12 += pHnStructures1;
+      while (indx21 < 0) indx21 += pHnStructures2;
+      while (indx22 < 0) indx22 += pHnStructures2;
+      while (indx11 > pHnStructures1 - 1) indx11 -= pHnStructures1;
+      while (indx12 > pHnStructures1 - 1) indx12 -= pHnStructures1;
+      while (indx21 > pHnStructures2 - 1) indx21 -= pHnStructures2;
+      while (indx22 > pHnStructures2 - 1) indx22 -= pHnStructures2;
+  
+      int denom1 = indx12 - indx11;
+      int denom2 = indx22 - indx21;
+  
+      double scale1 = (denom1 == 0) ? 0.0: 
+        (lambdas[j][1] * pHnStructures1 - 0.5 - static_cast<double>(indx11)) /static_cast<double>(denom1);
+      double scale2 = (denom2 == 0) ? 0.0: 
+        (lambdas[j][2] * pHnStructures2 - 0.5 - static_cast<double>(indx21)) /static_cast<double>(denom2);
 
-    double scale1 = (denom1 == 0) ? 0.0: 
-      (lambdas[j][1] * pHnStructures1 - 0.5 - static_cast<double>(indx11)) /static_cast<double>(denom1);
-    double scale2 = (denom2 == 0) ? 0.0: 
-      (lambdas[j][2] * pHnStructures2 - 0.5 - static_cast<double>(indx21)) /static_cast<double>(denom2);
+      for (const auto&i : lambda_index_to_atom_ids[j]) {
+        pH1qs_temp[type[i]] =
+            pH1qs[type[i]][indx11] + scale1 * (pH1qs[type[i]][indx12] - pH1qs[type[i]][indx11]);
+        pH2qs_temp[type[i]] =
+            pH2qs[type[i]][indx21] + scale2 * (pH2qs[type[i]][indx22] - pH2qs[type[i]][indx21]);
+        vector_atom[i] = scale0;
+      }
+    }
+
 
     for (const auto& i : lambda_index_to_atom_ids[j]) {
-      double q_init = q_orig[i];
-      double pH1q =
-            pH1qs[type[i]][indx11] + scale1 * (pH1qs[type[i]][indx12] - pH1qs[type[i]][indx11]);
-      double pH2q =
-            pH2qs[type[i]][indx21] + scale2 * (pH2qs[type[i]][indx22] - pH2qs[type[i]][indx21]);
+      double pH1q = pH1qs_temp[type[i]];
+      double pH2q = pH2qs_temp[type[i]];
       q[i] = pH1q + scale0 * (pH2q - pH1q);    // scale == 1 should be for the protonated state
-      vector_atom[i] = scale0;
     }
   }
 
@@ -1971,6 +1988,7 @@ template<int mode>
 void FixConstantPH::build_mappings()
 {
   auto& n_lambdas = pH_state->n_lambdas;
+  int *protonable = pH_structure_storage->protonable.get();
 
   // if just nlocal changes without 
   // changing the molids
