@@ -1533,7 +1533,6 @@ void FixConstantPH::calculate_Hs()
 
       for (int i: atomids)
       {
-        if (!protonable[type[i]]) continue;
         q[i] = pH2qs[type[i]][0] - pH1qs[type[i]][0];
       }
       // Neutralizing the system 
@@ -1552,8 +1551,6 @@ void FixConstantPH::calculate_Hs()
       HAs_local[k] = 0.0;
 
       for (const auto& i: atomids) {
-
-        if (!protonable[type[i]]) continue;
 
         int* jlist = firstneigh[i];
         int jnum  = numneigh[i];
@@ -1574,7 +1571,6 @@ void FixConstantPH::calculate_Hs()
           HAs_local[k] += force->pair->single(i,j,type[i],type[j],rsq,1.0,0.0,fforce);
         }
       }
-
       backup_restore_qfev<-1>();
     }
     MPI_Allreduce(HAs_local.get(),HAs.get(),n_lambdas,MPI_DOUBLE,MPI_SUM,world); 
