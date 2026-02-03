@@ -388,26 +388,31 @@ int FixAdaptiveProtonation::unpack_exchange(int nlocal, double* buf)
 
 void FixAdaptiveProtonation::grow_arrays(int nmax_new)
 {
-  auto q_new = std::make_unique<double []>(nmax_new);
-  int keep = std::min(nmax,nmax_new);
-  if (keep > 0) std::copy_n(q_orig.get(),keep,q_new.get());
-  if (keep < nmax_new) std::fill(q_new.get()+keep,q_new.get()+nmax_new,0.0);
+  using std::make_unique, std::fill_n, std::copy_n, std::min;
+  auto q_new = make_unique<double []>(nmax_new);
+  double** new_array_atom;
+  memory->create(new_array_atom,nmax_new,size_peratom_cols,"fix_adaptive_protonation:array_atoms");
+
+  int keep = min(nmax,nmax_new);
+  if (keep > 0) { 
+    copy_n(q_orig.get(),keep,q_new.get());
+    copy_n(&array_atom[0][0],keep*size_peratom_cols,&new_array_atom[0][0]);
+  }
+  if (keep < nmax_new) {
+    fill_n(q_new.get()+keep,nmax_new,0.0);
+    fill_n(array_atom[0]+keep*size_peratom_cols,nmax_new*size_peratom_cols,0.0);
+  }
   q_orig.swap(q_new);
+  memory->destroy(array_atom);
+  array_atom = new_array_atom;
+
+  nmax = nmax_new;
 
   //double *new_vector_atom = new double[nmax_new];
   //if (keep > 0) std::copy_n(vector_atom,keep,new_vector_atom);
   //if (keep < nmax_new) std::fill(new_vector_atom+keep,new_vector_atom+nmax_new,0.0);
   //delete [] vector_atom;
-  //vector_atom = new_vector_atom;
-
-  double** new_array_atom;
-  memory->create(new_array_atom,nmax_new,size_peratom_cols,"fix_adaptive_protonation:array_atoms");
-  std::fill_n(&new_array_atom[0][0],nmax_new*size_peratom_cols,0.0);
-  if (keep > 0) std::copy_n(&array_atom[0][0],keep*size_peratom_cols,&new_array_atom[0][0]);
-  memory->destroy(array_atom);
-  array_atom = new_array_atom;
-  
-  nmax = nmax_new;
+  //vector_atom = new_vector_atom;  
 }
 
 /* --------------------------------------------------------------------------------------- */
@@ -578,17 +583,17 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
   for (int ii = 0; ii < inum; ii++) {
     int i = ilist[ii];
 
-
-    // number of neighboring water molecules
-    int nNeighboringWaters = 0;
-
     // Check if this atom is protonable --> if not do not bother with it.
     if (protonable[type[i]] == 0) {
       continue;
     } 
-      
     protonable_size_local[molecule[i]]++;
 
+
+    // number of neighboring water molecules
+    int nNeighboringWaters = 0;
+
+      
     jlist = firstneigh[i];
     jnum  = numneigh[i];
     for (int jj = 0; jj < jnum; jj++) {
@@ -641,6 +646,11 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
 void FixAdaptiveProtonation::accumulate_mark_sum_running()
 {
   for (int m = 1; m <= nmolecules; ++m) {
+    // The protonable_size for molecules is set 
+    // in the last innernevery step before the 
+    // nevery step in which the accumulate_mark_sum_running
+    // function is called and it is not set to zero anywhere
+    // between. So it is fine to check its value here!
     if (!protonable_size[m]) {           // no protonable atoms in this mol
       mark[m] = NEITHER;
       continue;
@@ -794,7 +804,6 @@ void FixAdaptiveProtonation::modify_protonation_state()
   double *q = atom->q;
   int *type = atom->type;
   int *molecule = atom->molecule;
-  double q_change_local = 0;
   double q_init;
   double step = static_cast<double>(rampStep);
   double nRampStepInv = 1.0/static_cast<double>(nRampStep);
@@ -858,7 +867,6 @@ void FixAdaptiveProtonation::modify_protonation_state()
           q_new = q_orig[i] + frac*(pH1qs[type[i]][0]-q_orig[i]);
           if (!std::isfinite(q_new)) error->one(FLERR,"The q[{}] is infinite!",i);
           q[i] = q_new;
-          q_change_local += q[i] - q_init;
           break;
         } else if (mark_prev[molecule[i]] == SOLID || mark_prev[molecule[i]] == NEITHER)
           break;
@@ -872,7 +880,6 @@ void FixAdaptiveProtonation::modify_protonation_state()
     }
   }
 
-  MPI_Allreduce(&q_change_local, &q_change, 1, MPI_DOUBLE, MPI_SUM, world);
 
   // Check if we need to change n_protonable and protonable_molids
   /*
