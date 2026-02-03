@@ -325,11 +325,6 @@ void FixConstantPH::init()
   pH_structure_storage = std::make_unique<constant_pH_structures>(lmp, fileName1, fileName2);
   pH_structure_storage->read_pH_structure_files();
 
-  // Allocating the pH1qs_temp and pH2qs_temp arrays
-  int ntypes = atom->ntypes; // since the type array is 1 based
-  pH1qs_temp = std::make_unique<double []>(ntypes + 1);
-  pH2qs_temp = std::make_unique<double []>(ntypes + 1);
-
   /*
    * Allocating the storage so that the copy_arrays called
    * in the Verlet::Setup would not lead to out of range.
@@ -589,6 +584,7 @@ void FixConstantPH::set_lambdas()
   // Resetting the vector_atom to the default value
   int nmax = atom->nmax;
   std::fill_n(vector_atom,nmax,-1);
+
 }
 
 /* ----------------------------------------------------------------------
@@ -1064,6 +1060,8 @@ void FixConstantPH::allocate_storage()
   }
 
   vector_atom = new double[nmax];
+  pH1qs_temp = std::make_unique<double []>(nmax);
+  pH2qs_temp = std::make_unique<double []>(nmax);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -1276,79 +1274,104 @@ void FixConstantPH::modify_qs(double scale, int j)
    of the fix_nh_constant_pH.
    -------------------------------------------------------------- */
 
-template <int mode>
-void FixConstantPH::modify_qs(double **scales)
-{
-  int nlocal = atom->nlocal;
-  int *type = atom->type;
-  double *q = atom->q;
-
-  // Not safe, I should use std::shared_ptr instead.....
-  int *protonable = pH_structure_storage->protonable.get();    
-  double **pH1qs = pH_structure_storage->pH1qs;
-  double **pH2qs = pH_structure_storage->pH2qs;
-  int pHnStructures1 = pH_structure_storage->pHnStructures1;
-  int pHnStructures2 = pH_structure_storage->pHnStructures2;
-
-
-  double** lambdas = pH_state->lambdas;
-  auto& n_lambdas = pH_state->n_lambdas;
-  
-
-  std::fill_n(vector_atom,nmax,-1);
-
-
-
-  // update the charges
-  for (int j = 0; j < n_lambdas; j++) {
-    double scale0 = scales[j][0];
-
-
-
-    if constexpr (mode == 0) {
-      int indx11 = std::floor(lambdas[j][1] * pHnStructures1 - 0.5);
-      int indx12 = std::ceil(lambdas[j][1]  * pHnStructures1 - 0.5);
-      int indx21 = std::floor(lambdas[j][2] * pHnStructures2 - 0.5);
-      int indx22 = std::ceil(lambdas[j][2]  * pHnStructures2 - 0.5);
-  
-  
-      // Wrapping around 
-      while (indx11 < 0) indx11 += pHnStructures1;
-      while (indx12 < 0) indx12 += pHnStructures1;
-      while (indx21 < 0) indx21 += pHnStructures2;
-      while (indx22 < 0) indx22 += pHnStructures2;
-      while (indx11 > pHnStructures1 - 1) indx11 -= pHnStructures1;
-      while (indx12 > pHnStructures1 - 1) indx12 -= pHnStructures1;
-      while (indx21 > pHnStructures2 - 1) indx21 -= pHnStructures2;
-      while (indx22 > pHnStructures2 - 1) indx22 -= pHnStructures2;
-  
-      int denom1 = indx12 - indx11;
-      int denom2 = indx22 - indx21;
-  
-      double scale1 = (denom1 == 0) ? 0.0: 
-        (lambdas[j][1] * pHnStructures1 - 0.5 - static_cast<double>(indx11)) /static_cast<double>(denom1);
-      double scale2 = (denom2 == 0) ? 0.0: 
-        (lambdas[j][2] * pHnStructures2 - 0.5 - static_cast<double>(indx21)) /static_cast<double>(denom2);
-
-      for (const auto&i : lambda_index_to_atom_ids[j]) {
-        pH1qs_temp[type[i]] =
-            pH1qs[type[i]][indx11] + scale1 * (pH1qs[type[i]][indx12] - pH1qs[type[i]][indx11]);
-        pH2qs_temp[type[i]] =
-            pH2qs[type[i]][indx21] + scale2 * (pH2qs[type[i]][indx22] - pH2qs[type[i]][indx21]);
-        vector_atom[i] = scale0;
-      }
-    }
-
-
-    for (const auto& i : lambda_index_to_atom_ids[j]) {
-      double pH1q = pH1qs_temp[type[i]];
-      double pH2q = pH2qs_temp[type[i]];
-      q[i] = pH1q + scale0 * (pH2q - pH1q);    // scale == 1 should be for the protonated state
-    }
-  }
-
-
-}
+   template <int mode>
+   void FixConstantPH::modify_qs(double** scales)
+   {
+     int nlocal = atom->nlocal;
+     int* type = atom->type;
+     double* q = atom->q;
+   
+     // Not safe, I should use std::shared_ptr instead.....
+     int* protonable = pH_structure_storage->protonable.get();
+     double** pH1qs = pH_structure_storage->pH1qs;
+     double** pH2qs = pH_structure_storage->pH2qs;
+     int pHnStructures1 = pH_structure_storage->pHnStructures1;
+     int pHnStructures2 = pH_structure_storage->pHnStructures2;
+   
+   
+     double** lambdas = pH_state->lambdas;
+     auto& n_lambdas = pH_state->n_lambdas;
+   
+   
+     std::fill_n(vector_atom, nmax, -1);
+   
+   
+   
+     auto wrap = [](int x, int n) {
+       if (x < 0) return x + n;
+       else if (x >= n) return x - n;
+       else return x;
+       };
+   
+   
+   
+     if (pHnStructures1 > 1 || pHnStructures2 > 1) {
+       // update the charges
+       for (int j = 0; j < n_lambdas; j++) {
+         double scale0 = scales[j][0];
+   
+         if constexpr (mode == 0) {
+           if (lambdas[j][1] > 1.0) lambdas[j][1] -= 1.0;
+           if (lambdas[j][1] < 0.0) lambdas[j][1] += 1.0;
+           double x1 = lambdas[j][1] * pHnStructures1 - 0.5;
+           const int i1 = static_cast<int>(std::floor(x1));
+           const double f1 = x1 - static_cast<double>(i1);
+           const int indx11 = wrap(i1, pHnStructures1);
+           const int indx12 = wrap(i1 + 1, pHnStructures1);
+   
+           if (lambdas[j][2] > 1.0) lambdas[j][2] -= 1.0;
+           if (lambdas[j][2] < 0.0) lambdas[j][2] += 1.0;
+           double x2 = lambdas[j][2] * pHnStructures2 - 0.5;
+           const int i2 = static_cast<int>(std::floor(x2));
+           const double f2 = x2 - static_cast<double>(i2);
+           const int indx21 = wrap(i2, pHnStructures2);
+           const int indx22 = wrap(i2 + 1, pHnStructures2);
+   
+   
+           for (const auto& i : lambda_index_to_atom_ids[j]) {
+             double pH1q_temp = pH1qs_temp[i] =
+               pH1qs[type[i]][indx11] + f1 * (pH1qs[type[i]][indx12] - pH1qs[type[i]][indx11]);
+             double pH2q_temp = pH2qs_temp[i] =
+               pH2qs[type[i]][indx21] + f2 * (pH2qs[type[i]][indx22] - pH2qs[type[i]][indx21]);
+   
+             vector_atom[i] = scale0;
+   
+             q[i] = pH1q_temp + scale0 * (pH2q_temp - pH1q_temp);    // scale == 1 should be for the protonated state
+   
+           }
+         }
+         else if constexpr (mode != 0) {
+   
+   
+           for (const auto& i : lambda_index_to_atom_ids[j]) {
+             double pH1q = pH1qs_temp[i];
+             double pH2q = pH2qs_temp[i];
+             q[i] = pH1q + scale0 * (pH2q - pH1q);    // scale == 1 should be for the protonated state
+           }
+   
+   
+         }
+   
+   
+   
+       }
+     }
+     else
+     {
+       // fast path for the case with just one structure for each case 
+       // update the charges
+       for (int j = 0; j < n_lambdas; j++) {
+         for (const auto& i : lambda_index_to_atom_ids[j]) {
+           vector_atom[i] = scales[j][0];
+           q[i] = pH1qs[type[i]][0] + scales[j][0] * (pH2qs[type[i]][0] - pH1qs[type[i]][0]);    // scale == 1 should be for the protonated state
+         }
+   
+       }
+     }
+     
+   
+   
+   }
 
 /* --------------------------------------------------------------
    modify the q of the buffer
@@ -2026,14 +2049,74 @@ void FixConstantPH::build_mappings()
 void FixConstantPH::grow_arrays(int nmax_new)
 {
   double *new_vector_atom = new double[nmax_new];
+  double * new_q_orig;
+  double ** new_f_orig;
+  double *new_peatom_orig;
+  double **new_pvatom_orig;
+  double * new_keatom_orig;
+  double ** new_kvatom_orig;
+  memory->create(new_q_orig, nmax, "constant_pH:q_orig");
+  memory->create(new_f_orig, nmax, 3, "constant_pH:f_orig");
+  memory->create(new_peatom_orig, nmax, "constant_pH:peatom_orig");
+  memory->create(new_pvatom_orig, nmax, 6, "constant_pH:pvatom_orig");
+  if (force->kspace) {
+    memory->create(new_keatom_orig, nmax, "constant_pH:keatom_orig");
+    memory->create(new_kvatom_orig, nmax, 6, "constant_pH:kvatom_orig");
+  }
+  std::unique_ptr<double []> new_pH1qs_temp;
+  std::unique_ptr<double []> new_pH2qs_temp;
   int keep = std::min(nmax,nmax_new);
-  if (keep > 0) std::copy(vector_atom,vector_atom+keep,new_vector_atom);
-  if (keep < nmax_new) std::fill(new_vector_atom+keep,new_vector_atom+nmax_new,0.0);
+  if (keep > 0) {
+     std::copy(vector_atom,vector_atom+keep,new_vector_atom);
+     std::copy(pH1qs_temp.get(),pH1qs_temp.get()+keep,new_pH1qs_temp.get());
+     std::copy(pH2qs_temp.get(),pH2qs_temp.get()+keep,new_pH2qs_temp.get());
+     std::copy(q_orig, q_orig+keep,new_q_orig);
+     std::copy(f_orig[0], f_orig[0]+3*keep, new_f_orig[0]);
+     std::copy(peatom_orig,peatom_orig+keep, new_peatom_orig);
+     std::copy(pvatom_orig[0],pvatom_orig[0]+keep*6,new_pvatom_orig[0]);
+     if (force->kspace) {
+      std::copy(keatom_orig,keatom_orig+keep, new_keatom_orig);
+      std::copy(kvatom_orig[0],kvatom_orig[0]+keep*6,new_kvatom_orig[0]);
+     } 
+  }
+  if (keep < nmax_new) { 
+    std::fill(new_vector_atom+keep,new_vector_atom+nmax_new,0.0);
+    std::fill(new_pH1qs_temp.get()+keep,new_pH1qs_temp.get()+nmax_new,0.0);
+    std::fill(new_pH1qs_temp.get()+keep,new_pH1qs_temp.get()+nmax_new,0.0);
+    std::fill(new_q_orig+keep,new_q_orig+nmax_new,0.0);
+    std::fill(new_f_orig[0]+3*keep,new_f_orig[0]+3*nmax_new,0.0);
+    std::fill(new_peatom_orig+keep,new_peatom_orig+nmax_new,0.0);
+    std::fill(new_pvatom_orig[0]+6*keep,new_pvatom_orig[0]+6*nmax_new,0.0);
+    if (force->kspace) {
+      std::fill(keatom_orig+keep,keatom_orig+nmax_new,0.0);
+      std::fill(kvatom_orig[0]+6*keep,kvatom_orig[0]+6*nmax_new,0.0);
+    }
+  }
   delete [] vector_atom;
+  pH1qs_temp.swap(new_pH1qs_temp);
+  pH2qs_temp.swap(new_pH2qs_temp);
   vector_atom = new_vector_atom;
   nmax = nmax_new;
 
+
+
+  memory->destroy(q_orig);
+  memory->destroy(f_orig);
+  memory->destroy(peatom_orig);
+  memory->destroy(pvatom_orig);
+  memory->destroy(keatom_orig);
+  memory->destroy(kvatom_orig);
+  q_orig = new_q_orig;
+  f_orig = new_f_orig;
+  peatom_orig = new_peatom_orig;
+  pvatom_orig = new_pvatom_orig;
+  keatom_orig = new_keatom_orig;
+  kvatom_orig = new_kvatom_orig;
+
   build_mappings<1>();
+
+
+
 }
 
 /* --------------------------------------------------------------------------------------- */

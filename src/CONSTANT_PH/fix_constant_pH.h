@@ -144,6 +144,7 @@ class FixConstantPH : public Fix {
   std::unique_ptr<double[]> lambdas_j;
 
   // Temporary values to be used by the fix_nh_constant_pH constraint
+  std::unique_ptr<bool[]> filled_temp_pHqs;
   std::unique_ptr<double[]> pH1qs_temp, pH2qs_temp;
 
   
