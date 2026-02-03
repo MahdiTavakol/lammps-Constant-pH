@@ -139,9 +139,9 @@ FixAdaptiveProtonation::FixAdaptiveProtonation(LAMMPS *lmp, int narg, char **arg
   int nmolecules_local = 0;
   int nmolecules_total;
 
-  for (int i = 0; i < nlocal; i++) {
-    if (atom->molecule[i] > nmolecules_local) nmolecules_local = atom->molecule[i];
-  }
+  if (nlocal > 0)
+    nmolecules_local = *std::max_element(atom->molecule, atom->molecule + nlocal);
+ 
 
   MPI_Allreduce(&nmolecules_local, &nmolecules_total, 1, MPI_INT, MPI_MAX, world);
   nmolecules = nmolecules_total;
@@ -270,12 +270,11 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
 
   int nmolecules_local = 0;
   int nmolecules_total;
-    
-  for (int i = 0; i < atom->nlocal; i++) {
-    if (atom->molecule[i] > nmolecules_local) 
-      nmolecules_local = atom->molecule[i];
-  }
-    
+
+  int nlocal = atom->nlocal;
+  if (nlocal > 0)
+    nmolecules_local = *std::max_element(atom->molecule,atom->molecule+nlocal);
+
   MPI_Allreduce(&nmolecules_local, &nmolecules_total, 1, MPI_INT, MPI_MAX, world);
 
     
