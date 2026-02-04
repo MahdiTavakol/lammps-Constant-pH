@@ -157,14 +157,14 @@ void FixNHConstantPH::nve_v()
    }
 
 
- if (lambda_integration_flags & BUFFER) {
-  double& v_lambda_buff = pH_state->v_lambda_buff;
-  auto&   a_lambda_buff = pH_state->a_lambda_buff;
-  v_lambda_buff += dt * a_lambda_buff;
- }
+  if (lambda_integration_flags & BUFFER) {
+    double& v_lambda_buff = pH_state->v_lambda_buff;
+    auto&   a_lambda_buff = pH_state->a_lambda_buff;
+    v_lambda_buff += dt * a_lambda_buff;
+  }
 
- //if (lambda_integration_flags & CONSTRAIN)
- //  constrain_v_lambdas();
+  if (lambda_integration_flags & CONSTRAIN)
+    constrain_v_lambdas();
 
   // Returning the modified parameters to the fix_constant_pH.
   fix_constant_pH->reset_params(pH_state);
@@ -486,7 +486,7 @@ void FixNHConstantPH::constrain_lambdas()
       omega += domega;
       for (int i = 0; i < n_lambdas; i++)
          x_lambdas[i][0] += (domega * mols_charge_change / m_lambdas[i][0]);
-      x_lambda_buff += buff_charge_change * domega / m_lambda_buff;
+      x_lambda_buff += domega * buff_charge_change / m_lambda_buff;
      
 
       fix_constant_pH->reset_params(pH_state,1);
@@ -575,6 +575,7 @@ void FixNHConstantPH::constrain_v_lambdas()
 /* ----------------------------------------------------------------------
    computes the q_total to be used in the constrain_lambdas() function
    ---------------------------------------------------------------------- */
+
 double FixNHConstantPH::compute_q_total()
 {
    double * q = atom->q;
