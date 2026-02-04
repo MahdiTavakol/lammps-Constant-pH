@@ -1304,8 +1304,7 @@ void FixConstantPH::modify_qs(double scale, int j)
        };
    
    
-   
-     if (pHnStructures1 > 1 || pHnStructures2 > 1) {
+      if (pHnStructures1 > 1 || pHnStructures2 > 1) {
        // update the charges
        for (int j = 0; j < n_lambdas; j++) {
          double scale0 = scales[j][0];
@@ -1332,8 +1331,8 @@ void FixConstantPH::modify_qs(double scale, int j)
              double pH1q_temp = pH1qs_temp[i] =
                pH1qs[type[i]][indx11] + f1 * (pH1qs[type[i]][indx12] - pH1qs[type[i]][indx11]);
              double pH2q_temp = pH2qs_temp[i] =
-               pH2qs[type[i]][indx21] + f2 * (pH2qs[type[i]][indx22] - pH2qs[type[i]][indx21]);
-   
+              pH2qs[type[i]][indx21] + f2 * (pH2qs[type[i]][indx22] - pH2qs[type[i]][indx21]);
+
              vector_atom[i] = scale0;
    
              q[i] = pH1q_temp + scale0 * (pH2q_temp - pH1q_temp);    // scale == 1 should be for the protonated state
