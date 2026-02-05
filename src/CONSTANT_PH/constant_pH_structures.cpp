@@ -408,3 +408,74 @@ void constant_pH_state::deallocate_lambdas()
   a_lambdas = nullptr;
   m_lambdas = nullptr;
 }
+
+void constant_pH_state::write_restart(FILE* fp)
+{
+  if (comm->me != 0) return;
+  std::vector<double> data;
+  // n_lambdas,
+  // n_lambdas * molids
+  // n_lambdas * (x_lambdas, v_lambdas, a_lambdas, m_lambdas)
+  // mass_lambda
+  // x_b, v_b, a_b, m_b, N_b
+  int nsize = 7 + 4*3*this->n_lambdas + this->n_lambdas;
+  data.reserve(nsize);
+
+  data.push_back(static_cast<double>(n_lambdas));
+  
+  for (int i = 0; i < n_lambdas; i++) {
+    data.push_back(static_cast<double>(molids[i]));
+    for (int j = 0; j < 3; j++) {
+      data.push_back(lambdas[i][j]);
+      data.push_back(v_lambdas[i][j]);
+      data.push_back(a_lambdas[i][j]);
+      data.push_back(m_lambdas[i][j]);
+    }
+  }
+  data.push_back(mass_lambda);
+  
+  data.push_back(static_cast<double>(N_buff));
+  data.push_back(lambda_buff);
+  data.push_back(v_lambda_buff);
+  data.push_back(a_lambda_buff);
+  data.push_back(m_lambda_buff);
+
+  int size = nsize*sizeof(double);
+  fwrite(&size,sizeof(int),1,fp);
+  fwrite(data.data(),sizeof(double),nsize,fp);
+
+}
+
+void constant_pH_state::restart(char* buff)
+{
+  int n = 0;
+  auto *list = (double *)buff;
+  n_lambdas = static_cast<int>(list[n++]);
+  const int expected = 7 + 4*3*n_lambdas + n_lambdas;
+
+  deallocate_lambdas();
+  allocate_lambdas();
+
+  for (int i = 0; i < n_lambdas; i++) {
+    int molid_i = static_cast<int>(list[n++]);
+    molids[i] = molid_i;
+    for (int j = 0; j < 3; j++) {
+      lambdas[i][j] = list[n++];
+      v_lambdas[i][j] = list[n++];
+      a_lambdas[i][j] = list[n++];
+      m_lambdas[i][j] = list[n++];
+    }
+  }
+
+  mass_lambda = list[n++];
+
+  N_buff = static_cast<int>(list[n++]);
+  lambda_buff = list[n++];
+  v_lambda_buff = list[n++];
+  a_lambda_buff = list[n++];
+  m_lambda_buff = list[n++];
+
+  if (n != expected)
+  error->all(FLERR,"Corrupted restart file!");
+
+}

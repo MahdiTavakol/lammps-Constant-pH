@@ -84,6 +84,9 @@ class constant_pH_state : protected Pointers {
   void set_zero();
   void broadcast();
 
+  void write_restart(FILE* );
+  void restart(char *);
+
  private:
   
    // Lambda arrays

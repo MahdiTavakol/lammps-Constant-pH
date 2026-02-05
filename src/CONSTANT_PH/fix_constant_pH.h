@@ -61,6 +61,10 @@ class FixConstantPH : public Fix {
 
   void init_list(int, class NeighList *) override;
 
+  // related to restarting the simulation
+  void write_restart(FILE* ) override;
+  void restart(char *) override;
+
  protected:
   int flags;
 

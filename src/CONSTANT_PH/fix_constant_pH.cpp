@@ -2262,6 +2262,18 @@ double FixConstantPH::compute_array(int i, int j)
 }
 
 /* ----------------------------------------------------------------------
+    restarting a simulation
+   ---------------------------------------------------------------------- */
+
+void FixConstantPH::write_restart(FILE* fp) {
+  this->pH_state->write_restart(fp);
+}
+
+void FixConstantPH::restart(char * buff) {
+  this->pH_state->restart(buff);
+}
+
+/* ----------------------------------------------------------------------
    memory usage of local atom-based array --> Needs to be updated at the end
    ---------------------------------------------------------------------- */
 
