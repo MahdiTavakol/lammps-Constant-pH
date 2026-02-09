@@ -488,7 +488,7 @@ void FixConstantPH::initial_integrate(int /*vflag*/)
         // This part used the pH_state_prev to keep the lambdas available in the previous step.
         set_lambdas(); 
 
-        // mapping the molids to the lambda indices
+        // mapping the molids to the lambda indiceswhere
         build_mappings<0>();
 
         modify->clearstep_compute();
@@ -2054,16 +2054,16 @@ void FixConstantPH::grow_arrays(int nmax_new)
   double **new_pvatom_orig;
   double * new_keatom_orig;
   double ** new_kvatom_orig;
-  memory->create(new_q_orig, nmax, "constant_pH:q_orig");
-  memory->create(new_f_orig, nmax, 3, "constant_pH:f_orig");
-  memory->create(new_peatom_orig, nmax, "constant_pH:peatom_orig");
-  memory->create(new_pvatom_orig, nmax, 6, "constant_pH:pvatom_orig");
+  memory->create(new_q_orig, nmax_new, "constant_pH:q_orig");
+  memory->create(new_f_orig, nmax_new, 3, "constant_pH:f_orig");
+  memory->create(new_peatom_orig, nmax_new, "constant_pH:peatom_orig");
+  memory->create(new_pvatom_orig, nmax_new, 6, "constant_pH:pvatom_orig");
   if (force->kspace) {
-    memory->create(new_keatom_orig, nmax, "constant_pH:keatom_orig");
-    memory->create(new_kvatom_orig, nmax, 6, "constant_pH:kvatom_orig");
+    memory->create(new_keatom_orig, nmax_new, "constant_pH:keatom_orig");
+    memory->create(new_kvatom_orig, nmax_new, 6, "constant_pH:kvatom_orig");
   }
-  std::unique_ptr<double []> new_pH1qs_temp;
-  std::unique_ptr<double []> new_pH2qs_temp;
+  auto new_pH1qs_temp = std::make_unique<double []>(nmax_new);
+  auto new_pH2qs_temp = std::make_unique<double []>(nmax_new);
   int keep = std::min(nmax,nmax_new);
   if (keep > 0) {
      std::copy(vector_atom,vector_atom+keep,new_vector_atom);
@@ -2081,14 +2081,14 @@ void FixConstantPH::grow_arrays(int nmax_new)
   if (keep < nmax_new) { 
     std::fill(new_vector_atom+keep,new_vector_atom+nmax_new,0.0);
     std::fill(new_pH1qs_temp.get()+keep,new_pH1qs_temp.get()+nmax_new,0.0);
-    std::fill(new_pH1qs_temp.get()+keep,new_pH1qs_temp.get()+nmax_new,0.0);
+    std::fill(new_pH2qs_temp.get()+keep,new_pH2qs_temp.get()+nmax_new,0.0);
     std::fill(new_q_orig+keep,new_q_orig+nmax_new,0.0);
     std::fill(new_f_orig[0]+3*keep,new_f_orig[0]+3*nmax_new,0.0);
     std::fill(new_peatom_orig+keep,new_peatom_orig+nmax_new,0.0);
     std::fill(new_pvatom_orig[0]+6*keep,new_pvatom_orig[0]+6*nmax_new,0.0);
     if (force->kspace) {
-      std::fill(keatom_orig+keep,keatom_orig+nmax_new,0.0);
-      std::fill(kvatom_orig[0]+6*keep,kvatom_orig[0]+6*nmax_new,0.0);
+      std::fill(new_keatom_orig+keep,new_keatom_orig+nmax_new,0.0);
+      std::fill(new_kvatom_orig[0]+6*keep,new_kvatom_orig[0]+6*nmax_new,0.0);
     }
   }
   delete [] vector_atom;

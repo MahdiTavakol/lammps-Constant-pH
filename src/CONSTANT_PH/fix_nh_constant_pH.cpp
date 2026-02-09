@@ -239,12 +239,6 @@ void FixNHConstantPH::nh_v_temp()
   n_dof_1 = (lambda_integration_flags & BUFFER) ? n_dof_1 + 1.0 : n_dof_1;
   n_dof_1 = (lambda_integration_flags & CONSTRAIN) ? n_dof_1 - 1.0 : n_dof_1;
   double Nf_lambdas = static_cast<double>(3*n_lambdas);
-
-   
-  // constraining the v_lambdas
-  //if (comm->me == 0)
-  //  constrain_v_lambdas();
-
      
 
   // Temperature

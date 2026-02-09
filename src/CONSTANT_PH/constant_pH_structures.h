@@ -67,10 +67,10 @@ class constant_pH_state : protected Pointers {
   // with fix_adaptive_protonation.h class
   constant_pH_state(LAMMPS *lmp, const std::array<double,2>& lambda_masses, const int& N_buff_);
   // set in the input arguments of the fix_constant_pH.h class
-  constant_pH_state(LAMMPS *lmp, std::unique_ptr<int []>& molids_, const int& n_lambdas_, const std::array<double,2>& lambda_masses, const int& N_buff_);
+  constant_pH_state(LAMMPS *lmp, std::unique_ptr<int []>& molids_, int& n_lambdas_, const std::array<double,2>& lambda_masses, const int& N_buff_);
   // based on the values of the prev_pH_state_
   constant_pH_state(LAMMPS *lmp, std::unique_ptr<int []>& molids_, 
-    const int& n_lambdas_, const std::array<double,2>& lambda_masses, const int& N_buff_, 
+    int& n_lambdas_, const std::array<double,2>& lambda_masses, const int& N_buff_, 
     const std::unique_ptr<constant_pH_state>& prev_pH_state_);
 
   ~constant_pH_state();

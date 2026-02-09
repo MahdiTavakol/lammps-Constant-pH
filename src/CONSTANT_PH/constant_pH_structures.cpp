@@ -138,7 +138,7 @@ constant_pH_state::constant_pH_state(LAMMPS *lmp, const std::array<double,2>& la
   N_buff{N_buff_} {}
 
 constant_pH_state::constant_pH_state(LAMMPS *lmp, std::unique_ptr<int []>& molids_, 
-  const int& n_lambdas_, const std::array<double,2>& lambda_masses, const int& N_buff_):
+  int& n_lambdas_, const std::array<double,2>& lambda_masses, const int& N_buff_):
   Pointers{lmp},
   lambdas{nullptr}, v_lambdas{nullptr}, a_lambdas{nullptr}, m_lambdas{nullptr},
   molids{std::move(molids_)},
@@ -147,10 +147,18 @@ constant_pH_state::constant_pH_state(LAMMPS *lmp, std::unique_ptr<int []>& molid
   N_buff{N_buff_}
 {
   allocate_lambdas(true);
+  // Since the original molids_ is set to null 
+  // after the construction I need 
+  // to reset the n_lambdas.
+  // Otherwise when the write_data calls
+  // the init method of the fix_constant_pH
+  // it will be faced with a non-zero n_lambdas
+  // and a null molids
+  n_lambdas_ = 0;
 }
 
 constant_pH_state::constant_pH_state(LAMMPS *lmp, std::unique_ptr<int []>& molids_, 
-  const int& n_lambdas_, const std::array<double,2>& lambda_masses, const int& N_buff_, 
+  int& n_lambdas_, const std::array<double,2>& lambda_masses, const int& N_buff_, 
   const std::unique_ptr<constant_pH_state>& prev_pH_state_):
   constant_pH_state{lmp,molids_,n_lambdas_,lambda_masses,N_buff_}
 {
@@ -297,6 +305,11 @@ int constant_pH_state::reset_lambdas(const std::unique_ptr<constant_pH_state>& p
     m_lambda_buff = mass_lambda;
     return 0;
   }
+
+  // if n_lambdas == 0
+  // there is nothing to do here!
+  if (n_lambdas == 0)
+    return 0;
 
   // hash table
   //molid to index map : find has O(1) runtime

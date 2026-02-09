@@ -399,8 +399,8 @@ void FixAdaptiveProtonation::grow_arrays(int nmax_new)
     copy_n(&array_atom[0][0],keep*size_peratom_cols,&new_array_atom[0][0]);
   }
   if (keep < nmax_new) {
-    fill_n(q_new.get()+keep,nmax_new,0.0);
-    fill_n(array_atom[0]+keep*size_peratom_cols,nmax_new*size_peratom_cols,0.0);
+    fill_n(q_new.get()+keep,nmax_new-keep,0.0);
+    fill_n(new_array_atom[0]+keep*size_peratom_cols,(nmax_new-keep)*size_peratom_cols,0.0);
   }
   q_orig.swap(q_new);
   memory->destroy(array_atom);
@@ -789,9 +789,10 @@ void FixAdaptiveProtonation::get_protonable_molids(int *_molids) const
 
 void FixAdaptiveProtonation::get_protonable_molids(std::unique_ptr<int []>& molids_) const
 {
-  if (n_protonable)
+  if (n_protonable) {
     molids_ = std::make_unique<int []>(n_protonable);
-  std::copy_n(protonable_molids.get(),n_protonable,molids_.get());
+    std::copy_n(protonable_molids.get(),n_protonable,molids_.get());
+  }
 }
 
 /* ----------------------------------------------------------------------------------------
