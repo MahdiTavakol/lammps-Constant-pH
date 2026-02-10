@@ -567,7 +567,7 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
   // resetting the mark_local and molecule_size_local before going through atoms
   std::fill_n(mark_local.get(),nmolecules+1,0);
   std::fill_n(protonable_size_local.get(),nmolecules+1,0);
-  std::fill_n(&array_atom[0][0],nmax*size_peratom_cols,0.0);
+  std::fill_n(&array_atom[0][0],nlocal*size_peratom_cols,0.0);
   //std::fill_n(vector_atom,nmax,0.0);
 
 
@@ -845,7 +845,6 @@ void FixAdaptiveProtonation::modify_protonation_state()
       frac,step,nRampStepInv);
     frac = frac_new;
   }
-  double q_new;
 
   for (int i = 0; i < nlocal; i++) {
     if (!protonable[type[i]]) continue;
@@ -864,8 +863,7 @@ void FixAdaptiveProtonation::modify_protonation_state()
         // constrain function of the fix_nh_constant_pH neutralizes
         // the system.
         if (mark_prev[molecule[i]] == SOLVENT) {
-          q_init = q[i];
-          q_new = q_orig[i] + frac*(pH1qs[type[i]][0]-q_orig[i]);
+          double q_new = q_orig[i] + frac*(pH1qs[type[i]][0]-q_orig[i]);
           if (!std::isfinite(q_new)) error->one(FLERR,"The q[{}] is infinite!",i);
           q[i] = q_new;
           break;
