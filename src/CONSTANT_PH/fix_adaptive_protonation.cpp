@@ -621,11 +621,8 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
       }  
     }
 
-    if (array_atom[i][0] >= threshold) {
-      mark_local[molecule[i]] += SOLVENT;
-    } else {
-      mark_local[molecule[i]] += SOLID;
-    }
+    mark_local[molecule[i]] += array_atom[i];
+
   }
 
   // Reducing the values from various cpus
@@ -634,8 +631,16 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
                 world);
 
   for (int i = 1; i < nmolecules + 1; i++) {
-    if (protonable_size[i])
-      mark_sum_running[i] += static_cast<double>(mark_total[i]) / static_cast<double>(protonable_size[i]);
+    if (protonable_size[i]) {
+      double status = static_cast<double>(mark_total[i]) / static_cast<double>(protonable_size[i]);
+
+      if (status >= threshold) {
+        mark_sum_running[i] += static_cast<double>(SOLVENT);
+      } else {
+        mark_sum_running[i] += static_cast<double>(SOLID);
+      }
+
+    }
   }
 }
 
