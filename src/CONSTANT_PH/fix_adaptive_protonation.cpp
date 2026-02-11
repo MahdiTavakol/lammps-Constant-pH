@@ -621,7 +621,7 @@ void FixAdaptiveProtonation::mark_protonation_deprotonation()
       }  
     }
 
-    mark_local[molecule[i]] += array_atom[i];
+    mark_local[molecule[i]] += static_cast<int>(array_atom[i][0]);
 
   }
 
