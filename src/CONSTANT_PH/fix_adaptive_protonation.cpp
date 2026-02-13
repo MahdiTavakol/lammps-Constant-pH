@@ -303,6 +303,10 @@ void FixAdaptiveProtonation::initial_integrate(int /*vflag*/)
     rampStep = 0;
     // Setting the mark_prev variable
     std::copy_n(mark.get(),nmolecules+1,mark_prev.get());
+    // Setting the mark from the mark_avg_running
+    std::copy_n(mark_avg_running.get(),nmolecules+1,mark.get());
+    // resetting the mark_avg_running
+    std::fill_n(mark_avg_running.get(),nmolecules+1,0);
     // backing up the initial qs
     backup_init_qs();
   } 
@@ -346,11 +350,11 @@ void FixAdaptiveProtonation::post_force(int /*vflag*/)
   // If neighBuildRatio is higher than 50% neigher the mark is updated nor
   // the mark_prev nor is set and also the reset_mark_sum_running is not called
   // --->>> status quo
-  if ((update->ntimestep+1)%innernevery == 0) 
+  if ((update->ntimestep+2)%innernevery == 0) 
     mark_protonation_deprotonation();
   
 
-  if ((update->ntimestep+1)%nevery == 0) {
+  if ((update->ntimestep+2)%nevery == 0) {
     // Accumulating the mark_sum_running into the mark. 
     accumulate_mark_sum_running();
     // Resetting the mark_sum_running 
@@ -456,6 +460,7 @@ void FixAdaptiveProtonation::deallocate_storage()
   mark_local.reset();
   mark_total.reset();
   mark_sum_running.reset();
+  mark_avg_running.reset();
   protonable_size.reset();
   protonable_size_local.reset();
 }
@@ -477,6 +482,7 @@ void FixAdaptiveProtonation::allocate_storage()
   mark_local            = make_unique<int[]>(nmolecules + 1);
   mark_total            = make_unique<int[]>(nmolecules + 1);
   mark_sum_running      = make_unique<double[]>(nmolecules + 1);
+  mark_avg_running      = make_unique<int[]>(nmolecules + 1);
   protonable_size       = make_unique<int[]>(nmolecules + 1);
   protonable_size_local = make_unique<int[]>(nmolecules + 1);
 
@@ -486,6 +492,7 @@ void FixAdaptiveProtonation::allocate_storage()
   fill_n(mark_local.get(), nmolecules + 1, 0);
   fill_n(mark_total.get(), nmolecules + 1, 0);
   fill_n(mark_sum_running.get(),nmolecules + 1, 0.0);
+  fill_n(mark_avg_running.get(),nmolecules + 1, 0);
   fill_n(protonable_size.get(), nmolecules + 1, 0);
   fill_n(protonable_size_local.get(), nmolecules + 1, 0);
   /* I put it on purpose so in the first step every molecule changes unless 
@@ -657,13 +664,13 @@ void FixAdaptiveProtonation::accumulate_mark_sum_running()
     // function is called and it is not set to zero anywhere
     // between. So it is fine to check its value here!
     if (!protonable_size[m]) {           // no protonable atoms in this mol
-      mark[m] = NEITHER;
+      mark_avg_running[m] = NEITHER;
       continue;
     }
     const double frac = mark_sum_running[m] / static_cast<double>(nSmoothingSteps);
-    if (frac <= frac_low + eps)          mark[m] = SOLID;
-    else if (frac >= frac_high - eps)    mark[m] = SOLVENT;
-    else                                 mark[m] = mark_prev[m]; // hysteresis
+    if (frac <= frac_low + eps)          mark_avg_running[m] = SOLID;
+    else if (frac >= frac_high - eps)    mark_avg_running[m] = SOLVENT;
+    else                                 mark_avg_running[m] = mark_prev[m]; // hysteresis
   }
 }
 
