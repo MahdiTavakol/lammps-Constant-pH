@@ -2271,6 +2271,9 @@ void FixConstantPH::write_restart(FILE* fp) {
 
 void FixConstantPH::restart(char * buff) {
   this->pH_state->restart(buff);
+  if (comm->me == 0) {
+    error->warning(FLERR,"n_lambdas = {}",pH_state->n_lambdas);
+  }
 }
 
 /* ----------------------------------------------------------------------

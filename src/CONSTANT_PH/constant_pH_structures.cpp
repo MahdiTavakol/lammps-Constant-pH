@@ -465,6 +465,8 @@ void constant_pH_state::restart(char* buff)
   auto *list = (double *)buff;
   n_lambdas = static_cast<int>(list[n++]);
   const int expected = 7 + 4*3*n_lambdas + n_lambdas;
+  if (comm->me == 0)
+     error->warning(FLERR,"n_lambd = {}",n_lambdas);
 
   deallocate_lambdas();
   allocate_lambdas();
