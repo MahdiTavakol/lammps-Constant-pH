@@ -252,6 +252,7 @@ FixConstantPH::FixConstantPH(LAMMPS *lmp, int narg, char **arg) :
   size_peratom_cols = 0;
   peratom_freq = nevery;
   extarray = 0;
+  restart_global = 1;
 
   atom->add_callback(Atom::GROW);
   //atom->add_callback(Atom::COPY);
