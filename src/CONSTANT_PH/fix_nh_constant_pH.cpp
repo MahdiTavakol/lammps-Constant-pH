@@ -163,8 +163,8 @@ void FixNHConstantPH::nve_v()
     v_lambda_buff += dt * a_lambda_buff;
   }
 
-  //if (lambda_integration_flags & CONSTRAIN)
-    //constrain_v_lambdas();
+  if (lambda_integration_flags & CONSTRAIN)
+    constrain_v_lambdas();
 
   // Returning the modified parameters to the fix_constant_pH.
   fix_constant_pH->reset_params(pH_state);
