@@ -87,7 +87,7 @@ compute_GFF_constant_pH.cpp / .h
 FIX_ADAPTIVE_PROTONATION UML
 ----------------------------------------------------------------------
 
-![fix_adaptive_protonation UML diagram](https://raw.githubusercontent.com/MahdiTavakol/lammps-Constant-pH/develop/src/CONSTANT_PH/docs/ConstantpH-UML.svg)
+![fix_adaptive_protonation UML diagram](./docs/ConstantpH-UML.svg)
 
 ----------------------------------------------------------------------
 
