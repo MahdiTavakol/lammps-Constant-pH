@@ -87,6 +87,13 @@ compute_GFF_constant_pH.cpp / .h
 
 ----------------------------------------------------------------------
 
+FIX_ADAPTIVE_PROTONATION PROBLEM UNDER STUDY
+----------------------------------------------------------------------
+
+![fix_adaptive_protonation_problem_understudy](./docs/Constant-pH.gif)
+
+----------------------------------------------------------------------
+
 FIX_ADAPTIVE_PROTONATION UML
 ----------------------------------------------------------------------
 
