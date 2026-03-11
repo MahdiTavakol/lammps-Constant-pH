@@ -4,8 +4,11 @@ Constant-pH Molecular Dynamics Extension for LAMMPS
 ----------------------------------------------------------------------
 
 Contributing author:  Mahdi Tavakol
+
 Affiliation:          University of Oxford
+
 Contact:              mahditavakol90@gmail.com
+
 
 ----------------------------------------------------------------------
 
